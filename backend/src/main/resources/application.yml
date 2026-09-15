@@ -1,0 +1,94 @@
+spring:
+  application:
+    name: cms-backend
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/cms}
+    username: ${DB_USERNAME:cms}
+    password: ${DB_PASSWORD:cms}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+server:
+  port: ${PORT:8080}
+
+# Interactive OpenAPI/Swagger docs (see com.cms.common.OpenApiConfig for the API metadata).
+# UI at /docs, raw OpenAPI 3 JSON spec at /api-docs. Neither path is under /api/v1/**, so none
+# of the app's 6 path-scoped SecurityFilterChains match them - they're served unauthenticated,
+# same as every other framework/static asset outside /api/v1/**.
+springdoc:
+  swagger-ui:
+    path: /docs
+  api-docs:
+    path: /api-docs
+
+# Renders the per-request correlation id (see com.cms.common.RequestIdFilter, which populates
+# it via SLF4J's MDC) into every log line's level segment, e.g. "  INFO [3f2a9e1c-...]".
+# ":-" supplies a placeholder for the rare log line emitted outside any request (e.g. app
+# startup), where no MDC value is set.
+logging:
+  pattern:
+    level: "%5p [%X{requestId:-}]"
+
+# CORS: origins allowed to call the API from a browser (see com.cms.common.CorsConfig).
+# Dev-only default below (the Vite dev server) - override via APP_CORS_ALLOWED_ORIGINS
+# (comma-separated) with the real frontend origin(s) in any real deployment.
+app:
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  # Per-client-IP throttle on the sensitive public endpoints (see com.cms.common.RateLimitingConfig):
+  # staff/patient login and patient signup/clinic registration. 30 requests/60s is generous enough
+  # not to trip normal use or test traffic while making sustained brute force economically pointless.
+  rate-limit:
+    max-attempts: ${RATE_LIMIT_MAX_ATTEMPTS:30}
+    window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
+
+# T004 (002-patient-account-login): HMAC signing secret for patient-scoped JWTs.
+# _diagnostics [MAJOR] - [full-repo-audit] - [UNSAFE_JWT_DEFAULT]: deliberately NO default
+# committed here (previously a fixed dev-only string, which fails unsafe if a real deployment
+# forgets to set the env var - anyone reading the source could forge a token). Mirrors the
+# Super Admin username/password's own precedent just below: an unconfigured deployment gets a
+# random signing key generated at startup (see JwtService), not a known default. Override via
+# PATIENT_JWT_SECRET in any real deployment. Never shared with any staff-token signing key (FR-008).
+patient:
+  jwt:
+    secret: ${PATIENT_JWT_SECRET:}
+
+# 003-super-admin-verification: deliberately NO default committed here (unlike the
+# patient JWT secret above) - an unconfigured deployment gets a random, unguessable
+# password generated at startup (see SuperAdminSecurityConfig), not a known default.
+# Override both via SUPER_ADMIN_USERNAME / SUPER_ADMIN_PASSWORD in any real deployment.
+#
+# 040-super-admin-rbac-login: added the jwt.secret below for the Super Admin JWT issued
+# at login (replacing the prior per-request HTTP Basic Auth). _diagnostics [MAJOR] -
+# [full-repo-audit] - [UNSAFE_JWT_DEFAULT]: no default committed (previously a fixed dev-only
+# string) - now generates a random signing key at startup when unset (see SuperAdminJwtService),
+# same fail-safe treatment the username/password above already had. Override via
+# SUPER_ADMIN_JWT_SECRET in any real deployment. Deliberately a different secret from
+# the staff/patient JWTs below - no shared signing key between identity systems, same
+# invariant 002/004 already established for each other.
+admin:
+  super-admin:
+    username: ${SUPER_ADMIN_USERNAME:}
+    password: ${SUPER_ADMIN_PASSWORD:}
+    jwt:
+      secret: ${SUPER_ADMIN_JWT_SECRET:}
+  # super-admin-console-redesign: how long a rejected clinic/doctor registration sits in the
+  # Rejected bin before RejectedRecordPurgeTrigger's nightly sweep permanently deletes it (if it
+  # has no real activity attached - see ClinicVerificationService/DoctorVerificationService's
+  # deleteGuarded). Override via ADMIN_REJECTION_RETENTION_DAYS in any real deployment.
+  rejection-retention-days: ${ADMIN_REJECTION_RETENTION_DAYS:30}
+
+# 004-staff-onboarding-direct-hire: HMAC signing secret for staff-scoped JWTs (the
+# ClinicAdmin login this feature pulls forward from 003). _diagnostics [MAJOR] -
+# [full-repo-audit] - [UNSAFE_JWT_DEFAULT]: no default committed (previously a fixed dev-only
+# string) - now generates a random signing key at startup when unset (see StaffJwtService).
+# Override via STAFF_JWT_SECRET in any real deployment. Deliberately a different secret
+# from the patient JWT above - no shared signing key between the two identity systems.
+staff:
+  jwt:
+    secret: ${STAFF_JWT_SECRET:}

@@ -1,0 +1,7 @@
+# Never commit real environment values — see .env.example for the documented template.
+.env
+.env.*
+!.env.example
+
+# Impeccable design-hook tool cache/state (not source)
+.impeccable/

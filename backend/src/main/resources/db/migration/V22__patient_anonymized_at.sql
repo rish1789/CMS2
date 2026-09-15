@@ -1,0 +1,1 @@
+ALTER TABLE patient ADD COLUMN anonymized_at TIMESTAMPTZ;
