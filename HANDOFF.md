@@ -1,15 +1,17 @@
-# Handoff Note — 2026-09-14
+# Handoff Note — 2026-09-15
 
-Session context: spans two days. **Part 1** (2026-09-13): a design/UX polish pass across the
+Session context: spans three days. **Part 1** (2026-09-13): a design/UX polish pass across the
 entire patient-facing booking/waitlist flow, plus a few adjacent staff pages. **Part 2**
 (2026-09-13): a full-repo audit (backend + frontend) followed by fixing every Critical/Major
-finding. **Part 3** (2026-09-14, this session): resolved the accent-color decision flagged at
-the end of Part 2, executed the premium-redesign brief (accessibility-hardening pass on every
-real finding from the Part 2 oxlint audit), then — after live feedback that the first color
-pick still read as generic — went through two more rounds of live color-demo iteration and
-landed on a final **teal + cobalt two-accent system**, now implemented across the real app (see
-"Part 3b" below). **Part 3 is now fully complete**; nothing is paused mid-task, but dev servers
-may still need restarting per the instructions below depending on how you're resuming.
+finding. **Part 3** (2026-09-14): resolved the accent-color decision flagged at the end of
+Part 2, executed the premium-redesign brief (accessibility-hardening pass on every real finding
+from the Part 2 oxlint audit), then — after live feedback that the first color pick still read
+as generic — went through two more rounds of live color-demo iteration and landed on a final
+**teal + cobalt two-accent system**, now implemented across the real app (see "Part 3b" below).
+**Part 4** (2026-09-15, this session): fixed a real dev-environment reliability bug (background
+dev servers dying), added a `CLAUDE.md` project blueprint, and **put the project on GitHub for
+the first time** — see "Part 4" below. Nothing is paused mid-task, but dev servers may still
+need restarting per the instructions below depending on how you're resuming.
 
 ## ⚠️ New behavior this session — read before restarting the backend
 
@@ -320,6 +322,78 @@ now trimmed down to just the Teal & Cobalt mockup) and gave two more rounds of f
 requested anywhere), the finished version is in the live artifact and the lesson worth carrying
 over is: don't put two same-hue elements next to each other in one row, and give reference IDs
 (staff codes, order numbers, etc.) their own placement rather than stacking them against a tag.
+
+## Part 4 — Dev-server reliability fix, CLAUDE.md, first GitHub push (COMPLETE, 2026-09-15)
+
+**1. Dev-server reliability bug, found and fixed.** The backend kept dying a short time after a
+*confirmed-healthy* `bootRun` startup (Tomcat bound, "Started CmsApplication" logged, responding
+to requests) — no application error, no shutdown log line, it just stopped being reachable.
+Happened three times in a row across different Bash backgrounding techniques (`run_in_background`,
+then `nohup ... & disown`). Root cause: launching a long-lived JVM process as a raw backgrounded
+Bash command doesn't reliably survive in this sandbox across tool-call boundaries — a sandbox
+quirk, not a bug in the app or in Gradle. The frontend (`npm run dev`, also Bash-backgrounded)
+never had this problem in the same session, so it's specific to how this environment handles a
+long-lived JVM process tree.
+
+**Fix**: switched to `preview_start` (the tool actually meant for running dev servers) instead of
+Bash, via a new `.claude/launch.json`:
+```json
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "backend", "runtimeExecutable": "C:\\Users\\risha\\AppData\\Local\\Temp\\gradle-8.10\\bin\\gradle.bat", "runtimeArgs": ["-p", "backend", "bootRun"], "port": 8080 },
+    { "name": "frontend", "runtimeExecutable": "npm", "runtimeArgs": ["--prefix", "frontend", "run", "dev"], "port": 5173 }
+  ]
+}
+```
+Two non-obvious things baked into that config: `preview_start` doesn't go through Git Bash, so it
+needs the real Windows path + `.bat` wrapper for Gradle (not the POSIX `/tmp/gradle-8.10/bin/gradle`
+path Bash resolves), and it runs from the repo root with no `cwd` option, so the backend entry
+uses Gradle's own `-p backend` project-dir flag instead of a `cd`. Full details and the discovery
+process are in the `gradle_local_bootstrap` memory file. **Caveat**: a server started this way is
+reachable from the Browser pane (and from any page's own `fetch()` loaded there) but *not* from a
+plain `curl` in a Bash tool call — different network context. Verify it by driving the app in the
+browser, not by curling it from Bash.
+
+Separately, `README.md` (which didn't exist in earlier versions of this handoff's context) now
+documents that **`./gradlew` itself works fine** in the user's own real environment — the
+`/tmp/gradle-8.10` workaround is a Claude-Code-sandbox-specific fallback, not something to tell
+the user to rely on in their own terminal.
+
+**2. `CLAUDE.md` added** (repo root) — the user asked for "a blueprint for LLM models of my
+current project," which turned out to mean a project-reference document for LLMs (not a runtime
+AI feature — that ambiguity was resolved by asking rather than guessing). Used the `init` skill's
+process: read `README.md`, `CONTRIBUTING.md`, `.specify/memory/constitution.md`, `backend/build.gradle`,
+`frontend/package.json`, and the actual module/route directory structure, then wrote a
+non-redundant summary covering commands (including single-test invocations, verified against a
+real test class/method name rather than an invented one), the constitution's now-project-wide
+governance, the 3-JWT-realm/6-filter-chain security architecture, the frontend shell/guard split,
+the Tailwind `@theme` override mechanism (including the new `cobalt` scale from Part 3b), and a
+callout that the backlog's cited source BDD document (`clinic-management-system-BDD-2.md`) isn't
+actually in the repo. Doesn't duplicate README/CONTRIBUTING — points to them instead.
+
+**3. Project pushed to GitHub for the first time.** No git repository existed anywhere in this
+project before this session (confirmed via `git status` → "fatal: not a git repository" —
+consistent with every earlier handoff note's git-related caveats). User provided a target remote,
+`https://github.com/rish1789/CMS2.git`. Before the initial commit:
+- `backend/` had **no `.gitignore` at all** — would have committed `backend/build/` (4.6M),
+  `backend/bin/` (4.1M), and `backend/.gradle/` (the local Gradle cache). Added one covering
+  `build/`, `bin/`, `.gradle/`, `*.log`, and common IDE cruft.
+- Root `.gitignore` only covered `.env`/`.env.*` — added `.impeccable/` (the design-hook tool's
+  own cache directory, not source; it also appears nested under `frontend/src/` and
+  `frontend/src/features/`).
+- Verified before committing: `.env` genuinely excluded (`git check-ignore` confirmed),
+  `.env.example` included, no `node_modules`/`build`/`bin`/`dist` in the staged 1289 files, no
+  actual secret/credential files (a few source files with "Password"/"Credentials" in their
+  *names* — `PasswordPolicyValidator.java` etc. — are legitimate application code, not secrets).
+- `git init` → initial commit → `git branch -M main` → `git remote add origin
+  https://github.com/rish1789/CMS2.git` → `git push -u origin main`. Confirmed with `git log` and
+  `git status` afterward: clean working tree, `main` tracking `origin/main`.
+
+**The repo is `main`-only right now** — no branch protection, no CI status yet observed on
+GitHub's side (the `.github/workflows/ci.yml` referenced by `README.md` should run on this push;
+worth checking Actions on GitHub next session if that matters). No PR was opened since this was
+the initial commit directly to `main`, not a feature branch.
 
 ## Reference
 
