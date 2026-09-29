@@ -9,7 +9,6 @@ import com.cms.scheduling.domain.Session;
 import com.cms.scheduling.domain.Slot;
 import com.cms.scheduling.domain.SlotStatus;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -67,7 +66,7 @@ class PartialSessionCancellationSuccessTest extends AbstractPartialSessionCancel
         var doctor = saveDoctorStaffedAt(clinic);
         Session session = saveQueueSession(clinic, doctor);
         Instant sessionDayNoon =
-                LocalDate.of(2026, 9, 3).atTime(LocalTime.NOON).atZone(ZoneId.systemDefault()).toInstant();
+                session.getSessionDate().atTime(LocalTime.NOON).atZone(ZoneId.systemDefault()).toInstant();
 
         Slot beforeCutoffSlot = addQueueSlotWithCreatedAt(session, 1, sessionDayNoon.minusSeconds(3600));
         Slot afterCutoffSlot = addQueueSlotWithCreatedAt(session, 2, sessionDayNoon.plusSeconds(3600));

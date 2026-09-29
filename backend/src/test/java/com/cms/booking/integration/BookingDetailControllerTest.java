@@ -41,7 +41,8 @@ class BookingDetailControllerTest extends AbstractSessionCancellationIntegration
                 .andExpect(jsonPath("$.patientName").value(booking.getPatient().getName()))
                 .andExpect(jsonPath("$.doctorProfileId").value(doctor.getId().toString()))
                 .andExpect(jsonPath("$.doctorName").value(doctor.getAccount().getName()))
-                .andExpect(jsonPath("$.sessionDate").value("2026-09-03"))
+                .andExpect(jsonPath("$.sessionDate")
+                        .value(booking.getSlot().getSession().getSessionDate().toString()))
                 .andExpect(jsonPath("$.mode").value("FIXED_TIME"))
                 .andExpect(jsonPath("$.appointmentTypeName").value("Consultation"));
     }
