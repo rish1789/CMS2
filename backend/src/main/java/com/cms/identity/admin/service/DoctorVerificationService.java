@@ -183,7 +183,9 @@ public class DoctorVerificationService {
         }
 
         try {
-            profile = doctorProfileRepository.save(profile);
+            // Flushed here, inside the try: the UPDATE of a managed entity is otherwise deferred to
+            // commit, after this catch, and a license collision surfaces as an unmapped 500.
+            profile = doctorProfileRepository.saveAndFlush(profile);
         } catch (DataAccessException e) {
             log.warn("Doctor profile edit failed: {}", e.getClass().getSimpleName());
             if (isUniqueConstraintViolation(e, "uq_doctor_profile_license_number")) {

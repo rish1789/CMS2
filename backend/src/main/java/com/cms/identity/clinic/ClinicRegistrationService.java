@@ -74,7 +74,9 @@ public class ClinicRegistrationService {
                     passwordEncoder.encode(request.admin().password()),
                     staffCode,
                     request.admin().mobile());
-            account = accountRepository.save(account);
+            // Flushed here, inside the try: a deferred INSERT would otherwise hit uq_account_email
+            // at commit, after this catch, and surface as an unmapped 500.
+            account = accountRepository.saveAndFlush(account);
 
             RoleAssignment roleAssignment = new RoleAssignment(account, clinic, RoleAssignment.Role.ClinicAdmin);
             roleAssignmentRepository.save(roleAssignment);

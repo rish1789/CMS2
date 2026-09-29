@@ -61,7 +61,9 @@ public class PatientAccountService {
         try {
             PatientAccount account = new PatientAccount(
                     request.email(), passwordEncoder.encode(request.password()), request.mobile());
-            account = patientAccountRepository.save(account);
+            // Flushed here, inside the try: a deferred INSERT would otherwise hit
+            // uq_patient_account_email at commit, after this catch, and surface as an unmapped 500.
+            account = patientAccountRepository.saveAndFlush(account);
 
             log.info("Patient Account signup succeeded: patientAccountId={}", account.getId());
 

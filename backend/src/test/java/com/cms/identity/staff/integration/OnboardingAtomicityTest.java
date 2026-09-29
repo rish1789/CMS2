@@ -32,7 +32,7 @@ class OnboardingAtomicityTest extends AbstractStaffIntegrationTest {
         long accountsBefore = accountRepository.count();
         long roleAssignmentsBefore = roleAssignmentRepository.count();
 
-        when(doctorProfileRepositoryOverride.save(any()))
+        when(doctorProfileRepositoryOverride.saveAndFlush(any()))
                 .thenThrow(new DataIntegrityViolationException("simulated failure for T028"));
 
         mockMvc.perform(post("/api/v1/clinics/{clinicId}/staff", clinic.getId())
