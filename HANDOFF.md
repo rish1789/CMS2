@@ -1336,6 +1336,84 @@ Every item below is **Converged** in `backlog/progress.md`. Each was live-verifi
 2. Run the integration suite somewhere Docker is available, e.g. CI, to exercise the Testcontainers tests added in 062–064.
 3. Backlog 053 (visual/copy quality pass) is still Not Started. It begins with a discussion, not implementation.
 
+## Part 13 — 065 verified with Docker, CI repaired, test-harness repair started, waitlist-offer bug fixed (2026-09-29, cloud sandbox)
+
+This session ran in a Claude Code cloud container, not the Windows machine. All work is pushed. The only exception is an unused local branch, `claude/protection-settings-draft-race`, which holds just the two CI commits and no fix.
+
+### 065-phase1-stabilization: verified and closed (PR rish1789/CMS2#11)
+
+- All 38 tasks in `specs/065-phase1-stabilization/tasks.md` are checked. `backlog/progress.md` marks 065 **Implemented**; no `/speckit-converge` pass has been run.
+- **Runtime (port 8081, fresh PostgreSQL 16):**
+  - Flyway applied V1–V41, Hibernate `validate` passed, and there were no WARN or ERROR lines.
+  - All quickstart §3 smoke checks returned the expected codes.
+  - Booking inside a cancelled range, booking an elapsed slot, a repeat whole-cancel and deleting a cancelled session each return the expected 409.
+- **Browser (Playwright, staff login):** the day sheet shows cancelled ranges and whole-session cancellation correctly.
+- **Frontend:** `tsc` clean, lint at the 24-warning baseline, Vitest 441/441.
+- **T025** `SessionAvailabilityIntegrationTest`: 9/9 with Docker. Audit docs 07, 08 and 10 were updated. 07 now has a "Full backend run with Docker" section with the full failure breakdown.
+- **CI was completely broken on `main`**, and PR #11 now also fixes it:
+  - `ci.yml` used `secrets` in step-level `if:`, so every run failed at parse time with 0 jobs. The steps now test a job-level boolean `HAS_NVD_API_KEY`, checked with `actionlint`.
+  - `backend/gradlew` was mode 100644 (`Permission denied`) and is now executable.
+  - The frontend CI job passed for the first time.
+
+### Backend test-harness repair (PR rish1789/CMS2#12, branch `claude/test-harness-fixes`)
+
+These are test-only commits, each verified by re-running the affected classes before pushing:
+
+1. `66d4166`: **root cause of the mass CI failure.** The 23 integration base classes each stop their `@Container` Postgres after the class, but Spring's context cache reused the context bound to the stopped container. `@DirtiesContext(AFTER_CLASS)` fixes it. A plain `./gradlew test` run is now 848/1,046 passing with 0 `Connection refused`, in 24 min instead of 83 min with the fork-per-class workaround.
+2. `d6c070f`: fixture staff codes fit `VARCHAR(20)` (31 classes).
+3. `91ad452`: the inbox walk-in fixture produced 11-digit mobiles.
+4. `9f77665`: `@Import` the nested `RecordingNotificationSender` config, which Spring does not detect on a superclass (16 tests).
+5. `5bb8410`: `Instant` comparisons at microsecond precision.
+6. `f0441de`: no `entityManager.refresh()` or `@Modifying` calls outside a transaction; uses a `findById` re-read and `TransactionTemplate`.
+
+**First real backend CI run** on `f0441de`: 1,046 tests, **101 failed** (down from 198), 0 connection-refused, 17 min. Still to do on this branch:
+
+- teardown foreign-key order, and the duplicate-email knock-ons it causes (the largest group)
+- stale assertions:
+  - hard-coded `2026-09-03` dates in `BookingDetailControllerTest` and `PartialSessionCancellationSuccessTest.queueMode…`; derive the date from the session instead
+  - the 15-day session window
+  - entity-identity `contains`
+  - 057's 403→409 and the waitlist 404→409 status changes
+  - the retention-purge fixture blocked by the 2026-09-24 anonymization rule
+  - the no-show fixture with a nonexistent booker
+- tests that now reach their assertions:
+  - `SessionDaySheetControllerTest` (no fee configured)
+  - `ClinicStaffControllerTest.excludesADeactivatedRoleAssignment` (2 vs 1)
+  - `OnboardDoctorReuseTest`
+
+### Real product bugs found (pre-existing, none caused by 065)
+
+- **Waitlist offer never saved after a cancellation.** Fixed in **PR rish1789/CMS2#13** (`claude/waitlist-offer-persistence`, stacked on #12): `REQUIRES_NEW` on `WaitlistBumpListener`. Over 392 tests, failures went from 49 to 44, with 5 fixed and 0 new.
+- **Still open**, for option C; each needs a spec first:
+  - PB-003: queue-token issuance under concurrency
+  - unhandled duplicate-key races (clinic registration, patient signup, Super Admin license edit, staff onboarding email/license) return a 500 instead of a 409
+  - a patient-linking race that retries inside an aborted transaction
+  - `ClinicDeVerificationCascadeTest…WaitlistOffer`, which has a second cause beyond #13
+  - the booking rate limiter exceeding its margin (12 vs 9)
+
+### Open items and decisions
+
+- **PR merge order:** #11 first, then #12, then retarget #13 to `main`. Nothing has been merged; the owner merges.
+- **`ProtectionSettingsPage` "85" CI failure** on PR #12's frontend job:
+  - The mirror-prop-in-effect (TD-16) hypothesis could not be reproduced locally (24 isolated runs plus 3 parallel full suites).
+  - The owner chose to wait for the CI re-run before opening a fix PR.
+  - Worktree `CMS2-protection` / branch `claude/protection-settings-draft-race` is local only, not pushed.
+- **Housekeeping:**
+  - a stray gitlink `docs/.claude - Copy/worktrees/modest-tharp-3fd7e7` (post-job warning only)
+  - upgrading `actions/*@v4` to v5 (Node 20 deprecation)
+
+### Sandbox gotchas (cloud container)
+
+- **Docker:**
+  - Start it with `DOCKER_MIN_API_VERSION=1.24 dockerd &`. Docker 29's minimum API is too new for Testcontainers 1.21's docker-java.
+  - The daemon died once, most likely because broad `pkill -f` patterns killed it. Kill by PID, and check `docker info` before test runs.
+- **Maven Central** can return 429; retry.
+- **Git worktrees used:**
+  - `/home/user/CMS2`: #11
+  - `/home/user/CMS2-harness`: #12
+  - `/home/user/CMS2-waitlist`: #13
+  - `/home/user/CMS2-protection`: local branch with the CI commits only, on hold
+
 ## Reference
 
 Memory files at `C:\Users\risha\.claude\projects\C--Users-risha-OneDrive-Documents-CMS2\memory\`

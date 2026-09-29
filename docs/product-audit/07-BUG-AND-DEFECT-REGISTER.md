@@ -15,11 +15,55 @@ Severity: Critical / High / Medium / Low. No bugs were invented. Anything unprov
 | ID | Status | Root cause | Fix | Tests | Verification |
 |---|---|---|---|---|---|
 | BUG-001 / SEC-01 | **CONFIRMED FIXED** | Staff and patient chains ended in `anyRequest().permitAll()`; unlisted endpoints were anonymous | Both chains are fail-closed: explicit public endpoints (`POST /clinics/register`, `POST /patients/signup`, `/login`), then `anyRequest().authenticated()` | `StaffChainFailClosedContractTest` (11), `PatientChainFailClosedContractTest` (4). The 10 failures reproduced BUG-001 before the fix. | Unit and contract tests green. Runtime: the 7 endpoints plus unmapped paths → 401; public endpoints → 400 (validation); discovery and health → 200; CORS preflight → 200. |
-| PB-008 (creation half) / SEC-06 | **CONFIRMED FIXED** | `TreatingDoctorAuthorizationService` compared identity only; spec 034 had scoped out a staffing re-check | New `requireActiveTreatingDoctor` (treating doctor plus an active Doctor role at the booking's clinic), used by the 3 `create` paths. Reads unchanged. | `TreatingDoctorAuthorizationServiceTest` (4), one create-refusal case in each of 3 clinical service tests, integration `ConsultationNoteDeactivatedDoctorTest` | Unit tests green. Integration test compiles; **not executed (Docker unavailable)**. |
+| PB-008 (creation half) / SEC-06 | **CONFIRMED FIXED** | `TreatingDoctorAuthorizationService` compared identity only; spec 034 had scoped out a staffing re-check | New `requireActiveTreatingDoctor` (treating doctor plus an active Doctor role at the booking's clinic), used by the 3 `create` paths. Reads unchanged. | `TreatingDoctorAuthorizationServiceTest` (4), one create-refusal case in each of 3 clinical service tests, integration `ConsultationNoteDeactivatedDoctorTest` | Unit tests green. **Integration test `ConsultationNoteDeactivatedDoctorTest` executed with Docker (2026-09-29): passes.** |
 | PB-008 (booking-state half) | OPEN — out of Phase 1 scope | — | — | — | — |
 | PB-005 | **INVESTIGATED — NO CHANGE IN PHASE 1**; broader fix **BLOCKED — REQUIRES DECISION** | The product targets Indian clinics only. The repository defines no deployment that sets a non-IST JVM zone. All rules use the JVM default zone consistently, so the defect appears only on a non-IST host, which no configuration defines. | New rules (planned for the V41-dependent work) use an injectable `Clock` in the same zone | — | Decision needed: pin `-Duser.timezone=Asia/Kolkata` in deployment, or model a clinic time zone |
 | BUG-006 | **MITIGATED — intermittent, root cause addressed** | user-event's per-keystroke `setTimeout(0)` yield plus re-render cost over about 60 typed characters. Under full-suite parallel load the tests slowed about 4× past the 5 s default. Timers, awaits, mocks and cleanup were checked and excluded (09 §4a). | `userEvent.setup({ delay: null })` in 6 typing-heavy test files; global timeout unchanged | 6 test files changed; no assertions altered | 4 consecutive full runs at 436/436; affected tests 2–3× faster in isolation |
-| BUG-002 / 003 / 004 / 005 | **BLOCKED** — waiting for migration V41 (owner instruction) | — | — | — | — |
+| BUG-002 | **CONFIRMED FIXED** | Spec 029 deliberately returned cancelled slots to `OPEN` and had no session-level record, so no listing or booking path could tell "cancelled" from "never booked" | Migration V41 adds the insert-only `session_cancellation` table (whole record: `from_time` NULL). `SessionAvailabilityService` is the one bookability rule; all 5 booking paths (patient and staff fixed-time, patient and staff queue, walk-in) refuse a whole-cancelled session with 409 `SESSION_NOT_ACCEPTING_BOOKINGS`. Patient slot and queue-session listings exclude it (`NOT EXISTS`). Waitlist matching skips it. A session with a record cannot be deleted, so the nightly job cannot regenerate it. | `SessionAvailabilityServiceTest`, `SessionCancellationServiceTest`, `BookingPathsAvailabilityTest`; integration `SessionAvailabilityIntegrationTest` (9 cases), updated `SessionCancellationRejectionTest` | Unit tests green. **Integration tests executed with Docker (2026-09-29): 9/9 pass.** Runtime on a fresh database: whole-cancelled day lists 0 patient slots; repeat cancel → 409 `SESSION_ALREADY_CANCELLED`; delete → 409 `SESSION_DELETION_BLOCKED` |
+| BUG-003 | **CONFIRMED FIXED** | Spec 030 kept the `[cutoff, toTime)` range only as a request parameter; nothing persisted it | Each partial cancellation writes a range record (even with 0 qualifying bookings). Ranges are cumulative. Fixed-time slots starting inside a range, and queue tokens or walk-ins requested inside it on the session date, are refused and unlisted. | `SessionPartialCancellationServiceTest`, `BookingPathsAvailabilityTest`, `SessionAvailabilityIntegrationTest` | Unit and integration tests green. Runtime: after cancelling 14:00–16:00, the patient listing omits 14:00 and 15:00 only; staff booking of the 14:00 slot → 409 `SESSION_NOT_ACCEPTING_BOOKINGS`; the day sheet marks both rows "Cancelled" with no Book link |
+| BUG-004 | **CONFIRMED FIXED** | `cancelSession` treated "no BOOKED slot" as "already cancelled"; the frontend button also pre-blocked it | "Already cancelled" now means a whole record exists. An empty session (or one with only APPEARED/NO_SHOW visits) cancels with 0 bookings and a record. `CancelSessionButton` no longer pre-blocks; the day sheet shows a cancelled banner and hides booking actions. Spec 065 reverses spec 029's rule; `SessionCancellationRejectionTest` updated accordingly. | `SessionCancellationServiceTest`, `CancelSessionButton.test.tsx`, `SessionSlotsView.test.tsx`, `SessionCancellationRejectionTest`, `SessionAvailabilityIntegrationTest` | Unit, frontend and integration tests green. Browser (Playwright, staff login): "Cancel entire session" on an empty session → "Session cancelled. No active bookings needed cancelling."; banner persists after reload |
+| BUG-005 | **CONFIRMED FIXED** | Listings filtered on date only; `doBookSlot` checked date only; staff booking had no date check | A timed slot is elapsed when `start_time < now` (a start equal to now stays bookable, owner decision 5). Listing JPQL adds `(sessionDate > :from OR startTime > :nowTime)`. Patient and staff fixed-time booking refuse elapsed and past slots with `SLOT_DATE_IN_THE_PAST`; queue and walk-in refuse past dates. Time comes from an injectable `Clock` (same JVM zone as the rest of the server, see PB-005). | `SessionAvailabilityServiceTest` (fixed clock), `BookingPathsAvailabilityTest`, `SessionAvailabilityIntegrationTest` | Unit and integration tests green. Runtime at 08:02 server time: today's patient listing starts at 09:00 (06:00–08:00 hidden); staff booking of the 06:00 slot → 409 `SLOT_DATE_IN_THE_PAST` |
+
+### Full backend run with Docker (2026-09-29, cloud sandbox)
+
+This is the first time the integration tests ran with a working Docker. The run used `./gradlew test -x spotlessApply --continue`, plus a scratchpad-only Gradle init script that forks one JVM per test class. The script was not committed.
+
+- **Why the fork:** in a single shared JVM, cached Spring contexts point at a Testcontainers Postgres that an earlier class has already stopped. Most integration tests then time out on connection refused. CI runs the same plain `./gradlew test`, so it is exposed to this too.
+- **Result:** 344 classes, 1,046 tests, **847 passed, 199 failed**. All 199 are integration tests; every unit and `@WebMvcTest` test passed.
+- **Spec 065 tests all pass:**
+  - `SessionAvailabilityIntegrationTest` (9/9) and the updated `SessionCancellationRejectionTest`
+  - `WalkInLineLifecycleTest`, `ConsultationNoteDeactivatedDoctorTest`
+  - every session and partial cancellation success, access, concurrency, notification and no-waitlist-bump test
+- **None of the 199 failures is caused by 065.** Two candidates were re-run in a scratch copy with the 065 check removed, and both still failed the same way:
+  - `ClinicDeVerificationCascadeTest…WaitlistOffer`
+  - `BookingRateLimitConcurrencyTest`
+- **Pre-existing test-harness decay and stale assertions (192 of 199):** per-cause counts are approximate, classified by each test's first error message.
+
+  | Cause | About |
+  |---|---|
+  | Account fixture value over `VARCHAR(20)` | 54 |
+  | Teardown order (session/slot, `booking_attempt_log`, `inbox_item`, `patient`, `notification_event` foreign keys) | 37 |
+  | `refresh` or update outside a transaction in test helpers | 34 |
+  | Knock-on duplicate emails from failed teardown | 28 |
+  | Missing `RecordingNotificationSender` test bean | 16 |
+  | Invalid Indian mobile in walk-in fixtures | 10 |
+  | Super Admin Basic auth replaced by JWT (040) | 3 |
+
+  Stale assertions (about 13):
+  - a hard-coded `2026-09-03` date
+  - entity-identity `contains`
+  - nanosecond vs microsecond timestamps
+  - the 15-day session list window
+  - 057's doctor-completion rule (409, not 403)
+  - the waitlist `DOCTOR_NOT_STAFFED_AT_CLINIC` status (409, not 404)
+  - a retention-purge fixture blocked by the 2026-09-24 anonymization rule
+  - a no-show fixture with a nonexistent booker account
+- **Real defects surfaced (7 tests; pre-existing, not in Phase 1 scope):**
+  - **PB-003 reproduced:** `QueueSlotIssuanceConcurrencyTest`, 20 concurrent tokens → `TokenIssuanceFailedException`.
+  - **Unhandled duplicate-key races:** concurrent clinic registration or patient signup with the same email, or a Super Admin license edit to an existing number, returns an unmapped `DataIntegrityViolationException` instead of a 409. The database still prevents the duplicate.
+  - **Patient linking race:** a same-account race retries inside an aborted transaction.
+  - **De-verification cascade:** the waitlist offer is not persisted from the `AFTER_COMMIT` listener.
+  - **Booking rate limiter:** exceeds its bounded race margin (12 against 9).
 
 ---
 
