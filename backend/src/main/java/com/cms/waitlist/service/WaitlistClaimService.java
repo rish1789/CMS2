@@ -17,6 +17,8 @@ import java.time.Instant;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * 032: the two patient-self-service actions on an {@code OFFERED} entry - claim (research.md
@@ -53,6 +55,11 @@ public class WaitlistClaimService {
      * load-bearing here: {@code bookSlot}'s own thrown exception has already marked this
      * (participating) transaction rollback-only, so a plain in-line write here would silently
      * vanish along with the failed claim once this method re-throws.
+     *
+     * <p>The release must run only after this transaction has rolled back: {@code claimIfOffered}
+     * above holds the entry's row lock until then, so calling {@code releaseById} in-line made its
+     * {@code REQUIRES_NEW} update wait on a lock held by its own thread - a self-deadlock that hung
+     * the request forever. It is therefore deferred to {@code afterCompletion}.
      */
     @Transactional
     public Booking claim(UUID entryId, UUID patientAccountId, ClaimWaitlistRequest request) {
@@ -72,7 +79,12 @@ public class WaitlistClaimService {
                     entry.getOfferedSlot().getId(),
                     new PatientBookingService.BookSlotInput(request.patientName(), request.appointmentTypeId()));
         } catch (SlotAlreadyBookedException e) {
-            waitlistReleaseService.releaseById(entryId);
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCompletion(int status) {
+                    waitlistReleaseService.releaseById(entryId);
+                }
+            });
             throw e;
         }
 
