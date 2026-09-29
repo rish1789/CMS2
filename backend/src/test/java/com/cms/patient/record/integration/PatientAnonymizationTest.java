@@ -1,6 +1,7 @@
 package com.cms.patient.record.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -14,6 +15,7 @@ import com.cms.patient.record.domain.Patient;
 import com.cms.scheduling.domain.Session;
 import com.cms.scheduling.domain.Slot;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import com.cms.scheduling.domain.Schedule;
 import com.cms.scheduling.domain.ScheduleMode;
@@ -180,7 +182,9 @@ class PatientAnonymizationTest extends AbstractPatientAnonymizationIntegrationTe
 
         Patient second = patientAnonymizationService.anonymize(clinic.getId(), patient.getId());
 
-        assertThat(second.getAnonymizedAt()).isEqualTo(firstTimestamp);
+        // The first call returns the in-memory nanosecond value; the second reads it back from
+        // Postgres, which stores microseconds (rounded).
+        assertThat(second.getAnonymizedAt()).isCloseTo(firstTimestamp, within(1, ChronoUnit.MICROS));
     }
 
     @Test
