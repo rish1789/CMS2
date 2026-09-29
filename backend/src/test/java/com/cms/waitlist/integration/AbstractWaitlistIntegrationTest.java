@@ -39,8 +39,6 @@ import com.cms.waitlist.repository.WaitlistEntryRepository;
 import com.cms.waitlist.domain.WaitlistEntryStatus;
 import com.cms.waitlist.service.WaitlistExpirySweepService;
 import com.cms.waitlist.service.WaitlistReleaseService;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.DayOfWeek;
@@ -168,9 +166,6 @@ public abstract class AbstractWaitlistIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    @PersistenceContext
-    private EntityManager entityManager;
-
     private int counter = 0;
 
     @AfterEach
@@ -260,8 +255,9 @@ public abstract class AbstractWaitlistIntegrationTest {
         WaitlistEntry entry = waitlistEntryRepository.saveAndFlush(
                 new WaitlistEntry(clinic, patientAccount, doctorProfileOrNull, specializationOrNull));
         jdbcTemplate.update("UPDATE waitlist_entry SET joined_at = ? WHERE id = ?", Timestamp.from(joinedAt), entry.getId());
-        entityManager.refresh(entry);
-        return entry;
+        // Outside a test transaction every repository call gets a fresh persistence context, so a
+        // re-read returns the row as the raw JDBC update left it (refresh() needs a transaction).
+        return waitlistEntryRepository.findById(entry.getId()).orElseThrow();
     }
 
     /**
@@ -319,8 +315,9 @@ public abstract class AbstractWaitlistIntegrationTest {
                 Timestamp.from(offeredAt),
                 Timestamp.from(offerExpiresAt),
                 entry.getId());
-        entityManager.refresh(entry);
-        return entry;
+        // Outside a test transaction every repository call gets a fresh persistence context, so a
+        // re-read returns the row as the raw JDBC update left it (refresh() needs a transaction).
+        return waitlistEntryRepository.findById(entry.getId()).orElseThrow();
     }
 
     /** Backdates an already-OFFERED entry's window past expiry, for multi-hop cascade tests that need to lapse a specific entry mid-test. */

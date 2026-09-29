@@ -17,6 +17,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * real-bug-fix 2026-09-17: a Schedule edit never rewrites Sessions already generated from the
@@ -24,6 +25,11 @@ import org.springframework.http.HttpHeaders;
  * way to remove a stale one so the next generation run rebuilds it from the corrected Schedule.
  */
 class SessionDeletionTest extends AbstractSessionCancellationIntegrationTest {
+
+    // The repository's @Modifying update runs inside a service transaction in production;
+    // a test calling it directly must supply one.
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     @Autowired
     private WaitlistEntryRepository waitlistEntryRepository;
@@ -68,7 +74,8 @@ class SessionDeletionTest extends AbstractSessionCancellationIntegrationTest {
         Slot slot = slotRepository.findBySession_Id(session.getId()).get(0);
         PatientAccount patientAccount = savePatientAccount();
         WaitlistEntry entry = waitlistEntryRepository.save(new WaitlistEntry(clinic, patientAccount, doctor, null));
-        waitlistEntryRepository.offerIfWaiting(entry.getId(), Instant.now(), Instant.now().plusSeconds(1800), slot);
+        transactionTemplate.executeWithoutResult(status -> waitlistEntryRepository.offerIfWaiting(
+                entry.getId(), Instant.now(), Instant.now().plusSeconds(1800), slot));
         String token = clinicAdminToken(clinic);
 
         mockMvc.perform(delete("/api/v1/clinics/{clinicId}/sessions/{sessionId}", clinic.getId(), session.getId())

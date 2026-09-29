@@ -25,10 +25,17 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.EnumSet;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** 037 US1: T009 (successful anonymization), T010 (blocked-then-retried), T011 (idempotent retry), T012 (historical records/account untouched). */
 class PatientAnonymizationTest extends AbstractPatientAnonymizationIntegrationTest {
+
+    // The repository's @Modifying update runs inside a service transaction in production;
+    // a test calling it directly must supply one.
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     @Test
     void anonymizesAPatientWithNoActiveFutureBookings() throws Exception {
@@ -64,7 +71,7 @@ class PatientAnonymizationTest extends AbstractPatientAnonymizationIntegrationTe
         assertThat(stillUnmodified.isAnonymized()).isFalse();
         assertThat(stillUnmodified.getPhone()).isNotNull();
 
-        int updated = bookingRepository.cancelIfActive(booking.getId());
+        int updated = transactionTemplate.execute(status -> bookingRepository.cancelIfActive(booking.getId()));
         assertThat(updated).isEqualTo(1);
 
         mockMvc.perform(post("/api/v1/clinics/{clinicId}/patients/{patientId}/anonymize", clinic.getId(), patient.getId())
@@ -199,7 +206,7 @@ class PatientAnonymizationTest extends AbstractPatientAnonymizationIntegrationTe
         ConsultationNote note =
                 consultationNoteService.create(clinic.getId(), booking.getId(), doctor.getAccount().getId(), "Visit note.");
 
-        bookingRepository.cancelIfActive(booking.getId());
+        transactionTemplate.executeWithoutResult(status -> bookingRepository.cancelIfActive(booking.getId()));
         patientAnonymizationService.anonymize(clinic.getId(), patient.getId());
 
         List<Booking> bookings = bookingRepository.findAll();

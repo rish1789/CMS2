@@ -14,9 +14,15 @@ import com.cms.scheduling.domain.SlotStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** 038 US1, T016/FR-016: an anonymized Patient's scrubbed name is reflected live, not frozen, in an existing WALK_IN Inbox Item. */
 class InboxAnonymizationPropagationTest extends AbstractInboxIntegrationTest {
+
+    // The repository's @Modifying update runs inside a service transaction in production;
+    // a test calling it directly must supply one.
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     @Autowired
     private PatientAnonymizationService patientAnonymizationService;
@@ -31,7 +37,7 @@ class InboxAnonymizationPropagationTest extends AbstractInboxIntegrationTest {
 
         // Clear the "active future booking" precondition (037) without touching the Inbox Item
         // itself - only a claim/resolve action changes Inbox state, never a Booking cancellation.
-        bookingRepository.cancelIfActive(booking.getId());
+        transactionTemplate.executeWithoutResult(status -> bookingRepository.cancelIfActive(booking.getId()));
         booking.getSlot().setStatus(SlotStatus.OPEN);
         slotRepository.save(booking.getSlot());
 
