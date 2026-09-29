@@ -8,6 +8,8 @@ import com.cms.scheduling.domain.Session;
 import com.cms.scheduling.domain.Slot;
 import com.cms.scheduling.repository.SlotRepository;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -30,7 +32,11 @@ public class WaitlistBumpListener {
         this.waitlistMatchingService = waitlistMatchingService;
     }
 
+    // AFTER_COMMIT runs once the cancelling transaction has committed, but its resources are
+    // still bound: without a new transaction, matchAndOffer's writes would join that finished
+    // transaction and never be committed, so no offer would ever be persisted.
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onBookingCancelled(BookingCancelledEvent event) {
         Slot slot = slotRepository.findById(event.slotId()).orElse(null);
         if (slot == null) {
