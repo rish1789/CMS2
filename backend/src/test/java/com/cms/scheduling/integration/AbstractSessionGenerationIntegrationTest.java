@@ -1,5 +1,6 @@
 package com.cms.scheduling.integration;
 
+import com.cms.identity.admin.config.SuperAdminJwtService;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfile;
 import com.cms.scheduling.domain.Schedule;
@@ -7,10 +8,8 @@ import com.cms.scheduling.domain.ScheduleMode;
 import com.cms.scheduling.service.SessionGenerationService;
 import com.cms.scheduling.repository.SessionRepository;
 import com.cms.scheduling.repository.SlotRepository;
-import java.nio.charset.StandardCharsets;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
-import java.util.Base64;
 import java.util.EnumSet;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
@@ -51,9 +50,12 @@ public abstract class AbstractSessionGenerationIntegrationTest extends AbstractS
         sessionRepository.deleteAll();
     }
 
-    protected static String superAdminAuthHeader() {
-        String credentials = SUPER_ADMIN_USERNAME + ":" + SUPER_ADMIN_PASSWORD;
-        return "Basic " + Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
+    @Autowired
+    private SuperAdminJwtService superAdminJwtService;
+
+    /** 040-super-admin-rbac-login: the Super Admin realm accepts only its own JWT (Basic auth was retired). */
+    protected String superAdminAuthHeader() {
+        return "Bearer " + superAdminJwtService.issueToken(SUPER_ADMIN_USERNAME);
     }
 
     /** A Fixed-Time Schedule (Mon/Wed/Fri, 9-13, 15-minute slots) for a doctor staffed at the given clinic. */

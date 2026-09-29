@@ -1,12 +1,11 @@
 package com.cms.booking.integration;
 
+import com.cms.identity.admin.config.SuperAdminJwtService;
 import com.cms.identity.admin.service.ClinicVerificationService;
 import com.cms.identity.admin.service.DoctorVerificationService;
 import com.cms.inbox.repository.InboxItemRepository;
 import com.cms.waitlist.domain.WaitlistEntry;
 import com.cms.waitlist.repository.WaitlistEntryRepository;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -49,9 +48,12 @@ public abstract class AbstractDeVerificationCascadeIntegrationTest extends Abstr
         waitlistEntryRepository.deleteAll();
     }
 
-    protected static String superAdminAuthHeader() {
-        String credentials = SUPER_ADMIN_USERNAME + ":" + SUPER_ADMIN_PASSWORD;
-        return "Basic " + Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
+    @Autowired
+    private SuperAdminJwtService superAdminJwtService;
+
+    /** 040-super-admin-rbac-login: the Super Admin realm accepts only its own JWT (Basic auth was retired). */
+    protected String superAdminAuthHeader() {
+        return "Bearer " + superAdminJwtService.issueToken(SUPER_ADMIN_USERNAME);
     }
 
     protected WaitlistEntry saveWaitingEntry(
