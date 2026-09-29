@@ -22,6 +22,7 @@
 | A-04 | Done (elapsed = `start_time < now` in listings and fixed-time booking; see 07 BUG-005) |
 | A-08 | Partly done: every booking path now uses the central rule and refuses past-dated and cancelled sessions (spec 065 FR-006, FR-013). Queue tokens for a session that ended earlier today are still accepted (walk-ins after the end are allowed by design, spec 063); that part of PB-004 stays open |
 | A-07 | Unchanged: the new rules use an injectable `Clock` in the server zone; the zone decision is still open |
+| H-01 | Partly done: executed once with Docker on 2026-09-29, 1,046 tests with 847 passing (see 07, "Full backend run with Docker"). The 199 failures are pre-existing: about 192 are test-harness decay or stale assertions, and 7 are real defects (PB-003 plus new unhandled duplicate-key and race cases). None come from 065. Still open: fix the harness (shared-context/stopped-container reuse, teardown order, fixtures) so plain `./gradlew test` in CI is meaningful. |
 
 ## Suggested logical order (where dependencies make it clear)
 

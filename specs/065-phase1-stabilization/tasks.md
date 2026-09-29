@@ -161,7 +161,15 @@
 
 ## Phase 9: Polish & verification
 
-- [ ] T035 Backend: `spotlessCheck` on the changed files, compile, and the full `test -x spotlessApply --continue`. Compare against the T001 baseline.
+- [x] T035 Backend: `spotlessCheck` on the changed files, compile, and the full `test -x spotlessApply --continue`. Compare against the T001 baseline.
+  - Done 2026-09-29 in a cloud sandbox where Docker worked. `spotlessCheck` passes on the whole tree. `compileJava` and `compileTestJava` pass.
+  - Full suite with a scratchpad-only Gradle init script that forks one JVM per test class: 344 classes, 1,046 tests, **847 pass, 199 fail**. The script was needed because the plain shared-JVM run reuses cached Spring contexts pointing at stopped Testcontainers.
+  - Baseline (T001): 620 entries, 371 pass, 249 Docker-init failures. The integration tests now actually execute, so the two runs aren't like-for-like.
+  - All 199 failures are integration tests; every unit and `@WebMvcTest` test passes. None come from 065:
+    - All 065-owned and 065-edited integration tests pass: `SessionAvailabilityIntegrationTest` 9/9, `SessionCancellationRejectionTest`, `WalkInLineLifecycleTest`, `ConsultationNoteDeactivatedDoctorTest`.
+    - The one 065-edited test that failed, `UntimedSlotSweepsTest`, fails only in its teardown.
+    - The two plausible candidates still failed with the 065 check removed in a scratch copy.
+  - Breakdown in `docs/product-audit/07-BUG-AND-DEFECT-REGISTER.md`, "Full backend run with Docker".
 - [x] T036 Frontend: `tsc -b`, `npm run lint` (no new warnings), full test run.
   - Done 2026-09-29 after `npm ci`: `tsc -b` clean; lint 0 errors and 24 warnings (the existing baseline); Vitest 78 files, 441/441 pass.
 - [x] T037 Restart the local backend: V41 applies and Hibernate `validate` plus JPQL parsing succeed. Run the quickstart §3 curl smoke tests.
@@ -169,7 +177,8 @@
   - Smoke checks: the 7 audit endpoints, unmapped `/clinics/{id}/x` and `/patients/nonexistent` → 401 anonymous; `POST /clinics/register` `{}` → 400 `MISSING_REQUIRED_FIELD`; `/discovery/cities` → 200; `/actuator/health` → 200; CORS preflight → 200.
   - Extra runtime checks on seeded data: patient listing hides elapsed and cancelled times; staff booking inside a cancelled range → 409 `SESSION_NOT_ACCEPTING_BOOKINGS`; staff booking of an elapsed slot → 409 `SLOT_DATE_IN_THE_PAST`; repeat whole cancel → 409 `SESSION_ALREADY_CANCELLED`; deleting a cancelled session → 409 `SESSION_DELETION_BLOCKED`.
   - Browser (Playwright, staff login): the day sheet shows the range banner and marks the cancelled rows "Cancelled" with no Book link. Cancelling an empty session through "Cancel entire session" succeeds and the banner persists after reload.
-- [ ] T038 Update `docs/product-audit/07-BUG-AND-DEFECT-REGISTER.md`, `08-SECURITY-AUDIT.md` and `10-PRODUCT-IMPROVEMENT-BACKLOG.md` with each issue's status, root cause, fix, tests and verification. Add a row for 065 to `backlog/progress.md`.
+- [x] T038 Update `docs/product-audit/07-BUG-AND-DEFECT-REGISTER.md`, `08-SECURITY-AUDIT.md` and `10-PRODUCT-IMPROVEMENT-BACKLOG.md` with each issue's status, root cause, fix, tests and verification. Add a row for 065 to `backlog/progress.md`.
+  - Done 2026-09-29. 07 has BUG-002–005 rows, the PB-008 integration result, and the full-run findings. 08 has the SEC-01 re-verification and a session-cancellation audit-trail note. 10 has A-01–A-04, A-07, A-08 and H-01. `backlog/progress.md` has its existing 065 row updated.
 
 ## Dependencies
 
