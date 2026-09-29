@@ -3,6 +3,7 @@ package com.cms.inbox.integration;
 import com.cms.booking.domain.AppointmentType;
 import com.cms.booking.repository.AppointmentTypeRepository;
 import com.cms.booking.domain.Booking;
+import com.cms.booking.repository.BookingAttemptLogRepository;
 import com.cms.booking.repository.BookingRepository;
 import com.cms.booking.service.DeVerificationCascadeService;
 import com.cms.booking.service.FrontDeskWalkInService;
@@ -17,6 +18,7 @@ import com.cms.identity.doctor.DoctorProfile;
 import com.cms.identity.doctor.DoctorProfileRepository;
 import com.cms.inbox.domain.InboxItem;
 import com.cms.inbox.repository.InboxItemRepository;
+import com.cms.notification.repository.NotificationEventRepository;
 import com.cms.patient.account.domain.PatientAccount;
 import com.cms.patient.account.repository.PatientAccountRepository;
 import com.cms.patient.record.repository.PatientRepository;
@@ -45,6 +47,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -60,6 +63,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public abstract class AbstractInboxIntegrationTest {
 
     @Container
@@ -135,10 +139,20 @@ public abstract class AbstractInboxIntegrationTest {
 
     private int counter = 0;
 
+    @Autowired
+    private BookingAttemptLogRepository bookingAttemptLogRepository;
+
+    @Autowired
+    private NotificationEventRepository notificationEventRepository;
+
     @AfterEach
     void cleanDatabase() {
+        // Waitlist offers and de-verification cascades emit notification events that reference patient_account.
+        notificationEventRepository.deleteAll();
         inboxItemRepository.deleteAll();
         waitlistEntryRepository.deleteAll();
+        // 060-booking-abuse-prevention: attempt-log rows reference booking, patient_account and clinic.
+        bookingAttemptLogRepository.deleteAll();
         bookingRepository.deleteAll();
         patientRepository.deleteAll();
         patientAccountRepository.deleteAll();
@@ -271,7 +285,7 @@ public abstract class AbstractInboxIntegrationTest {
                                 session.getId(),
                                 null,
                                 "Walk-in Patient " + UUID.randomUUID(),
-                                "98" + (100000000 + (counter++)),
+                                "98" + (10000000 + (counter++)),
                                 null,
                                 appointmentType.getId(),
                                 "GENERAL_CHECKUP",

@@ -64,7 +64,7 @@ class QueueBookingConcurrencyTest extends AbstractQueueBookingIntegrationTest {
         String unique = java.util.UUID.randomUUID().toString();
         var admin = accountRepository.save(new com.cms.identity.account.domain.Account(
                 "Admin X", "adminx-" + unique + "@example.com",
-                passwordEncoder.encode("Str0ng!Pass"), "CAX-" + unique, null));
+                passwordEncoder.encode("Str0ng!Pass"), "CAX-" + unique.substring(0, 13), null));
         roleAssignmentRepository.save(new com.cms.identity.account.domain.RoleAssignment(
                 admin, clinic, com.cms.identity.account.domain.RoleAssignment.Role.ClinicAdmin));
         return admin.getId();

@@ -1,11 +1,11 @@
 package com.cms.booking.integration;
 
+import com.cms.identity.admin.config.SuperAdminJwtService;
 import com.cms.identity.admin.service.ClinicVerificationService;
 import com.cms.identity.admin.service.DoctorVerificationService;
+import com.cms.inbox.repository.InboxItemRepository;
 import com.cms.waitlist.domain.WaitlistEntry;
 import com.cms.waitlist.repository.WaitlistEntryRepository;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -38,15 +38,22 @@ public abstract class AbstractDeVerificationCascadeIntegrationTest extends Abstr
     @Autowired
     protected WaitlistEntryRepository waitlistEntryRepository;
 
-    /** Runs before the superclass's own {@code cleanDatabase} (JUnit 5's subclass-before-superclass @AfterEach order) - waitlist_entry references patient_account, so it must go first. */
+    @Autowired
+    private InboxItemRepository inboxItemRepository;
+
+    /** Runs before the superclass's own {@code cleanDatabase} (JUnit 5's subclass-before-superclass @AfterEach order) - waitlist_entry references patient_account, and the cascade's inbox items reference clinic (no ON DELETE CASCADE), so both must go first. */
     @AfterEach
     void cleanWaitlistEntries() {
+        inboxItemRepository.deleteAll();
         waitlistEntryRepository.deleteAll();
     }
 
-    protected static String superAdminAuthHeader() {
-        String credentials = SUPER_ADMIN_USERNAME + ":" + SUPER_ADMIN_PASSWORD;
-        return "Basic " + Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
+    @Autowired
+    private SuperAdminJwtService superAdminJwtService;
+
+    /** 040-super-admin-rbac-login: the Super Admin realm accepts only its own JWT (Basic auth was retired). */
+    protected String superAdminAuthHeader() {
+        return "Bearer " + superAdminJwtService.issueToken(SUPER_ADMIN_USERNAME);
     }
 
     protected WaitlistEntry saveWaitingEntry(

@@ -16,6 +16,7 @@ import com.cms.scheduling.domain.Session;
 import com.cms.scheduling.domain.Slot;
 import com.cms.scheduling.domain.SlotStatus;
 import com.jayway.jsonpath.JsonPath;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -28,7 +29,7 @@ class SessionDaySheetControllerTest extends AbstractStaffBookingIntegrationTest 
     private UUID saveClinicAdminAccountId(Clinic clinic) {
         Account admin = accountRepository.save(new Account(
                 "Admin", "admin-" + UUID.randomUUID() + "@example.com",
-                passwordEncoder.encode("Str0ng!Pass"), "CA-" + UUID.randomUUID(), null));
+                passwordEncoder.encode("Str0ng!Pass"), "CA-" + UUID.randomUUID().toString().substring(0, 13), null));
         roleAssignmentRepository.save(new RoleAssignment(admin, clinic, RoleAssignment.Role.ClinicAdmin));
         return admin.getId();
     }
@@ -40,7 +41,8 @@ class SessionDaySheetControllerTest extends AbstractStaffBookingIntegrationTest 
         Session session = saveFixedTimeSessionWithSlots(clinic, doctor);
         Slot slotToBook = anOpenSlotOf(session);
         Patient patient = saveExistingPatient(clinic);
-        AppointmentType appointmentType = saveAppointmentTypeWithNoOverride(doctor);
+        // A priced type: with no fee override and no default fee, booking is (correctly) blocked.
+        AppointmentType appointmentType = saveAppointmentTypeWithOverride(doctor, new BigDecimal("300.00"));
         UUID adminAccountId = saveClinicAdminAccountId(clinic);
 
         staffBookingService.bookSlot(
@@ -84,7 +86,8 @@ class SessionDaySheetControllerTest extends AbstractStaffBookingIntegrationTest 
         List<Slot> slotsInGenerationOrder = slotRepository.findBySession_Id(session.getId());
         Slot middleSlot = slotsInGenerationOrder.get(slotsInGenerationOrder.size() / 2);
         Patient patient = saveExistingPatient(clinic);
-        AppointmentType appointmentType = saveAppointmentTypeWithNoOverride(doctor);
+        // A priced type: with no fee override and no default fee, booking is (correctly) blocked.
+        AppointmentType appointmentType = saveAppointmentTypeWithOverride(doctor, new BigDecimal("300.00"));
         UUID adminAccountId = saveClinicAdminAccountId(clinic);
 
         staffBookingService.bookSlot(
@@ -126,7 +129,8 @@ class SessionDaySheetControllerTest extends AbstractStaffBookingIntegrationTest 
         List<Slot> slotsInGenerationOrder = slotRepository.findBySession_Id(session.getId());
         Slot middleSlot = slotsInGenerationOrder.get(slotsInGenerationOrder.size() / 2);
         Patient patient = saveExistingPatient(clinic);
-        AppointmentType appointmentType = saveAppointmentTypeWithNoOverride(doctor);
+        // A priced type: with no fee override and no default fee, booking is (correctly) blocked.
+        AppointmentType appointmentType = saveAppointmentTypeWithOverride(doctor, new BigDecimal("300.00"));
         UUID adminAccountId = saveClinicAdminAccountId(clinic);
 
         staffBookingService.bookSlot(

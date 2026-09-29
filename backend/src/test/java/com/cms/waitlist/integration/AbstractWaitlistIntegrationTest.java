@@ -3,6 +3,7 @@ package com.cms.waitlist.integration;
 import com.cms.booking.domain.AppointmentType;
 import com.cms.booking.repository.AppointmentTypeRepository;
 import com.cms.booking.domain.Booking;
+import com.cms.booking.repository.BookingAttemptLogRepository;
 import com.cms.booking.service.BookingCancellationService;
 import com.cms.booking.repository.BookingRepository;
 import com.cms.booking.service.SessionCancellationService;
@@ -39,8 +40,6 @@ import com.cms.waitlist.repository.WaitlistEntryRepository;
 import com.cms.waitlist.domain.WaitlistEntryStatus;
 import com.cms.waitlist.service.WaitlistExpirySweepService;
 import com.cms.waitlist.service.WaitlistReleaseService;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.DayOfWeek;
@@ -55,6 +54,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -72,6 +72,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public abstract class AbstractWaitlistIntegrationTest {
 
     @Container
@@ -166,15 +167,17 @@ public abstract class AbstractWaitlistIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    @PersistenceContext
-    private EntityManager entityManager;
-
     private int counter = 0;
+
+    @Autowired
+    private BookingAttemptLogRepository bookingAttemptLogRepository;
 
     @AfterEach
     void cleanDatabase() {
         notificationEventRepository.deleteAll();
         waitlistEntryRepository.deleteAll();
+        // 060-booking-abuse-prevention: attempt-log rows reference booking, patient_account and clinic.
+        bookingAttemptLogRepository.deleteAll();
         bookingRepository.deleteAll();
         patientRepository.deleteAll();
         patientAccountRepository.deleteAll();
@@ -258,8 +261,9 @@ public abstract class AbstractWaitlistIntegrationTest {
         WaitlistEntry entry = waitlistEntryRepository.saveAndFlush(
                 new WaitlistEntry(clinic, patientAccount, doctorProfileOrNull, specializationOrNull));
         jdbcTemplate.update("UPDATE waitlist_entry SET joined_at = ? WHERE id = ?", Timestamp.from(joinedAt), entry.getId());
-        entityManager.refresh(entry);
-        return entry;
+        // Outside a test transaction every repository call gets a fresh persistence context, so a
+        // re-read returns the row as the raw JDBC update left it (refresh() needs a transaction).
+        return waitlistEntryRepository.findById(entry.getId()).orElseThrow();
     }
 
     /**
@@ -317,8 +321,9 @@ public abstract class AbstractWaitlistIntegrationTest {
                 Timestamp.from(offeredAt),
                 Timestamp.from(offerExpiresAt),
                 entry.getId());
-        entityManager.refresh(entry);
-        return entry;
+        // Outside a test transaction every repository call gets a fresh persistence context, so a
+        // re-read returns the row as the raw JDBC update left it (refresh() needs a transaction).
+        return waitlistEntryRepository.findById(entry.getId()).orElseThrow();
     }
 
     /** Backdates an already-OFFERED entry's window past expiry, for multi-hop cascade tests that need to lapse a specific entry mid-test. */

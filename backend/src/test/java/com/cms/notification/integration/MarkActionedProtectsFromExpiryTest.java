@@ -1,10 +1,12 @@
 package com.cms.notification.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 import com.cms.notification.domain.NotificationEvent;
 import com.cms.notification.domain.NotificationEventStatus;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.Test;
 
 /** 011 FR-006, spec US2 AC2-AC3: an event actioned before its window lapses is never expired, and its window is queryable before expiry. */
@@ -21,7 +23,9 @@ class MarkActionedProtectsFromExpiryTest extends AbstractNotificationIntegration
         Instant expiry = Instant.now().minusSeconds(60);
         NotificationEvent event = notificationEventService.publish(account.getId(), "test.event", null, expiry);
 
-        assertThat(notificationEventService.get(event.getId()).getExpiresAt()).isEqualTo(expiry);
+        // Postgres stores microseconds (rounded), Instant.now() carries nanoseconds.
+        assertThat(notificationEventService.get(event.getId()).getExpiresAt())
+                .isCloseTo(expiry, within(1, ChronoUnit.MICROS));
 
         NotificationEvent actioned = notificationEventService.markActioned(event.getId());
         assertThat(actioned.getStatus()).isEqualTo(NotificationEventStatus.ACTIONED);

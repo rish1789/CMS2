@@ -18,7 +18,6 @@ import com.cms.scheduling.domain.Slot;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -35,11 +34,6 @@ class PatientExternalRecordReferenceAccessTest extends AbstractExternalRecordRef
 
     @Autowired
     private JwtService patientJwtService;
-
-    @AfterEach
-    void cleanPatientAccounts() {
-        patientAccountRepository.deleteAll();
-    }
 
     private PatientAccount savePatientAccount() {
         return patientAccountRepository.save(

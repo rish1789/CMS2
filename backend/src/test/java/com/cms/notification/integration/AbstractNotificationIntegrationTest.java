@@ -12,8 +12,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -26,7 +28,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * assert exactly what would have been sent, without a real provider or log-scraping.
  */
 @SpringBootTest
+// A nested @TestConfiguration is only auto-detected on the test class itself, never on a
+// superclass, so the subclasses must import it explicitly to get the recording sender.
+@Import(AbstractNotificationIntegrationTest.RecordingNotificationSenderConfig.class)
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public abstract class AbstractNotificationIntegrationTest {
 
     /** 037: records every {@code send} call in place of the real {@code LoggingNotificationSender} bean. */

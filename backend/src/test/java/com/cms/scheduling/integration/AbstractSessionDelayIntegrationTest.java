@@ -22,7 +22,7 @@ public abstract class AbstractSessionDelayIntegrationTest extends AbstractNoShow
         String unique = java.util.UUID.randomUUID().toString();
         Account ops = accountRepository.save(new Account(
                 "Ops " + unique, "ops-" + unique + "@example.com",
-                passwordEncoder.encode("Str0ng!Pass"), "OP-" + unique, null));
+                passwordEncoder.encode("Str0ng!Pass"), "OP-" + unique.substring(0, 13), null));
         roleAssignmentRepository.save(new RoleAssignment(ops, clinic, RoleAssignment.Role.Operations));
         return staffJwtService.issueToken(ops.getId());
     }

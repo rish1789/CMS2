@@ -3,6 +3,7 @@ package com.cms.patient.record.integration;
 import com.cms.booking.domain.AppointmentType;
 import com.cms.booking.repository.AppointmentTypeRepository;
 import com.cms.booking.domain.Booking;
+import com.cms.booking.repository.BookingAttemptLogRepository;
 import com.cms.booking.repository.BookingRepository;
 import com.cms.clinical.repository.ConsultationNoteRepository;
 import com.cms.clinical.service.ConsultationNoteService;
@@ -39,6 +40,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -50,6 +52,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public abstract class AbstractPatientAnonymizationIntegrationTest {
 
     @Container
@@ -119,9 +122,14 @@ public abstract class AbstractPatientAnonymizationIntegrationTest {
 
     private int counter = 0;
 
+    @Autowired
+    private BookingAttemptLogRepository bookingAttemptLogRepository;
+
     @AfterEach
     void cleanDatabase() {
         consultationNoteRepository.deleteAll();
+        // 060-booking-abuse-prevention: attempt-log rows reference booking, patient_account and clinic.
+        bookingAttemptLogRepository.deleteAll();
         bookingRepository.deleteAll();
         patientRepository.deleteAll();
         patientAccountRepository.deleteAll();

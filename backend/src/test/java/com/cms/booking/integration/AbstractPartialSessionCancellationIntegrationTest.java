@@ -2,8 +2,6 @@ package com.cms.booking.integration;
 
 import com.cms.scheduling.domain.Session;
 import com.cms.scheduling.domain.Slot;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import java.sql.Timestamp;
 import java.time.Instant;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,16 +20,12 @@ public abstract class AbstractPartialSessionCancellationIntegrationTest extends 
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    @PersistenceContext
-    private EntityManager entityManager;
-
     protected Slot addQueueSlotWithCreatedAt(Session session, int tokenNumber, Instant createdAt) {
         Slot slot = slotRepository.saveAndFlush(new Slot(session, tokenNumber));
         jdbcTemplate.update("UPDATE slot SET created_at = ? WHERE id = ?", Timestamp.from(createdAt), slot.getId());
-        // The raw JDBC update above bypasses Hibernate's persistence context, so the managed
-        // `slot` reference (and a plain findById in the same context) would otherwise still
-        // show the pre-update value - refresh forces a re-read from the database.
-        entityManager.refresh(slot);
-        return slot;
+        // The raw JDBC update above bypasses Hibernate, so the returned `slot` still holds the
+        // pre-update value. Outside a test transaction each repository call gets a fresh
+        // persistence context, so a re-read returns the updated row (refresh() needs a transaction).
+        return slotRepository.findById(slot.getId()).orElseThrow();
     }
 }

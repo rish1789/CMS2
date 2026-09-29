@@ -37,6 +37,11 @@ class OnboardDoctorReuseTest extends AbstractStaffIntegrationTest {
         String existingAccountId = existing.getAccount().getId().toString();
         String existingStaffCode = existing.getAccount().getStaffCode();
         String existingDoctorProfileId = existing.getId().toString();
+        // Snapshot after both ClinicAdmin tokens and the first onboarding exist, so the assertions
+        // below measure only what the second onboarding adds.
+        long accountsBefore = accountRepository.count();
+        long doctorProfilesBefore = doctorProfileRepository.count();
+        long roleAssignmentsBefore = roleAssignmentRepository.count();
 
         mockMvc.perform(post("/api/v1/clinics/{clinicId}/staff", clinicB.getId())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenB)
@@ -52,8 +57,8 @@ class OnboardDoctorReuseTest extends AbstractStaffIntegrationTest {
                 .andExpect(jsonPath("$.staffCode").value(existingStaffCode))
                 .andExpect(jsonPath("$.doctorProfileId").value(existingDoctorProfileId));
 
-        assertThat(accountRepository.count()).isEqualTo(1);
-        assertThat(doctorProfileRepository.count()).isEqualTo(1);
-        assertThat(roleAssignmentRepository.count()).isEqualTo(3); // ClinicAdmin x2 + the reused Doctor
+        assertThat(accountRepository.count()).isEqualTo(accountsBefore); // no new Account
+        assertThat(doctorProfileRepository.count()).isEqualTo(doctorProfilesBefore); // no new Doctor Profile
+        assertThat(roleAssignmentRepository.count()).isEqualTo(roleAssignmentsBefore + 1); // only the new Role Assignment
     }
 }

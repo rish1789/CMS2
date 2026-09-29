@@ -200,10 +200,12 @@ describe('ClinicToolsDashboard live data', () => {
     mockedGetTodayStats.mockResolvedValueOnce({ completedCount: 3, noShowCount: 1 })
     renderWithSession()
 
+    // The tile's labels render immediately (with a loading skeleton), so waiting for a label
+    // does not mean the stats have arrived - wait for the counts themselves.
     expect(await screen.findByText('Completed today')).toBeInTheDocument()
-    expect(screen.getByText('3')).toBeInTheDocument()
+    expect(await screen.findByText('3')).toBeInTheDocument()
     expect(screen.getByText('No-shows today')).toBeInTheDocument()
-    expect(screen.getByText('1')).toBeInTheDocument()
+    expect(await screen.findByText('1')).toBeInTheDocument()
   })
 
   it("a failed today's-stats fetch never blocks the other tiles from rendering", async () => {

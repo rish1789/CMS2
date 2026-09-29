@@ -151,7 +151,7 @@ class WaitlistOfferInboxAutoResolveTest extends AbstractWaitlistIntegrationTest 
         String unique = java.util.UUID.randomUUID().toString();
         var admin = accountRepository.save(new com.cms.identity.account.domain.Account(
                 "Admin " + unique, "admin-" + unique + "@example.com",
-                passwordEncoder.encode("Str0ng!Pass"), "CA-" + unique, null));
+                passwordEncoder.encode("Str0ng!Pass"), "CA-" + unique.substring(0, 13), null));
         roleAssignmentRepository.save(
                 new com.cms.identity.account.domain.RoleAssignment(admin, clinic, com.cms.identity.account.domain.RoleAssignment.Role.ClinicAdmin));
         return admin.getId();

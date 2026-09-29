@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -25,6 +26,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public abstract class AbstractStaffIntegrationTest {
 
     /** 005-last-active-clinicadmin-protection (T014): same credentials pattern as AbstractAdminIntegrationTest. */
@@ -90,7 +92,7 @@ public abstract class AbstractStaffIntegrationTest {
 
     /** Creates a Clinic + an active ClinicAdmin Account/RoleAssignment for it, returning a valid staff JWT for that Account. */
     protected String clinicAdminToken(Clinic clinic) {
-        Account admin = saveAccount("admin-" + clinic.getId() + "@example.com", "Str0ng!Pass", "CA-" + clinic.getId());
+        Account admin = saveAccount("admin-" + clinic.getId() + "@example.com", "Str0ng!Pass", "CA-" + clinic.getId().toString().substring(0, 13));
         roleAssignmentRepository.save(new RoleAssignment(admin, clinic, RoleAssignment.Role.ClinicAdmin));
         return staffJwtService.issueToken(admin.getId());
     }
@@ -98,7 +100,7 @@ public abstract class AbstractStaffIntegrationTest {
     /** A non-ClinicAdmin (Operations) staff token, for authorization-rejection tests. */
     protected String nonClinicAdminToken(Clinic clinic) {
         Account operations =
-                saveAccount("ops-" + clinic.getId() + "@example.com", "Str0ng!Pass", "OP-" + clinic.getId());
+                saveAccount("ops-" + clinic.getId() + "@example.com", "Str0ng!Pass", "OP-" + clinic.getId().toString().substring(0, 13));
         roleAssignmentRepository.save(new RoleAssignment(operations, clinic, RoleAssignment.Role.Operations));
         return staffJwtService.issueToken(operations.getId());
     }

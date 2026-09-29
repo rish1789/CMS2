@@ -3,6 +3,7 @@ package com.cms.clinical.integration;
 import com.cms.booking.domain.AppointmentType;
 import com.cms.booking.repository.AppointmentTypeRepository;
 import com.cms.booking.domain.Booking;
+import com.cms.booking.repository.BookingAttemptLogRepository;
 import com.cms.booking.repository.BookingRepository;
 import com.cms.clinical.repository.ConsultationNoteRepository;
 import com.cms.clinical.service.ConsultationNoteService;
@@ -40,6 +41,7 @@ import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.util.EnumSet;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -48,6 +50,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -59,6 +62,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public abstract class AbstractRetentionPurgeIntegrationTest {
 
     @Container
@@ -146,12 +150,17 @@ public abstract class AbstractRetentionPurgeIntegrationTest {
 
     private int counter = 0;
 
+    @Autowired
+    private BookingAttemptLogRepository bookingAttemptLogRepository;
+
     @AfterEach
     void cleanDatabase() {
         jdbcTemplate.update("DELETE FROM prescription_item");
         prescriptionRepository.deleteAll();
         externalRecordReferenceRepository.deleteAll();
         consultationNoteRepository.deleteAll();
+        // 060-booking-abuse-prevention: attempt-log rows reference booking, patient_account and clinic.
+        bookingAttemptLogRepository.deleteAll();
         bookingRepository.deleteAll();
         patientRepository.deleteAll();
         patientAccountRepository.deleteAll();
@@ -204,14 +213,22 @@ public abstract class AbstractRetentionPurgeIntegrationTest {
                 appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
         Booking booking = bookingRepository.saveAndFlush(
                 new Booking(slot, patient, appointmentType, new BigDecimal("300.00"), doctor.getAccount().getId()));
-        slot.setStatus(SlotStatus.BOOKED);
+        // The visit has taken place: a still-BOOKED timed slot counts as a pending future booking
+        // (anonymization precondition, real-bug-fix 2026-09-24) and would block the anonymize()
+        // every purge scenario needs. Purge eligibility itself ignores slot/booking status.
+        slot.setStatus(SlotStatus.COMPLETED);
         slotRepository.save(slot);
         jdbcTemplate.update("UPDATE booking SET created_at = ? WHERE id = ?", Timestamp.from(createdAt), booking.getId());
         return booking;
     }
 
+    /**
+     * Calendar arithmetic, matching RetentionPurgeService's cutoff (start of today minus 3 years,
+     * UTC). A fixed 3*365+1 days was not enough whenever the window spans a 29 February: the
+     * timestamp then landed on the cutoff day itself, after its midnight, and was not eligible.
+     */
     protected Instant threeYearsAndOneDayAgo() {
-        return Instant.now().minusSeconds(3L * 365 * 24 * 3600 + 24 * 3600);
+        return LocalDate.now(ZoneOffset.UTC).minusYears(3).minusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
     }
 
     protected Instant oneYearAgo() {

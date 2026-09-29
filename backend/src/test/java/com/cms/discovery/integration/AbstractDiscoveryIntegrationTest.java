@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -29,6 +30,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public abstract class AbstractDiscoveryIntegrationTest {
 
     @Container
@@ -98,7 +100,7 @@ public abstract class AbstractDiscoveryIntegrationTest {
             boolean visible) {
         Account account = accountRepository.save(new Account(
                 doctorName, licenseNumber + "@example.com", passwordEncoder.encode("Str0ng!Pass"),
-                "DR-" + licenseNumber, null));
+                "DR-" + java.util.UUID.randomUUID().toString().substring(0, 13), null));
         DoctorProfile profile = new DoctorProfile(account, specialization, licenseNumber, experienceYears);
         profile.setLicenseVerified(licenseVerified);
         profile.setVisible(visible);

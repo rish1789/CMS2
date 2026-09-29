@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 064-queue-send-in-complete (FR-011, Constitution I data migration, tasks.md T001): V40 moves an
@@ -21,6 +22,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * pre-064 data, since Flyway has already applied it to the empty schema at startup.
  */
 class QueueTokenMigrationTest extends AbstractSessionCancellationIntegrationTest {
+
+    // The repository's @Modifying update runs inside a service transaction in production;
+    // a test calling it directly must supply one.
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -40,7 +46,7 @@ class QueueTokenMigrationTest extends AbstractSessionCancellationIntegrationTest
         Slot cancelledToken = preFeatureToken(queue, 2);
         bookSlot(clinic, doctor, activeToken);
         Booking cancelled = bookSlot(clinic, doctor, cancelledToken);
-        bookingRepository.cancelIfActive(cancelled.getId());
+        transactionTemplate.executeWithoutResult(status -> bookingRepository.cancelIfActive(cancelled.getId()));
         // bookSlot flips a slot BOOKED; put both tokens back to the pre-064 shape.
         jdbcTemplate.update("UPDATE slot SET status = 'OPEN' WHERE id IN (?, ?)", activeToken.getId(), cancelledToken.getId());
 

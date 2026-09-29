@@ -35,7 +35,10 @@ class ClinicStaffControllerTest extends AbstractStaffIntegrationTest {
         roleAssignment.deactivate(com.cms.identity.account.domain.RoleAssignment.DeactivationReason.RESIGNED);
         roleAssignmentRepository.save(roleAssignment);
 
+        // The roster includes inactive Role Assignments by default (status-filter follow-up);
+        // excluding them is opt-in via active=true.
         mockMvc.perform(get("/api/v1/clinics/{clinicId}/staff", clinic.getId())
+                        .param("active", "true")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + clinicAdminToken(clinic)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.staff.length()").value(1)); // only clinicAdminToken's own admin

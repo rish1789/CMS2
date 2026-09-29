@@ -13,6 +13,10 @@ class DiscoveryEligibilityAllConditionsTest extends AbstractDoctorIntegrationTes
         var profile = saveDoctorProfile("LIC-GATE-ALL", true, true);
         linkDoctorToClinic(profile, clinic, true);
 
-        assertThat(doctorProfileRepository.findDiscoveryEligible()).contains(profile);
+        // Compare by id: the repository returns fresh instances and DoctorProfile has no equals(),
+        // so an instance comparison would never match (and doesNotContain would pass vacuously).
+        assertThat(doctorProfileRepository.findDiscoveryEligible())
+                .extracting(p -> p.getId())
+                .contains(profile.getId());
     }
 }
