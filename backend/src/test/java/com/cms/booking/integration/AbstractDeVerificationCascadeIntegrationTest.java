@@ -2,6 +2,7 @@ package com.cms.booking.integration;
 
 import com.cms.identity.admin.service.ClinicVerificationService;
 import com.cms.identity.admin.service.DoctorVerificationService;
+import com.cms.inbox.repository.InboxItemRepository;
 import com.cms.waitlist.domain.WaitlistEntry;
 import com.cms.waitlist.repository.WaitlistEntryRepository;
 import java.nio.charset.StandardCharsets;
@@ -38,9 +39,13 @@ public abstract class AbstractDeVerificationCascadeIntegrationTest extends Abstr
     @Autowired
     protected WaitlistEntryRepository waitlistEntryRepository;
 
-    /** Runs before the superclass's own {@code cleanDatabase} (JUnit 5's subclass-before-superclass @AfterEach order) - waitlist_entry references patient_account, so it must go first. */
+    @Autowired
+    private InboxItemRepository inboxItemRepository;
+
+    /** Runs before the superclass's own {@code cleanDatabase} (JUnit 5's subclass-before-superclass @AfterEach order) - waitlist_entry references patient_account, and the cascade's inbox items reference clinic (no ON DELETE CASCADE), so both must go first. */
     @AfterEach
     void cleanWaitlistEntries() {
+        inboxItemRepository.deleteAll();
         waitlistEntryRepository.deleteAll();
     }
 

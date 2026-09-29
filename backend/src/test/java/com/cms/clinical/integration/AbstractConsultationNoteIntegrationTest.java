@@ -16,6 +16,7 @@ import com.cms.identity.clinic.Clinic;
 import com.cms.identity.clinic.ClinicRepository;
 import com.cms.identity.doctor.DoctorProfile;
 import com.cms.identity.doctor.DoctorProfileRepository;
+import com.cms.patient.account.repository.PatientAccountRepository;
 import com.cms.patient.record.domain.Patient;
 import com.cms.patient.record.repository.PatientRepository;
 import com.cms.scheduling.domain.Schedule;
@@ -117,6 +118,9 @@ public abstract class AbstractConsultationNoteIntegrationTest {
     @Autowired
     private BookingAttemptLogRepository bookingAttemptLogRepository;
 
+    @Autowired
+    private PatientAccountRepository patientAccountRepository;
+
     @AfterEach
     void cleanDatabase() {
         consultationNoteRepository.deleteAll();
@@ -124,6 +128,8 @@ public abstract class AbstractConsultationNoteIntegrationTest {
         bookingAttemptLogRepository.deleteAll();
         bookingRepository.deleteAll();
         patientRepository.deleteAll();
+        // Subclasses create patient accounts; they must go after the patients that reference them.
+        patientAccountRepository.deleteAll();
         appointmentTypeRepository.deleteAll();
         slotRepository.deleteAll();
         sessionRepository.deleteAll();

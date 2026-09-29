@@ -17,7 +17,6 @@ import com.cms.scheduling.domain.Session;
 import com.cms.scheduling.domain.Slot;
 import java.math.BigDecimal;
 import java.util.UUID;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -35,11 +34,6 @@ class PatientPrescriptionAccessTest extends AbstractPrescriptionIntegrationTest 
 
     @Autowired
     private JwtService patientJwtService;
-
-    @AfterEach
-    void cleanPatientAccounts() {
-        patientAccountRepository.deleteAll();
-    }
 
     private PatientAccount savePatientAccount() {
         return patientAccountRepository.save(
