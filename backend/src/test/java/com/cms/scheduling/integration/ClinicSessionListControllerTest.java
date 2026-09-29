@@ -132,6 +132,9 @@ class ClinicSessionListControllerTest extends AbstractScheduleIntegrationTest {
     /** 042-day-sheet-hardening FR-005/SC-002: the list is paginated, not returned in one unbounded response. */
     @Test
     void paginatesResultsAndReportsTotalCount() throws Exception {
+        // Generation creates one session per doctor per day for 15 days, and the default
+        // window spans 15 days; pin the query to today so each doctor contributes one session.
+        String today = LocalDate.now().toString();
         Clinic clinic = saveClinic();
         DoctorProfile doctorA = saveDoctorStaffedAt(clinic);
         DoctorProfile doctorB = saveDoctorStaffedAt(clinic);
@@ -141,6 +144,8 @@ class ClinicSessionListControllerTest extends AbstractScheduleIntegrationTest {
         generateFixedTimeSession(clinic, doctorC);
 
         mockMvc.perform(get("/api/v1/clinics/{clinicId}/sessions", clinic.getId())
+                        .param("from", today)
+                        .param("to", today)
                         .param("page", "0")
                         .param("size", "2")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + clinicAdminToken(clinic)))
@@ -151,6 +156,8 @@ class ClinicSessionListControllerTest extends AbstractScheduleIntegrationTest {
                 .andExpect(jsonPath("$.totalCount").value(3));
 
         mockMvc.perform(get("/api/v1/clinics/{clinicId}/sessions", clinic.getId())
+                        .param("from", today)
+                        .param("to", today)
                         .param("page", "1")
                         .param("size", "2")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + clinicAdminToken(clinic)))
@@ -162,6 +169,9 @@ class ClinicSessionListControllerTest extends AbstractScheduleIntegrationTest {
     /** 042-day-sheet-hardening FR-004: filters the list down to one doctor. */
     @Test
     void filtersToOneDoctor() throws Exception {
+        // Generation creates one session per doctor per day for 15 days, and the default
+        // window spans 15 days; pin the query to today so each doctor contributes one session.
+        String today = LocalDate.now().toString();
         Clinic clinic = saveClinic();
         DoctorProfile doctorA = saveDoctorStaffedAt(clinic);
         DoctorProfile doctorB = saveDoctorStaffedAt(clinic);
@@ -169,6 +179,8 @@ class ClinicSessionListControllerTest extends AbstractScheduleIntegrationTest {
         generateFixedTimeSession(clinic, doctorB);
 
         mockMvc.perform(get("/api/v1/clinics/{clinicId}/sessions", clinic.getId())
+                        .param("from", today)
+                        .param("to", today)
                         .param("doctorProfileId", doctorA.getId().toString())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + clinicAdminToken(clinic)))
                 .andExpect(status().isOk())
