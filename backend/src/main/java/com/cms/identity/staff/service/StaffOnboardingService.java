@@ -122,7 +122,9 @@ public class StaffOnboardingService {
 
             Account account = new Account(
                     request.name(), request.email(), passwordEncoder.encode(temporaryPassword), staffCode, request.mobile());
-            account = accountRepository.save(account);
+            // Flushed here, inside the try: a deferred INSERT would otherwise hit uq_account_email
+            // at commit, after this catch, and surface as an unmapped 500.
+            account = accountRepository.saveAndFlush(account);
 
             roleAssignmentRepository.save(new RoleAssignment(account, clinic, role));
 
@@ -133,7 +135,8 @@ public class StaffOnboardingService {
                         request.doctor().specialization(),
                         request.doctor().licenseNumber(),
                         request.doctor().experienceYears());
-                doctorProfile = doctorProfileRepository.save(doctorProfile);
+                // Flushed for the same reason, for uq_doctor_profile_license_number.
+                doctorProfile = doctorProfileRepository.saveAndFlush(doctorProfile);
                 doctorProfileId = doctorProfile.getId();
             }
 

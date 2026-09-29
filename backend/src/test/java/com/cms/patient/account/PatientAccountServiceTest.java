@@ -76,7 +76,7 @@ class PatientAccountServiceTest {
         when(passwordPolicyValidator.validate("Str0ng!Pass")).thenReturn(List.of());
         when(patientAccountRepository.existsByEmail("owner@example.com")).thenReturn(false);
         when(passwordEncoder.encode("Str0ng!Pass")).thenReturn("hashed-pw");
-        when(patientAccountRepository.save(any(PatientAccount.class))).thenReturn(account);
+        when(patientAccountRepository.saveAndFlush(any(PatientAccount.class))).thenReturn(account);
         UUID accountId = UUID.randomUUID();
         when(account.getId()).thenReturn(accountId);
         when(account.getEmail()).thenReturn("owner@example.com");
@@ -95,7 +95,7 @@ class PatientAccountServiceTest {
 
         assertThatThrownBy(() -> service().signup(request)).isInstanceOf(EmailAlreadyInUseException.class);
         verify(passwordEncoder, never()).encode(anyString());
-        verify(patientAccountRepository, never()).save(any());
+        verify(patientAccountRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -105,7 +105,7 @@ class PatientAccountServiceTest {
         when(passwordPolicyValidator.validate("weak")).thenReturn(List.of("MIN_LENGTH"));
 
         assertThatThrownBy(() -> service().signup(request)).isInstanceOf(InvalidPasswordException.class);
-        verify(patientAccountRepository, never()).save(any());
+        verify(patientAccountRepository, never()).saveAndFlush(any());
     }
 
     @Test
