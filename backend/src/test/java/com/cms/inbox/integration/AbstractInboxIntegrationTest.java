@@ -18,6 +18,7 @@ import com.cms.identity.doctor.DoctorProfile;
 import com.cms.identity.doctor.DoctorProfileRepository;
 import com.cms.inbox.domain.InboxItem;
 import com.cms.inbox.repository.InboxItemRepository;
+import com.cms.notification.repository.NotificationEventRepository;
 import com.cms.patient.account.domain.PatientAccount;
 import com.cms.patient.account.repository.PatientAccountRepository;
 import com.cms.patient.record.repository.PatientRepository;
@@ -141,8 +142,13 @@ public abstract class AbstractInboxIntegrationTest {
     @Autowired
     private BookingAttemptLogRepository bookingAttemptLogRepository;
 
+    @Autowired
+    private NotificationEventRepository notificationEventRepository;
+
     @AfterEach
     void cleanDatabase() {
+        // Waitlist offers and de-verification cascades emit notification events that reference patient_account.
+        notificationEventRepository.deleteAll();
         inboxItemRepository.deleteAll();
         waitlistEntryRepository.deleteAll();
         // 060-booking-abuse-prevention: attempt-log rows reference booking, patient_account and clinic.
