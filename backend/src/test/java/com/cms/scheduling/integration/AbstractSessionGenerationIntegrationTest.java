@@ -6,6 +6,7 @@ import com.cms.scheduling.domain.Schedule;
 import com.cms.scheduling.domain.ScheduleMode;
 import com.cms.scheduling.service.SessionGenerationService;
 import com.cms.scheduling.repository.SessionRepository;
+import com.cms.scheduling.repository.SlotRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
@@ -40,8 +41,13 @@ public abstract class AbstractSessionGenerationIntegrationTest extends AbstractS
     @Autowired
     protected SessionGenerationService sessionGenerationService;
 
+    @Autowired
+    private SlotRepository slotRepository;
+
     @AfterEach
     void cleanSessions() {
+        // Generated sessions own slots (FK slot.session_id), so slots must go first.
+        slotRepository.deleteAll();
         sessionRepository.deleteAll();
     }
 

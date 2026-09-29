@@ -3,6 +3,7 @@ package com.cms.inbox.integration;
 import com.cms.booking.domain.AppointmentType;
 import com.cms.booking.repository.AppointmentTypeRepository;
 import com.cms.booking.domain.Booking;
+import com.cms.booking.repository.BookingAttemptLogRepository;
 import com.cms.booking.repository.BookingRepository;
 import com.cms.booking.service.DeVerificationCascadeService;
 import com.cms.booking.service.FrontDeskWalkInService;
@@ -137,10 +138,15 @@ public abstract class AbstractInboxIntegrationTest {
 
     private int counter = 0;
 
+    @Autowired
+    private BookingAttemptLogRepository bookingAttemptLogRepository;
+
     @AfterEach
     void cleanDatabase() {
         inboxItemRepository.deleteAll();
         waitlistEntryRepository.deleteAll();
+        // 060-booking-abuse-prevention: attempt-log rows reference booking, patient_account and clinic.
+        bookingAttemptLogRepository.deleteAll();
         bookingRepository.deleteAll();
         patientRepository.deleteAll();
         patientAccountRepository.deleteAll();

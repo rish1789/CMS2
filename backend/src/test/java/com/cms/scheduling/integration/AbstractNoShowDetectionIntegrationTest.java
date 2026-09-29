@@ -3,6 +3,7 @@ package com.cms.scheduling.integration;
 import com.cms.booking.domain.AppointmentType;
 import com.cms.booking.repository.AppointmentTypeRepository;
 import com.cms.booking.domain.Booking;
+import com.cms.booking.repository.BookingAttemptLogRepository;
 import com.cms.booking.repository.BookingRepository;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfile;
@@ -41,8 +42,13 @@ public abstract class AbstractNoShowDetectionIntegrationTest extends AbstractSlo
     @Autowired
     protected BookingRepository bookingRepository;
 
+    @Autowired
+    private BookingAttemptLogRepository bookingAttemptLogRepository;
+
     @AfterEach
     void cleanBookingRelatedRows() {
+        // 060-booking-abuse-prevention: attempt-log rows reference booking, patient_account and clinic.
+        bookingAttemptLogRepository.deleteAll();
         bookingRepository.deleteAll();
         patientRepository.deleteAll();
         appointmentTypeRepository.deleteAll();

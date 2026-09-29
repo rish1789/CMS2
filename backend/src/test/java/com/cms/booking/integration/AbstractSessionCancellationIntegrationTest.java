@@ -3,6 +3,7 @@ package com.cms.booking.integration;
 import com.cms.booking.domain.AppointmentType;
 import com.cms.booking.repository.AppointmentTypeRepository;
 import com.cms.booking.domain.Booking;
+import com.cms.booking.repository.BookingAttemptLogRepository;
 import com.cms.booking.repository.BookingRepository;
 import com.cms.booking.repository.DoctorDefaultFeeRepository;
 import com.cms.identity.account.domain.Account;
@@ -132,9 +133,14 @@ public abstract class AbstractSessionCancellationIntegrationTest {
 
     private int counter = 0;
 
+    @Autowired
+    private BookingAttemptLogRepository bookingAttemptLogRepository;
+
     @AfterEach
     void cleanDatabase() {
         notificationEventRepository.deleteAll();
+        // 060-booking-abuse-prevention: attempt-log rows reference booking, patient_account and clinic.
+        bookingAttemptLogRepository.deleteAll();
         bookingRepository.deleteAll();
         patientRepository.deleteAll();
         patientAccountRepository.deleteAll();

@@ -38,6 +38,8 @@ class ClinicSessionListControllerTest extends AbstractScheduleIntegrationTest {
 
     @AfterEach
     void cleanSessions() {
+        // Generated sessions own slots (FK slot.session_id), so slots must go first.
+        slotRepository.deleteAll();
         sessionRepository.deleteAll();
     }
 
