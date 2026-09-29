@@ -21,6 +21,10 @@ public interface PatientAccountRepository extends JpaRepository<PatientAccount, 
      * the duration of the count-then-insert transaction, serializing two simultaneous booking
      * attempts from the same patient so the second always sees the first's freshly-inserted
      * Booking when it re-reads the active-appointment count.
+     *
+     * <p>066-patient-linking-race: also taken by PatientLinkingService.findOrCreatePatient, so
+     * concurrent same-account linking at one clinic serializes on this row instead of racing on
+     * uq_patient_clinic_account (research.md R3).
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<PatientAccount> findWithLockById(UUID id);
