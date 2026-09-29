@@ -1,7 +1,7 @@
 // 060-booking-abuse-prevention T055: renders every setting, editing and saving one calls the
 // update endpoint, expanding a setting's history calls the history endpoint and renders its
 // entries.
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ProtectionSettingsPage } from '../../src/features/admin-protection-settings/ProtectionSettingsPage'
@@ -71,8 +71,10 @@ describe('ProtectionSettingsPage', () => {
     await screen.findByText('rate-limit.max-attempts')
     const inputs = screen.getAllByRole('spinbutton')
     const rateLimitInput = inputs.find((el) => (el as HTMLInputElement).value === '8')!
-    await user.clear(rateLimitInput)
-    await user.type(rateLimitInput, '5')
+    // One change event, not user.clear() + user.type(): in CI the clear was occasionally lost
+    // before typing, leaving "85" (8 + 5) instead of "5". This test covers saving, not typing.
+    fireEvent.change(rateLimitInput, { target: { value: '5' } })
+    expect(rateLimitInput).toHaveValue(5)
 
     const saveButtons = screen.getAllByRole('button', { name: /^save$/i })
     await user.click(saveButtons[saveButtons.length - 1])
