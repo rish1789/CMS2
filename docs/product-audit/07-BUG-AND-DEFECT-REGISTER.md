@@ -61,9 +61,16 @@ This is the first time the integration tests ran with a working Docker. The run 
 - **Real defects surfaced (7 tests; pre-existing, not in Phase 1 scope):**
   - **PB-003 reproduced:** `QueueSlotIssuanceConcurrencyTest`, 20 concurrent tokens → `TokenIssuanceFailedException`.
   - **Unhandled duplicate-key races:** concurrent clinic registration or patient signup with the same email, or a Super Admin license edit to an existing number, returns an unmapped `DataIntegrityViolationException` instead of a 409. The database still prevents the duplicate.
+    - **FIXED 2026-09-29 (PR #16).** The write in each `try` is now `saveAndFlush`, so the violation surfaces where the existing handler maps it. This covers doctor onboarding by email and by license too. The Super Admin license edit failed even without concurrency.
   - **Patient linking race:** a same-account race retries inside an aborted transaction.
+    - **FIXED 2026-09-29 (spec 066).** `PatientLinkingService.findOrCreatePatient` now takes the 060 account row lock, so same-account calls serialize, and the broken re-read was removed.
+    - Before the fix, the race also broke real bookings: fixed-time bookings with the booking limit disabled (`PatientBookingSameAccountRaceTest`) and queue bookings, 3 of 5 runs (`PatientQueueBookingSameAccountRaceTest`).
+    - Tests: `PatientLinkingSameAccountRaceTest`, `PatientLinkingWinnerRollbackTest`, `PatientBookingFailureLeavesNoPatientTest`.
   - **De-verification cascade:** the waitlist offer is not persisted from the `AFTER_COMMIT` listener.
-  - **Booking rate limiter:** exceeds its bounded race margin (12 against 9).
+    - **Still OPEN on `main` `715738b`**, even with PR #13's `WaitlistBumpListener` `REQUIRES_NEW` fix: `cancelledFixedTimeBookingProducesARealWaitlistOffer…` still gets `WAITING`, not `OFFERED`. The cause differs from #13's and has not been investigated. (PR #13 fixed the four `WaitlistMatching*` tests only.)
+  - **Booking rate limiter:** exceeds its bounded race margin (12 against 9). Still open.
+  - **Waitlist claim/decline race** (found 2026-09-29, open): `WaitlistClaimService.decline()` reports success even when it loses its guarded update to a concurrent `claim()`, so both callers "win".
+    - `WaitlistClaimConcurrencyTest.claimAndDeclineRacingOnTheSameEntryOnlyOneWins` fails intermittently on `main` `715738b` (5 of 8 `--rerun` runs).
 
 ---
 

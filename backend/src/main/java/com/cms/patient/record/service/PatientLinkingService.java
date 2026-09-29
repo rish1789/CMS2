@@ -13,7 +13,6 @@ import java.util.NoSuchElementException;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,8 +41,14 @@ public class PatientLinkingService {
 
     @Transactional
     public Patient findOrCreatePatient(UUID patientAccountId, UUID clinicId, String name) {
+        // 066-patient-linking-race (research.md R3): a row lock on the Patient Account, held until
+        // the caller's transaction ends, serializes concurrent calls for the same account - the
+        // same lock 060's BookingProtectionService.checkBookingLimit takes (a no-op re-lock when
+        // it already did, in the same transaction). A second caller waits here, then sees the
+        // first caller's committed record via the FR-002 lookup below, or creates its own if the
+        // first rolled back - so it never issues a conflicting INSERT (009 FR-006).
         PatientAccount account = patientAccountRepository
-                .findById(patientAccountId)
+                .findWithLockById(patientAccountId)
                 .orElseThrow(() -> new PatientAccountNotFoundException(patientAccountId));
 
         // FR-002: already linked at this clinic - reuse directly, no phone re-matching.
@@ -73,36 +78,13 @@ public class PatientLinkingService {
         Clinic clinic = clinicRepository
                 .findById(clinicId)
                 .orElseThrow(() -> new NoSuchElementException("No clinic with id " + clinicId));
-        try {
-            // 021-patient-self-service-booking convergence fix: saveAndFlush (not save)
-            // forces the INSERT - and its uq_patient_clinic_account constraint check - to
-            // happen synchronously right here, where this catch block can actually
-            // intercept it. A plain save() defers the INSERT to whatever later flush
-            // happens to occur first (e.g. a caller's own saveAndFlush on an unrelated
-            // entity), by which point this method has already returned and no catch here
-            // could ever fire - the exact bug class 020 found and fixed in StaffBookingService.
-            Patient created = patientRepository.saveAndFlush(new Patient(clinic, account, name, mobile));
-            log.info("Patient linking: created new record, accountId={}, clinicId={}", patientAccountId, clinicId);
-            return created;
-        } catch (DataAccessException e) {
-            if (!isUniqueConstraintViolation(e, "uq_patient_clinic_account")) {
-                throw e;
-            }
-            // FR-006: lost the same-account race (uq_patient_clinic_account) against a
-            // concurrent call for this same account+clinic - not a failure, the
-            // concurrent winner's row is what we return.
-            log.info(
-                    "Patient linking: lost create race, re-reading winner's record, accountId={}, clinicId={}",
-                    patientAccountId,
-                    clinicId);
-            return patientRepository
-                    .findByClinic_IdAndPatientAccount_Id(clinicId, patientAccountId)
-                    .orElseThrow(() -> e);
-        }
-    }
-
-    private boolean isUniqueConstraintViolation(DataAccessException e, String constraintName) {
-        String message = e.getMostSpecificCause().getMessage();
-        return message != null && message.contains(constraintName);
+        // No catch for uq_patient_clinic_account here (066 research.md R1/R3): the account lock
+        // above means a same-account race never reaches this INSERT, and a re-read after a failed
+        // INSERT could never work anyway - PostgreSQL aborts the whole transaction. The index stays
+        // as the data-layer backstop (FR-005a); a violation from any other writer propagates.
+        // saveAndFlush (not save) keeps the INSERT - and its constraint check - inside this method.
+        Patient created = patientRepository.saveAndFlush(new Patient(clinic, account, name, mobile));
+        log.info("Patient linking: created new record, accountId={}, clinicId={}", patientAccountId, clinicId);
+        return created;
     }
 }

@@ -27,7 +27,7 @@ description: "Task list for 066 patient-linking same-account race"
 
 **Purpose**: Confirm the starting point, so that red and green results are attributable to this feature.
 
-- [ ] T001 Confirm that branch `claude/066-patient-linking-race` is based on `main` `715738b` and that Docker is reachable (`docker info`). Then run `cd backend && ./gradlew test -x spotlessApply --tests "*PatientLinkingSameAccountRaceTest"` and confirm it **fails** with `current transaction is aborted` (research.md R1). Record the result here.
+- [X] T001 Confirm that branch `claude/066-patient-linking-race` is based on `main` `715738b` and that Docker is reachable (`docker info`). Then run `cd backend && ./gradlew test -x spotlessApply --tests "*PatientLinkingSameAccountRaceTest"` and confirm it **fails** with `current transaction is aborted` (research.md R1). Record the result here. **Done:** based on `715738b`, Docker OK; (observed: RED) `current transaction is aborted` on the re-sent INSERT (auto-flush during the catch's re-read). Confirms R1.
 
 ---
 
@@ -45,8 +45,8 @@ description: "Task list for 066 patient-linking same-account race"
 
 ### Tests for User Story 1 (write first, run, and record the result before T006)
 
-- [ ] T002 [P] [US1] Leave `backend/src/test/java/com/cms/patient/record/integration/PatientLinkingSameAccountRaceTest.java` **unchanged** (SC-005). It is the primary red test, already confirmed in T001. No edit.
-- [ ] T003 [P] [US1] Create `backend/src/test/java/com/cms/patient/record/integration/PatientLinkingWinnerRollbackTest.java`, extending `AbstractPatientRecordIntegrationTest` (FR-004).
+- [X] T002 [P] [US1] Leave `backend/src/test/java/com/cms/patient/record/integration/PatientLinkingSameAccountRaceTest.java` **unchanged** (SC-005). It is the primary red test, already confirmed in T001. No edit. **Done:** unchanged; (observed: RED before, GREEN after).
+- [X] T003 [P] [US1] Create `backend/src/test/java/com/cms/patient/record/integration/PatientLinkingWinnerRollbackTest.java`, extending `AbstractPatientRecordIntegrationTest` (FR-004). **Done:** (observed: GREEN before the fix, a characterization test as R4 allowed; GREEN after).
   - Inject `PatientLinkingService` and a `TransactionTemplate` (built from the autowired `PlatformTransactionManager`).
   - **Thread A:** inside `transactionTemplate.execute`, call `findOrCreatePatient(account, clinic, "Jane Doe")`, count down latch `aLinked`, wait on latch `releaseA` (max 30 s), then `status.setRollbackOnly()`.
   - **Thread B:** after `aLinked`, call `findOrCreatePatient` for the same account and clinic in its own transaction (no template).
@@ -54,12 +54,12 @@ description: "Task list for 066 patient-linking same-account race"
   - **Assert:** B returns normally with a non-null id; `patientRepository.count() == 1`; the one row's id equals B's returned id.
   - Use a 2-thread `ExecutorService` and `shutdownNow()` in `finally`.
   - Record `(observed: …)`. Research R4 says this may be green before the fix, because a pre-fix B's INSERT waits and then succeeds after A's rollback. Green here is acceptable as characterization.
-- [ ] T004 [P] [US1] Create `backend/src/test/java/com/cms/booking/integration/PatientQueueBookingSameAccountRaceTest.java`, extending `AbstractQueueBookingIntegrationTest` (FR-007, queue path).
+- [X] T004 [P] [US1] Create `backend/src/test/java/com/cms/booking/integration/PatientQueueBookingSameAccountRaceTest.java`, extending `AbstractQueueBookingIntegrationTest` (FR-007, queue path). **Done:** (observed: intermittently RED before, failing 3 of 5 `--rerun` runs; GREEN after, passing 10 of 10 `--rerun` runs together with T002).
   - **Setup:** a new clinic and a staffed doctor; `saveQueueSession(clinic, doctor)`; an appointment type via `saveAppointmentTypeWithOverride(doctor, new BigDecimal("300.00"))`; one `savePatientAccount()` with **no** Patient record at the clinic.
   - **Race:** fire two concurrent `POST` patient queue bookings for that session with the same `patientToken(account)`. Copy the exact endpoint and body from `backend/src/test/java/com/cms/booking/integration/PatientQueueBookingTest.java`. Use `invokeAll` on a 2-thread pool, as in `QueueBookingConcurrencyTest`.
   - **Assert:** both responses are 201; the `patient` table has exactly 1 row for `(clinic, account)`; both `booking` rows reference that Patient id.
   - Record `(observed: …)`; expected RED.
-- [ ] T005 [P] [US1] Create `backend/src/test/java/com/cms/booking/integration/PatientBookingSameAccountRaceTest.java`, extending `AbstractPatientBookingIntegrationTest` (FR-007, fixed-time path with the booking limit **disabled**).
+- [X] T005 [P] [US1] Create `backend/src/test/java/com/cms/booking/integration/PatientBookingSameAccountRaceTest.java`, extending `AbstractPatientBookingIntegrationTest` (FR-007, fixed-time path with the booking limit **disabled**). **Done:** (observed: RED before, same aborted-transaction error through HTTP; GREEN after).
   - **Setup:** in `@BeforeEach`, autowire `ProtectionSettingService` and call `update("booking-limit.enabled", "false", "test-066")`. In `@AfterEach`, delete the `protection_setting` and `protection_setting_change_log` rows, via their repositories or `JdbcTemplate`, **before** the base class cleanup, so that other test classes see defaults. Check the real table names in `backend/src/main/resources/db/migration`.
   - **Fixture:** `saveFixedTimeSessionWithSlots(clinic, doctor)`, two **different** open slots of that session, `saveAppointmentTypeWithOverride(doctor, new BigDecimal("300.00"))`, and one `savePatientAccount()` with no Patient record at the clinic.
   - **Race:** fire two concurrent `POST` slot bookings, one per slot, with the same `patientToken(account)`. Copy the endpoint and body from `PatientBookingFirstTimeLinkTest.java`.
@@ -68,14 +68,14 @@ description: "Task list for 066 patient-linking same-account race"
 
 ### Implementation for User Story 1
 
-- [ ] T006 [US1] In `backend/src/main/java/com/cms/patient/record/service/PatientLinkingService.java` `findOrCreatePatient` (research.md R3, contracts/patient-linking-service.md):
+- [X] T006 [US1] In `backend/src/main/java/com/cms/patient/record/service/PatientLinkingService.java` `findOrCreatePatient` (research.md R3, contracts/patient-linking-service.md): **Done.**
   - Replace `patientAccountRepository.findById(patientAccountId)` with `patientAccountRepository.findWithLockById(patientAccountId)`, keeping the same `orElseThrow(PatientAccountNotFoundException)`.
   - Add a comment citing 066 research R3 and the 060 precedent.
   - In the create branch, keep `saveAndFlush`, but **remove** the `try/catch (DataAccessException)` re-read block and the now-unused `isUniqueConstraintViolation` helper, together with any imports they alone used. A violation now propagates (FR-006). Replace the old catch comment with a short one explaining why no catch is needed.
   - Do not change the FR-002 or FR-003 branches.
-- [ ] T007 [US1] Update the javadoc of `findWithLockById` in `backend/src/main/java/com/cms/patient/account/repository/PatientAccountRepository.java` to name its second user: 066, `PatientLinkingService`. This is a comment-only change.
-- [ ] T008 [US1] Check the Mockito unit tests for `PatientLinkingService`. Run `grep -rn "PatientLinkingService" backend/src/test/java --include=*Test.java`, and in any **unit** test that stubs `patientAccountRepository.findById` for `findOrCreatePatient`, switch the stub or verify to `findWithLockById`. If none exist, record "none".
-- [ ] T009 [US1] Re-run T001's test and T003–T005. All must pass. Then run the existing 009 linking suite, `--tests "com.cms.patient.record.integration.PatientLinking*"`, and record the results. SC-001, SC-002, SC-004 and SC-005 are covered for linking.
+- [X] T007 [US1] Update the javadoc of `findWithLockById` in `backend/src/main/java/com/cms/patient/account/repository/PatientAccountRepository.java` to name its second user: 066, `PatientLinkingService`. This is a comment-only change. **Done.**
+- [X] T008 [US1] Check the Mockito unit tests for `PatientLinkingService`. Run `grep -rn "PatientLinkingService" backend/src/test/java --include=*Test.java`, and in any **unit** test that stubs `patientAccountRepository.findById` for `findOrCreatePatient`, switch the stub or verify to `findWithLockById`. If none exist, record "none". **Done:** none. The three `booking/unit` tests mock `PatientLinkingService` as a whole, and no unit test constructs it.
+- [X] T009 [US1] Re-run T001's test and T003–T005. All must pass. Then run the existing 009 linking suite, `--tests "com.cms.patient.record.integration.PatientLinking*"`, and record the results. SC-001, SC-002, SC-004 and SC-005 are covered for linking. **Done:** all 12 pass (T002–T005, T010 and all 8 existing `PatientLinking*` tests).
 
 **Checkpoint**: US1 is complete. Both concurrent callers succeed on all paths, with exactly one Patient record.
 
@@ -89,7 +89,7 @@ description: "Task list for 066 patient-linking same-account race"
 
 ### Tests for User Story 2
 
-- [ ] T010 [P] [US2] Create `backend/src/test/java/com/cms/booking/integration/PatientBookingFailureLeavesNoPatientTest.java`, extending `AbstractPatientBookingIntegrationTest`.
+- [X] T010 [P] [US2] Create `backend/src/test/java/com/cms/booking/integration/PatientBookingFailureLeavesNoPatientTest.java`, extending `AbstractPatientBookingIntegrationTest`. **Done:** (observed: GREEN before and after, a characterization guard). It uses `Booking.bookedByPatient` plus `saveAndFlush` rather than raw SQL to occupy the slot.
   - **Fixture:** a clinic, a doctor and a fixed-time session; one open slot `S`; an appointment type with a fee.
   - **Conflict:** insert, directly through `JdbcTemplate`, a `booking` row that occupies `S` while `S.status` stays `OPEN`. The booking INSERT inside `doBookSlot` then hits `uq_booking_slot` **after** `findOrCreatePatient` has run. Take the exact column list from the booking migrations; the conflicting row needs its own existing Patient, so use `saveExistingPatient(clinic)`.
   - **Act:** book `S` as a new `savePatientAccount()` that has no Patient record at the clinic.
@@ -98,7 +98,7 @@ description: "Task list for 066 patient-linking same-account race"
 
 ### Implementation for User Story 2
 
-- [ ] T011 [US2] No production change. Confirm that T010 is green **after** T006, which proves the account lock did not move the Patient record out of the booking transaction.
+- [X] T011 [US2] No production change. Confirm that T010 is green **after** T006, which proves the account lock did not move the Patient record out of the booking transaction. **Done:** T010 is green after T006.
 
 **Checkpoint**: US1 and US2 are both independently verified.
 
@@ -106,12 +106,12 @@ description: "Task list for 066 patient-linking same-account race"
 
 ## Phase 5: Polish & Cross-Cutting Concerns
 
-- [ ] T012 Run `cd backend && ./gradlew spotlessCheck -x spotlessApply`. Fix formatting only in files this feature touched.
-- [ ] T013 Run the regression scope from quickstart.md §3 (`--tests "com.cms.patient.*" --tests "com.cms.booking.*"`) and compare with `main` `715738b`: no new failures. `BookingRateLimitConcurrencyTest` is known-failing on `main` and unrelated.
-- [ ] T014 Run the full suite (quickstart.md §4) and record the failure list. `PatientLinkingSameAccountRaceTest` must be absent, with no failure that is absent on `main`.
-- [ ] T015 [P] Update `docs/product-audit/07-BUG-AND-DEFECT-REGISTER.md`: mark the "Patient linking race" entry as fixed by 066, with the test names.
-- [ ] T016 [P] Update `backlog/progress.md` if it tracks bug-fix features. Otherwise record "n/a".
-- [ ] T017 Check off completed tasks in this file with their observed results, then commit and push to `claude/066-patient-linking-race`. Before committing, inspect `git status` and confirm the exact changed files.
+- [X] T012 Run `cd backend && ./gradlew spotlessCheck -x spotlessApply`. Fix formatting only in files this feature touched. **Done:** `spotlessCheck` clean.
+- [X] T013 Run the regression scope from quickstart.md §3 (`--tests "com.cms.patient.*" --tests "com.cms.booking.*"`) and compare with `main` `715738b`: no new failures. `BookingRateLimitConcurrencyTest` is known-failing on `main` and unrelated. **Done:** 392 tests, 2 failed: `BookingRateLimitConcurrencyTest` (known) and `ClinicDeVerificationCascadeTest…WaitlistOffer`. The second also fails on `main` `715738b` without 066 (`WAITING`, not `OFFERED`), so it is pre-existing and recorded in 07.
+- [X] T014 Run the full suite (quickstart.md §4) and record the failure list. `PatientLinkingSameAccountRaceTest` must be absent, with no failure that is absent on `main`. **Done:** 1050 tests, 4 failed, all pre-existing on `main`: rate limit, de-verification offer, `PatientWaitlistJoinTest` (404/409 decision pending), and `WaitlistClaimConcurrencyTest` claim/decline (the known decline race; it fails 5 of 8 `--rerun` runs on `main` and 7 of 8 on 066). `PatientLinkingSameAccountRaceTest` is no longer failing.
+- [X] T015 [P] Update `docs/product-audit/07-BUG-AND-DEFECT-REGISTER.md`: mark the "Patient linking race" entry as fixed by 066, with the test names. **Done.**
+- [X] T016 [P] Update `backlog/progress.md` if it tracks bug-fix features. Otherwise record "n/a". **Done:** row added.
+- [X] T017 Check off completed tasks in this file with their observed results, then commit and push to `claude/066-patient-linking-race`. Before committing, inspect `git status` and confirm the exact changed files. **Done.**
 
 ---
 
