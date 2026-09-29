@@ -21,12 +21,18 @@ class SlotCompletionAuthorizationTest extends AbstractSessionDelayIntegrationTes
                 .contentType(MediaType.APPLICATION_JSON));
     }
 
+    /**
+     * A doctor who is not the slot's treating doctor has no completion rights at all (403). Since
+     * 057, the treating doctor's own BOOKED slot is a 409 instead - covered by
+     * treatingDoctorIsRejectedForAStillBookedSlot below.
+     */
     @Test
     void doctorCallerIsForbidden() throws Exception {
         var clinic = saveClinic();
-        var doctor = saveDoctorStaffedAt(clinic);
-        Slot slot = saveFixedTimeSlotAt(clinic, doctor, LocalTime.now().minusMinutes(15), SlotStatus.BOOKED);
-        String token = doctorToken(doctor);
+        var treatingDoctor = saveDoctorStaffedAt(clinic);
+        var otherDoctor = saveDoctorStaffedAt(clinic);
+        Slot slot = saveFixedTimeSlotAt(clinic, treatingDoctor, LocalTime.now().minusMinutes(15), SlotStatus.BOOKED);
+        String token = doctorToken(otherDoctor);
 
         complete(clinic.getId().toString(), slot.getId().toString(), token)
                 .andExpect(status().isForbidden())
