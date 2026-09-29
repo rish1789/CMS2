@@ -106,7 +106,12 @@ public class WaitlistClaimService {
         if (entry.getStatus() != WaitlistEntryStatus.OFFERED) {
             throw new WaitlistOfferNotClaimableException(entryId);
         }
-        waitlistReleaseService.release(entry);
+        // The status check above reads a snapshot; a concurrent claim can still win the guarded
+        // update inside release(). Losing it must be reported, not treated as a successful decline
+        // (032 FR-010/SC-004: exactly one of concurrent claim/decline/expiry succeeds).
+        if (!waitlistReleaseService.release(entry)) {
+            throw new WaitlistOfferNotClaimableException(entryId);
+        }
         return entry;
     }
 

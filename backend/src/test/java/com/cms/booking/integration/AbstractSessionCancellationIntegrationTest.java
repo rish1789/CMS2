@@ -213,10 +213,19 @@ public abstract class AbstractSessionCancellationIntegrationTest {
 
     /** A Fixed-Time Schedule (every day, 9-13, 15-min) generated into a Session with Slots, for a doctor staffed at the given clinic. */
     protected Session saveFixedTimeSessionWithSlots(Clinic clinic, DoctorProfile doctor) {
+        return saveFixedTimeSessionWithSlotsOn(clinic, doctor, LocalDate.now());
+    }
+
+    /**
+     * The same fixture on a given date. A test that needs its slots to still be bookable (e.g. a
+     * waitlist offer, which 065's availability rule refuses for an already-started slot) must use
+     * a future date - today's 9:00 slots have elapsed for any run after 9:00.
+     */
+    protected Session saveFixedTimeSessionWithSlotsOn(Clinic clinic, DoctorProfile doctor, LocalDate date) {
         Schedule schedule = scheduleRepository.save(new Schedule(
                 doctor, clinic, EnumSet.allOf(DayOfWeek.class),
                 LocalTime.of(9, 0), LocalTime.of(13, 0), ScheduleMode.FIXED_TIME, 15));
-        sessionGenerationService.generate(LocalDate.now());
+        sessionGenerationService.generate(date);
         return sessionRepository.findBySchedule_Id(schedule.getId()).get(0);
     }
 

@@ -12,6 +12,7 @@ import com.cms.scheduling.domain.Slot;
 import com.cms.scheduling.domain.SlotStatus;
 import com.cms.waitlist.domain.WaitlistEntry;
 import com.cms.waitlist.domain.WaitlistEntryStatus;
+import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -54,7 +55,9 @@ class ClinicDeVerificationCascadeTest extends AbstractDeVerificationCascadeInteg
         PatientAccount waitingPatient = savePatientAccount();
         WaitlistEntry entry = saveWaitingEntry(clinic, doctorA, waitingPatient);
 
-        Session fixedSessionA = saveFixedTimeSessionWithSlots(clinic, doctorA);
+        // Tomorrow, not today: a waitlist offer is only made for a slot that is still bookable (065),
+        // and today's 9:00 slot has already started for any run after 9:00.
+        Session fixedSessionA = saveFixedTimeSessionWithSlotsOn(clinic, doctorA, LocalDate.now().plusDays(1));
         bookSlot(clinic, doctorA, slotRepository.findBySession_Id(fixedSessionA.getId()).get(0));
 
         Session queueSession = saveQueueSession(clinic, doctorB);
