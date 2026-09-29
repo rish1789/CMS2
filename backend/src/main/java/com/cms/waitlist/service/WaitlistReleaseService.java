@@ -38,13 +38,16 @@ public class WaitlistReleaseService {
      * FR-006/FR-007: releases an OFFERED entry (data-layer-guarded, Constitution IV) and, only
      * if that transition actually won, re-runs matching against the same Slot's Session for the
      * next-longest-waiting eligible entry (FR-008). A lost race (entry already resolved by a
-     * concurrent claim/decline/expiry) is a silent no-op, not an error.
+     * concurrent claim/decline/expiry) is a no-op, not an error, for the expiry sweep - but the
+     * result is returned so an explicit decline can report that it lost (032 FR-010/SC-004).
+     *
+     * @return {@code true} if this call released the offer, {@code false} if it lost the race
      */
     @Transactional
-    public void release(WaitlistEntry entry) {
+    public boolean release(WaitlistEntry entry) {
         int updated = waitlistEntryRepository.expireIfOffered(entry.getId());
         if (updated == 0) {
-            return;
+            return false;
         }
 
         entry.expire();
@@ -57,6 +60,7 @@ public class WaitlistReleaseService {
         Slot slot = entry.getOfferedSlot();
         Session session = slot.getSession();
         waitlistMatchingService.matchAndOffer(session, slot);
+        return true;
     }
 
     /**
