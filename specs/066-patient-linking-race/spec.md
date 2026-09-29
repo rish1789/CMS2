@@ -38,7 +38,7 @@ Both bookings must succeed and point to the same single Patient record at that c
 
 ### User Story 2 - A failed booking leaves no stray patient record (Priority: P2)
 
-When a patient's first booking at a clinic fails for an ordinary reason after the Patient record step (for example the slot was just taken, or a booking limit applies), nothing from that attempt may remain. In particular, no Patient record created by that attempt may remain. Fixing the race must not weaken this existing all-or-nothing behaviour.
+When a patient's first fixed-time slot booking at a clinic fails for an ordinary reason after the Patient record step (for example the slot was just taken), nothing from that attempt may remain. In particular, no Patient record created by that attempt may remain. Fixing the race must not weaken this existing all-or-nothing behaviour.
 
 **Why this priority**: This guards against a regression. An obvious way to fix the race would commit the Patient record separately from the booking, which breaks this guarantee. The guarantee also matters for data privacy: patient-identifying data must not be kept without a visit.
 
@@ -46,7 +46,7 @@ When a patient's first booking at a clinic fails for an ordinary reason after th
 
 **Acceptance Scenarios**:
 
-1. **Given** a Patient Account with no Patient record at clinic C, **When** its first booking at clinic C is rejected after the Patient record step, **Then** no Patient record exists for that account at clinic C afterwards.
+1. **Given** a Patient Account with no Patient record at clinic C, **When** its first fixed-time slot booking at clinic C is rejected after the Patient record step, **Then** no Patient record exists for that account at clinic C afterwards.
 2. **Given** two concurrent first-time requests where the one that created the Patient record then fails and is rolled back, **When** the other request completes, **Then** the other request still succeeds, and exactly one Patient record exists at clinic C, owned by the successful request.
 
 ---
@@ -66,7 +66,7 @@ When a patient's first booking at a clinic fails for an ordinary reason after th
 
 - **FR-001**: When two or more requests concurrently link or create a Patient record for the same Patient Account at the same clinic, and no such record existed before, every request MUST succeed and return the same single Patient record. (Restores 009 FR-006 for race FR-005a.)
 - **FR-002**: The guarantee that one Patient Account never has two Patient records at the same clinic MUST continue to be enforced at the data layer, not only by an application-level check. (009 FR-005a; Constitution Principle IV.)
-- **FR-003**: The Patient-record step MUST remain part of the booking's all-or-nothing outcome. If the booking that created the record does not complete, that record MUST NOT persist.
+- **FR-003**: The fix MUST NOT weaken today's all-or-nothing guarantee. On the fixed-time slot booking path, the Patient-record step is part of the booking's all-or-nothing outcome: if that booking does not complete, the record it created MUST NOT persist, and this MUST remain so. The queue booking path already records the Patient record as its own step by existing design (feature 022). That behaviour is unchanged, and changing it is out of scope.
 - **FR-004**: If the concurrent request that would have created the record fails and its record does not persist, a waiting request MUST still succeed, creating the record itself if needed.
 - **FR-005**: Existing linking behaviour MUST be unchanged: the already-linked reuse path (009 FR-002), walk-in phone-match linking (009 FR-003) and the rule that unlinked walk-in records never share a clinic and phone (009 FR-005b).
 - **FR-006**: Only the same-account duplicate conflict may be treated as "reuse the winner's record". Any other data failure during the Patient-record step MUST still fail the request.
@@ -83,7 +83,7 @@ When a patient's first booking at a clinic fails for an ordinary reason after th
 
 - **SC-001**: With concurrent first-time requests by the same Patient Account at the same clinic, 100% of the requests succeed and none returns an error. Verified with at least 2 concurrent requests, as in 009 SC-004.
 - **SC-002**: After any such concurrent run, exactly one Patient record exists for that account at that clinic, checked directly against stored data.
-- **SC-003**: After a first-time booking that fails, zero Patient records created by that attempt remain.
+- **SC-003**: After a first-time fixed-time slot booking that fails, zero Patient records created by that attempt remain.
 - **SC-004**: All existing patient-linking and patient-booking tests continue to pass, including the already-linked, phone-match and walk-in-uniqueness cases.
 - **SC-005**: The previously failing `PatientLinkingSameAccountRaceTest` passes, with its assertions unchanged.
 
