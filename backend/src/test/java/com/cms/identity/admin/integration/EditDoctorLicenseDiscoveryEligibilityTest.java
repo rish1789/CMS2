@@ -20,7 +20,11 @@ class EditDoctorLicenseDiscoveryEligibilityTest extends AbstractAdminIntegration
         var profile = saveDoctorProfile("doc@example.com", "LIC-ORIGINAL", "ENT", true);
         linkDoctorToClinic(profile, clinic, true);
 
-        assertThat(doctorProfileRepository.findDiscoveryEligible()).contains(profile);
+        // Compare by id: the repository returns fresh instances and DoctorProfile has no equals(),
+        // so an instance comparison would never match (and doesNotContain would pass vacuously).
+        assertThat(doctorProfileRepository.findDiscoveryEligible())
+                .extracting(p -> p.getId())
+                .contains(profile.getId());
 
         mockMvc.perform(patch("/api/v1/admin/doctors/{id}", profile.getId())
                         .header(HttpHeaders.AUTHORIZATION, superAdminAuthHeader())

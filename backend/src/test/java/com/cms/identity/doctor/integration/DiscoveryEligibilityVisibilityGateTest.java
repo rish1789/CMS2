@@ -13,6 +13,10 @@ class DiscoveryEligibilityVisibilityGateTest extends AbstractDoctorIntegrationTe
         var profile = saveDoctorProfile("LIC-GATE-VISIBLE", true, false);
         linkDoctorToClinic(profile, clinic, true);
 
-        assertThat(doctorProfileRepository.findDiscoveryEligible()).doesNotContain(profile);
+        // Compare by id: the repository returns fresh instances and DoctorProfile has no equals(),
+        // so an instance comparison would never match (and doesNotContain would pass vacuously).
+        assertThat(doctorProfileRepository.findDiscoveryEligible())
+                .extracting(p -> p.getId())
+                .doesNotContain(profile.getId());
     }
 }
