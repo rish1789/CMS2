@@ -273,7 +273,7 @@ public abstract class AbstractInboxIntegrationTest {
                                 session.getId(),
                                 null,
                                 "Walk-in Patient " + UUID.randomUUID(),
-                                "98" + (100000000 + (counter++)),
+                                "98" + (10000000 + (counter++)),
                                 null,
                                 appointmentType.getId(),
                                 "GENERAL_CHECKUP",
