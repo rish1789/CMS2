@@ -41,6 +41,7 @@ import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.util.EnumSet;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -212,14 +213,22 @@ public abstract class AbstractRetentionPurgeIntegrationTest {
                 appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
         Booking booking = bookingRepository.saveAndFlush(
                 new Booking(slot, patient, appointmentType, new BigDecimal("300.00"), doctor.getAccount().getId()));
-        slot.setStatus(SlotStatus.BOOKED);
+        // The visit has taken place: a still-BOOKED timed slot counts as a pending future booking
+        // (anonymization precondition, real-bug-fix 2026-09-24) and would block the anonymize()
+        // every purge scenario needs. Purge eligibility itself ignores slot/booking status.
+        slot.setStatus(SlotStatus.COMPLETED);
         slotRepository.save(slot);
         jdbcTemplate.update("UPDATE booking SET created_at = ? WHERE id = ?", Timestamp.from(createdAt), booking.getId());
         return booking;
     }
 
+    /**
+     * Calendar arithmetic, matching RetentionPurgeService's cutoff (start of today minus 3 years,
+     * UTC). A fixed 3*365+1 days was not enough whenever the window spans a 29 February: the
+     * timestamp then landed on the cutoff day itself, after its midnight, and was not eligible.
+     */
     protected Instant threeYearsAndOneDayAgo() {
-        return Instant.now().minusSeconds(3L * 365 * 24 * 3600 + 24 * 3600);
+        return LocalDate.now(ZoneOffset.UTC).minusYears(3).minusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
     }
 
     protected Instant oneYearAgo() {
