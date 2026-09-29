@@ -1,6 +1,6 @@
 package com.cms.identity.staff.dto;
 
-import com.cms.identity.account.RoleAssignment;
+import com.cms.identity.account.domain.RoleAssignment;
 import com.cms.identity.doctor.DoctorProfile;
 import java.time.Instant;
 import java.util.UUID;

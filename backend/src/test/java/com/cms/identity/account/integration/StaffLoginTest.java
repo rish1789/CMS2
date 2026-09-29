@@ -8,7 +8,7 @@ import com.cms.identity.staff.integration.AbstractStaffIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
-/** T007: correct credentials succeed with a token; wrong password and unknown email both return the identically-shaped 401. */
+/** T007: correct credentials succeed with a token; wrong password and unknown email are now distinguished (see class-level decision note in StaffAuthService). */
 class StaffLoginTest extends AbstractStaffIntegrationTest {
 
     @Test
@@ -30,28 +30,28 @@ class StaffLoginTest extends AbstractStaffIntegrationTest {
     }
 
     @Test
-    void wrongPasswordRejectedWithSameShapeAsUnknownEmail() throws Exception {
+    void wrongPasswordForAKnownEmailReturnsIncorrectPassword() throws Exception {
         saveAccount("wrong.pass@sunrise-clinic.example", "Str0ng!Pass", "OP-0002");
 
-        String wrongPasswordBody =
-                """
-                { "identifier": "wrong.pass@sunrise-clinic.example", "password": "Incorrect1!" }
-                """;
-        String unknownEmailBody =
-                """
-                { "identifier": "does.not.exist@sunrise-clinic.example", "password": "Incorrect1!" }
-                """;
-
         mockMvc.perform(post("/api/v1/staff/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(wrongPasswordBody))
+                        .content(
+                                """
+                                { "identifier": "wrong.pass@sunrise-clinic.example", "password": "Incorrect1!" }
+                                """))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("INVALID_CREDENTIALS"));
+                .andExpect(jsonPath("$.error").value("INCORRECT_PASSWORD"));
+    }
 
+    @Test
+    void unknownEmailReturnsAccountNotFound() throws Exception {
         mockMvc.perform(post("/api/v1/staff/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(unknownEmailBody))
+                        .content(
+                                """
+                                { "identifier": "does.not.exist@sunrise-clinic.example", "password": "Incorrect1!" }
+                                """))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("INVALID_CREDENTIALS"));
+                .andExpect(jsonPath("$.error").value("ACCOUNT_NOT_FOUND"));
     }
 }

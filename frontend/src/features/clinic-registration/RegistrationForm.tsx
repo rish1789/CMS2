@@ -4,6 +4,7 @@ import {
   RegisterClinicApiError,
   type RegisterClinicResponse,
 } from './api'
+import { FormField } from '../../components/FormField'
 
 interface FormState {
   clinicName: string
@@ -156,7 +157,7 @@ export function RegistrationForm() {
       <fieldset className="space-y-4">
         <legend className="text-sm font-medium text-gray-900">Clinic details</legend>
 
-        <Field label="Clinic name" htmlFor="clinicName" required>
+        <FormField label="Clinic name" htmlFor="clinicName" required>
           <input
             id="clinicName"
             required
@@ -164,9 +165,9 @@ export function RegistrationForm() {
             onChange={(e) => updateField('clinicName', e.target.value)}
             className="input"
           />
-        </Field>
+        </FormField>
 
-        <Field label="Address" htmlFor="clinicAddress" required>
+        <FormField label="Address" htmlFor="clinicAddress" required>
           <input
             id="clinicAddress"
             required
@@ -174,18 +175,18 @@ export function RegistrationForm() {
             onChange={(e) => updateField('clinicAddress', e.target.value)}
             className="input"
           />
-        </Field>
+        </FormField>
 
-        <Field label="City (optional)" htmlFor="clinicCity">
+        <FormField label="City (optional)" htmlFor="clinicCity">
           <input
             id="clinicCity"
             value={form.clinicCity}
             onChange={(e) => updateField('clinicCity', e.target.value)}
             className="input"
           />
-        </Field>
+        </FormField>
 
-        <Field label="Contact email (optional)" htmlFor="clinicContactEmail">
+        <FormField label="Contact email (optional)" htmlFor="clinicContactEmail">
           <input
             id="clinicContactEmail"
             type="email"
@@ -193,9 +194,9 @@ export function RegistrationForm() {
             onChange={(e) => updateField('clinicContactEmail', e.target.value)}
             className="input"
           />
-        </Field>
+        </FormField>
 
-        <Field
+        <FormField
           label="Contact mobile (optional)"
           htmlFor="clinicContactMobile"
           error={fieldErrors.clinicContactMobile}
@@ -206,13 +207,13 @@ export function RegistrationForm() {
             onChange={(e) => updateField('clinicContactMobile', e.target.value)}
             className="input"
           />
-        </Field>
+        </FormField>
       </fieldset>
 
       <fieldset className="space-y-4">
         <legend className="text-sm font-medium text-gray-900">Your admin account</legend>
 
-        <Field label="Your name" htmlFor="adminName" required>
+        <FormField label="Your name" htmlFor="adminName" required>
           <input
             id="adminName"
             required
@@ -220,9 +221,9 @@ export function RegistrationForm() {
             onChange={(e) => updateField('adminName', e.target.value)}
             className="input"
           />
-        </Field>
+        </FormField>
 
-        <Field label="Email" htmlFor="adminEmail" required error={fieldErrors.adminEmail}>
+        <FormField label="Email" htmlFor="adminEmail" required error={fieldErrors.adminEmail}>
           <input
             id="adminEmail"
             type="email"
@@ -231,9 +232,9 @@ export function RegistrationForm() {
             onChange={(e) => updateField('adminEmail', e.target.value)}
             className="input"
           />
-        </Field>
+        </FormField>
 
-        <Field label="Password" htmlFor="adminPassword" required error={fieldErrors.adminPassword}>
+        <FormField label="Password" htmlFor="adminPassword" required error={fieldErrors.adminPassword}>
           <input
             id="adminPassword"
             type="password"
@@ -249,16 +250,16 @@ export function RegistrationForm() {
               ))}
             </ul>
           )}
-        </Field>
+        </FormField>
 
-        <Field label="Mobile (optional)" htmlFor="adminMobile" error={fieldErrors.adminMobile}>
+        <FormField label="Mobile (optional)" htmlFor="adminMobile" error={fieldErrors.adminMobile}>
           <input
             id="adminMobile"
             value={form.adminMobile}
             onChange={(e) => updateField('adminMobile', e.target.value)}
             className="input"
           />
-        </Field>
+        </FormField>
       </fieldset>
 
       <button
@@ -269,30 +270,5 @@ export function RegistrationForm() {
         {submitting ? 'Registering…' : 'Register clinic'}
       </button>
     </form>
-  )
-}
-
-interface FieldProps {
-  label: string
-  htmlFor: string
-  required?: boolean
-  error?: string
-  children: React.ReactNode
-}
-
-function Field({ label, htmlFor, required, error, children }: FieldProps) {
-  return (
-    <div>
-      <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700">
-        {label}
-        {required && <span aria-hidden="true"> *</span>}
-      </label>
-      <div className="mt-1">{children}</div>
-      {error && (
-        <p role="alert" className="mt-1 text-sm text-red-600">
-          {error}
-        </p>
-      )}
-    </div>
   )
 }

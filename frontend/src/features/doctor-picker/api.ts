@@ -37,6 +37,17 @@ export interface PatientDoctorListResult {
   totalCount: number
 }
 
+// real-bug-fix 2026-09-17: backs the "booking setup incomplete" warning on the staff-console
+// Doctors page - found live, a newly-onboarded doctor (zero appointment types, no default fee)
+// looked fully staffed with nothing indicating a patient couldn't actually book them yet.
+export interface DoctorBookingReadiness {
+  doctorProfileId: string
+  hasAppointmentTypes: boolean
+  hasDefaultFee: boolean
+  hasAppointmentTypeMissingFeeOverride: boolean
+  bookingReady: boolean
+}
+
 export class DoctorPickerApiError extends Error {
   readonly status: number
 
@@ -68,6 +79,16 @@ export async function listClinicDoctors(
     throw new DoctorPickerApiError(response.status)
   }
   return (await response.json()) as DoctorListResult
+}
+
+export async function listDoctorBookingReadiness(clinicId: string, token: string): Promise<DoctorBookingReadiness[]> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/clinics/${clinicId}/doctors/booking-readiness`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!response.ok) {
+    throw new DoctorPickerApiError(response.status)
+  }
+  return (await response.json()) as DoctorBookingReadiness[]
 }
 
 // Patient-facing analog of listClinicDoctors, backing the doctor picker that replaces the raw

@@ -1,7 +1,7 @@
 package com.cms.booking.dto;
 
-import com.cms.booking.Booking;
-import com.cms.booking.PaymentStatus;
+import com.cms.booking.domain.Booking;
+import com.cms.booking.domain.PaymentStatus;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;

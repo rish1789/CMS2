@@ -1,10 +1,10 @@
 package com.cms.identity.admin.integration;
 
-import com.cms.identity.account.Account;
-import com.cms.identity.account.AccountRepository;
-import com.cms.identity.account.RoleAssignment;
-import com.cms.identity.account.RoleAssignmentRepository;
-import com.cms.identity.admin.SuperAdminJwtService;
+import com.cms.identity.account.domain.Account;
+import com.cms.identity.account.repository.AccountRepository;
+import com.cms.identity.account.domain.RoleAssignment;
+import com.cms.identity.account.repository.RoleAssignmentRepository;
+import com.cms.identity.admin.config.SuperAdminJwtService;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.clinic.ClinicRepository;
 import com.cms.identity.doctor.DoctorProfile;
@@ -114,7 +114,7 @@ public abstract class AbstractAdminIntegrationTest {
     protected RoleAssignment linkDoctorToClinic(DoctorProfile profile, Clinic clinic, boolean active) {
         RoleAssignment roleAssignment = new RoleAssignment(profile.getAccount(), clinic, RoleAssignment.Role.Doctor);
         if (!active) {
-            roleAssignment.deactivate(com.cms.identity.account.RoleAssignment.DeactivationReason.RESIGNED);
+            roleAssignment.deactivate(com.cms.identity.account.domain.RoleAssignment.DeactivationReason.RESIGNED);
         }
         return roleAssignmentRepository.save(roleAssignment);
     }

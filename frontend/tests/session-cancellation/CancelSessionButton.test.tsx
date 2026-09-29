@@ -33,7 +33,7 @@ describe('CancelSessionButton', () => {
     await user.click(screen.getByRole('button', { name: /cancel entire session/i }))
 
     expect(mockedCancelSession).not.toHaveBeenCalled()
-    expect(screen.getByText(/active bookings in this session will be cancelled/i)).toBeInTheDocument()
+    expect(screen.getByText(/stop taking bookings/i)).toBeInTheDocument()
   })
 
   it('clicking Back on the confirmation step does not call the API', async () => {
@@ -63,7 +63,22 @@ describe('CancelSessionButton', () => {
     expect(mockedCancelSession).toHaveBeenCalledWith(CLINIC_ID, SESSION_ID, 'a.jwt.token')
   })
 
-  it('ends the interaction (no dead-end retry loop) when there is nothing left to cancel', async () => {
+  // 065-phase1-stabilization (FR-009): an empty session is cancellable - it reaches the API and
+  // reports that no bookings needed cancelling, instead of being blocked client-side (BUG-004).
+  it('cancels an empty session through the API and says no bookings needed cancelling', async () => {
+    const user = userEvent.setup()
+    mockedCancelSession.mockResolvedValueOnce({ sessionId: SESSION_ID, bookingsCancelled: 0 })
+
+    render(<CancelSessionButton clinicId={CLINIC_ID} sessionId={SESSION_ID} />)
+
+    await user.click(screen.getByRole('button', { name: /cancel entire session/i }))
+    await user.click(screen.getByRole('button', { name: /^confirm$/i }))
+
+    expect(await screen.findByText(/session cancelled\. no active bookings needed cancelling/i)).toBeInTheDocument()
+    expect(mockedCancelSession).toHaveBeenCalledWith(CLINIC_ID, SESSION_ID, 'a.jwt.token')
+  })
+
+  it('ends the interaction (no dead-end retry loop) when the session is already cancelled', async () => {
     const user = userEvent.setup()
     mockedCancelSession.mockRejectedValueOnce(new SessionCancellationApiError({ error: 'SESSION_ALREADY_CANCELLED' }))
 
@@ -72,22 +87,18 @@ describe('CancelSessionButton', () => {
     await user.click(screen.getByRole('button', { name: /cancel entire session/i }))
     await user.click(screen.getByRole('button', { name: /^confirm$/i }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/nothing left to cancel/i)
+    expect(await screen.findByRole('alert')).toHaveTextContent(/already cancelled/i)
     // Retrying can never succeed here, so Confirm/Back must not still be sitting there.
     expect(screen.queryByRole('button', { name: /^confirm$/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^back$/i })).not.toBeInTheDocument()
   })
 
-  it('shows the nothing-to-cancel message immediately on click when the caller already knows there are no active bookings, with no API call and no confirm step', async () => {
-    const user = userEvent.setup()
-    render(<CancelSessionButton clinicId={CLINIC_ID} sessionId={SESSION_ID} hasActiveBookings={false} />)
+  // The caller (the day sheet) states the cancelled status itself; the button just steps aside.
+  it('offers no cancel action for an already-cancelled session', () => {
+    const { container } = render(<CancelSessionButton clinicId={CLINIC_ID} sessionId={SESSION_ID} alreadyCancelled />)
 
-    await user.click(screen.getByRole('button', { name: /cancel entire session/i }))
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(/nothing left to cancel/i)
-    expect(mockedCancelSession).not.toHaveBeenCalled()
-    expect(screen.queryByRole('button', { name: /^confirm$/i })).not.toBeInTheDocument()
-    expect(screen.queryByText(/are you sure/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /cancel entire session/i })).not.toBeInTheDocument()
+    expect(container).toBeEmptyDOMElement()
   })
 
   it('shows the FORBIDDEN error message after Confirm', async () => {

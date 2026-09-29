@@ -76,7 +76,7 @@ describe('OpenSlotList', () => {
     await user.click(await screen.findByRole('button', { name: /book/i }))
 
     expect(await screen.findByRole('form', { name: /book slot/i })).toBeInTheDocument()
-    expect(screen.getByLabelText(/your name/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/appointment type/i)).toBeInTheDocument()
   })
 
   it('re-fetches with the newly selected date when a date-strip pill is clicked', async () => {

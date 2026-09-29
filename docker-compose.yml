@@ -1,0 +1,26 @@
+# Local development Postgres for CMS2.
+#
+# Usage: docker compose up -d
+# Matches backend/src/main/resources/application.yml's defaults exactly
+# (see .env.example) — no DB_* environment variable overrides are needed
+# to use it. Tear down with `docker compose down` (add `-v` to also wipe
+# the persisted data volume for a clean slate).
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: cms
+      POSTGRES_USER: cms
+      POSTGRES_PASSWORD: cms
+    ports:
+      - "5432:5432"
+    volumes:
+      - cms-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cms -d cms"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  cms-postgres-data:

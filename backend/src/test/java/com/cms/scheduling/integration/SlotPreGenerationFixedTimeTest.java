@@ -2,7 +2,7 @@ package com.cms.scheduling.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.cms.scheduling.SlotStatus;
+import com.cms.scheduling.domain.SlotStatus;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import org.junit.jupiter.api.Test;

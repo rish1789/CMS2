@@ -1,5 +1,17 @@
 package com.cms.patient.account;
 
+import com.cms.patient.account.config.JwtService;
+import com.cms.patient.account.domain.PatientAccount;
+import com.cms.patient.account.exception.AccountNotFoundException;
+import com.cms.patient.account.exception.EmailAlreadyInUseException;
+import com.cms.patient.account.exception.IncorrectPasswordException;
+import com.cms.patient.account.exception.InvalidMobileNumberException;
+import com.cms.patient.account.exception.InvalidPasswordException;
+import com.cms.patient.account.repository.PatientAccountRepository;
+import com.cms.patient.account.service.PasswordPolicyValidator;
+import com.cms.patient.account.service.PatientAccountService;
+
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -25,8 +37,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 /**
  * Unit slice (no Spring context, no DB) for {@link PatientAccountService}'s business rules -
  * the pre-check-then-DB-constraint email-uniqueness pattern, validation ordering (mobile before
- * password), and the identical-exception-for-both-failure-modes login contract (FR-007).
- * Complements (does not replace) the Testcontainers-backed integration tests
+ * password), and login's distinct-error-per-failure-mode contract (see the class-level decision
+ * note on {@link PatientAccountService#authenticate}). Complements (does not replace) the
+ * Testcontainers-backed integration tests
  * (PatientSignupHappyPathTest, PatientSignupDuplicateEmailTest, PatientLoginTest, etc.), which
  * prove the real DB-level uniqueness constraint - not just this pre-check - actually holds.
  */
@@ -121,17 +134,20 @@ class PatientAccountServiceTest {
     }
 
     @Test
-    void loginWithWrongPasswordAndUnknownEmailShareTheSameException() {
+    void loginWithWrongPasswordForARegisteredEmailThrowsIncorrectPassword() {
         when(patientAccountRepository.findByEmail("owner@example.com")).thenReturn(Optional.of(account));
         when(account.getPasswordHash()).thenReturn("hashed-pw");
         when(passwordEncoder.matches("wrong-password", "hashed-pw")).thenReturn(false);
 
         assertThatThrownBy(() -> service().authenticate(new LoginRequest("owner@example.com", "wrong-password")))
-                .isInstanceOf(InvalidCredentialsException.class);
+                .isInstanceOf(IncorrectPasswordException.class);
+    }
 
+    @Test
+    void loginWithAnUnregisteredEmailThrowsAccountNotFound() {
         when(patientAccountRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service().authenticate(new LoginRequest("nobody@example.com", "irrelevant")))
-                .isInstanceOf(InvalidCredentialsException.class);
+                .isInstanceOf(AccountNotFoundException.class);
     }
 }

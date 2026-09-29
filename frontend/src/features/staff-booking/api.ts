@@ -1,9 +1,13 @@
 // Client for POST /api/v1/clinics/{clinicId}/slots/{slotId}/book
 // See specs/020-staff-assisted-fixed-time-booking/contracts/staff-booking.md
-// Also: POST /api/v1/clinics/{clinicId}/sessions/{sessionId}/walk-in
-// See specs/025-walk-in-priority-insertion/contracts/walk-in-insertion.md
+// 063-front-desk-walk-in: the 025 per-session walk-in insertion client that lived here is retired;
+// walk-ins now go through features/front-desk-walk-in.
+// 054-forms-validation-consistency: migrated onto the shared apiClient - both local error
+// classes had the identical defaultMessageFor(body) ?? body.message dead-code bug 043 found
+// and fixed elsewhere. `BookSlotApiError`/`WalkInApiError` are gone; callers catch the shared
+// `ApiError`.
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
+import { apiRequest } from '../../lib/apiClient'
 
 export interface BookSlotRequest {
   patientId?: string
@@ -12,18 +16,12 @@ export interface BookSlotRequest {
   appointmentTypeId: string
 }
 
-export interface WalkInRequest {
-  patientId?: string
-  patientName?: string
-  patientPhone?: string
-  appointmentTypeId: string
-  overrideReason?: string
-}
-
 export interface BookingResponse {
   id: string
   slotId: string
   patientId: string
+  patientName: string
+  doctorName: string
   appointmentTypeId: string
   lockedFee: number
   paymentStatus: 'PENDING' | 'PAID'
@@ -37,38 +35,13 @@ export type BookSlotErrorBody =
   | { error: 'APPOINTMENT_TYPE_NOT_FOUND'; message?: string }
   | { error: 'SLOT_ALREADY_BOOKED'; message?: string }
   | { error: 'NO_FEE_CONFIGURED'; message?: string }
+  | { error: 'CLINIC_NOT_ACCEPTING_APPOINTMENTS'; message?: string }
   | { error: 'INVALID_MOBILE_NUMBER'; message?: string }
   | { error: 'UNAUTHORIZED'; message?: string }
 
-export type WalkInErrorBody =
-  | BookSlotErrorBody
-  | { error: 'SESSION_NOT_FOUND'; message?: string }
-  | { error: 'NO_SLOT_AVAILABLE'; message?: string }
-  | { error: 'OVERRIDE_REASON_REQUIRED'; message?: string }
-  | { error: 'NOT_A_FIXED_TIME_SESSION'; message?: string }
-
-export class BookSlotApiError extends Error {
-  readonly body: BookSlotErrorBody
-
-  constructor(body: BookSlotErrorBody) {
-    super(defaultMessageFor(body) ?? body.message)
-    this.name = 'BookSlotApiError'
-    this.body = body
-  }
-}
-
-export class WalkInApiError extends Error {
-  readonly body: WalkInErrorBody
-
-  constructor(body: WalkInErrorBody) {
-    super(defaultWalkInMessageFor(body) ?? body.message)
-    this.name = 'WalkInApiError'
-    this.body = body
-  }
-}
-
-function defaultMessageFor(body: BookSlotErrorBody): string {
-  switch (body.error) {
+function defaultMessageFor(body: unknown): string {
+  const error = (body as BookSlotErrorBody | undefined)?.error
+  switch (error) {
     case 'FORBIDDEN':
       return 'Only front-desk Operations staff or a ClinicAdmin can book this slot.'
     case 'SLOT_NOT_FOUND':
@@ -85,23 +58,10 @@ function defaultMessageFor(body: BookSlotErrorBody): string {
       return 'Mobile number must be a valid Indian number.'
     case 'UNAUTHORIZED':
       return 'Your session has expired. Please sign in again.'
+    case 'CLINIC_NOT_ACCEPTING_APPOINTMENTS':
+      return 'This clinic is not accepting appointments.'
     default:
       return 'Something went wrong. Please try again.'
-  }
-}
-
-function defaultWalkInMessageFor(body: WalkInErrorBody): string {
-  switch (body.error) {
-    case 'SESSION_NOT_FOUND':
-      return 'This session could not be found.'
-    case 'NO_SLOT_AVAILABLE':
-      return 'No slot is available for a walk-in in this session.'
-    case 'OVERRIDE_REASON_REQUIRED':
-      return 'An override reason is required to insert this walk-in into a regular slot.'
-    case 'NOT_A_FIXED_TIME_SESSION':
-      return 'Walk-ins can only be inserted into a fixed-time session.'
-    default:
-      return defaultMessageFor(body)
   }
 }
 
@@ -111,52 +71,10 @@ export async function bookSlot(
   payload: BookSlotRequest,
   token: string,
 ): Promise<BookingResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/clinics/${clinicId}/slots/${slotId}/book`, {
+  return apiRequest<BookingResponse>(`/api/v1/clinics/${clinicId}/slots/${slotId}/book`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(payload),
+    token,
+    body: payload,
+    fallbackMessage: defaultMessageFor,
   })
-
-  if (!response.ok) {
-    let body: BookSlotErrorBody
-    try {
-      body = (await response.json()) as BookSlotErrorBody
-    } catch {
-      body = { error: 'SLOT_NOT_FOUND' }
-    }
-    throw new BookSlotApiError(body)
-  }
-
-  return (await response.json()) as BookingResponse
-}
-
-export async function insertWalkIn(
-  clinicId: string,
-  sessionId: string,
-  payload: WalkInRequest,
-  token: string,
-): Promise<BookingResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/clinics/${clinicId}/sessions/${sessionId}/walk-in`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(payload),
-  })
-
-  if (!response.ok) {
-    let body: WalkInErrorBody
-    try {
-      body = (await response.json()) as WalkInErrorBody
-    } catch {
-      body = { error: 'SESSION_NOT_FOUND' }
-    }
-    throw new WalkInApiError(body)
-  }
-
-  return (await response.json()) as BookingResponse
 }

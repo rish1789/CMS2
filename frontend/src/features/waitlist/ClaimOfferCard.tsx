@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { claimOffer, declineOffer, WaitlistClaimApiError, type WaitlistClaimResponse } from './api'
+import { claimOffer, declineOffer, type WaitlistClaimResponse } from './api'
+import { ApiError } from '../../lib/apiClient'
 import { loadPatientSession } from '../patient-account/token'
 import { PatientAppointmentTypeSelect } from '../appointment-types/PatientAppointmentTypeSelect'
 import { listPatientAppointmentTypes, type AppointmentTypeResponse } from '../appointment-types/api'
@@ -83,7 +84,7 @@ export function ClaimOfferCard({
       setClaimedBooking(booking)
       onClaimed?.(booking)
     } catch (err) {
-      if (err instanceof WaitlistClaimApiError) {
+      if (err instanceof ApiError) {
         setError(err.message)
       } else {
         setError('Something went wrong. Please try again.')
@@ -103,7 +104,7 @@ export function ClaimOfferCard({
       setDeclined(true)
       onDeclined?.()
     } catch (err) {
-      if (err instanceof WaitlistClaimApiError) {
+      if (err instanceof ApiError) {
         setError(err.message)
       } else {
         setError('Something went wrong. Please try again.')

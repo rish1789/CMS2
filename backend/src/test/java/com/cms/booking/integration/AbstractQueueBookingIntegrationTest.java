@@ -1,32 +1,32 @@
 package com.cms.booking.integration;
 
-import com.cms.booking.AppointmentType;
-import com.cms.booking.AppointmentTypeRepository;
-import com.cms.booking.BookingRepository;
-import com.cms.booking.DoctorDefaultFeeRepository;
-import com.cms.booking.PatientQueueBookingService;
-import com.cms.booking.StaffQueueBookingService;
-import com.cms.identity.account.Account;
-import com.cms.identity.account.AccountRepository;
-import com.cms.identity.account.RoleAssignment;
-import com.cms.identity.account.RoleAssignmentRepository;
-import com.cms.identity.account.StaffJwtService;
+import com.cms.booking.domain.AppointmentType;
+import com.cms.booking.repository.AppointmentTypeRepository;
+import com.cms.booking.repository.BookingRepository;
+import com.cms.booking.repository.DoctorDefaultFeeRepository;
+import com.cms.booking.service.PatientQueueBookingService;
+import com.cms.booking.service.StaffQueueBookingService;
+import com.cms.identity.account.domain.Account;
+import com.cms.identity.account.repository.AccountRepository;
+import com.cms.identity.account.domain.RoleAssignment;
+import com.cms.identity.account.repository.RoleAssignmentRepository;
+import com.cms.identity.account.config.StaffJwtService;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.clinic.ClinicRepository;
 import com.cms.identity.doctor.DoctorProfile;
 import com.cms.identity.doctor.DoctorProfileRepository;
-import com.cms.patient.account.JwtService;
-import com.cms.patient.account.PatientAccount;
-import com.cms.patient.account.PatientAccountRepository;
-import com.cms.patient.record.Patient;
-import com.cms.patient.record.PatientRepository;
-import com.cms.scheduling.Schedule;
-import com.cms.scheduling.ScheduleMode;
-import com.cms.scheduling.ScheduleRepository;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.SessionGenerationService;
-import com.cms.scheduling.SessionRepository;
-import com.cms.scheduling.SlotRepository;
+import com.cms.patient.account.config.JwtService;
+import com.cms.patient.account.domain.PatientAccount;
+import com.cms.patient.account.repository.PatientAccountRepository;
+import com.cms.patient.record.domain.Patient;
+import com.cms.patient.record.repository.PatientRepository;
+import com.cms.scheduling.domain.Schedule;
+import com.cms.scheduling.domain.ScheduleMode;
+import com.cms.scheduling.repository.ScheduleRepository;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.service.SessionGenerationService;
+import com.cms.scheduling.repository.SessionRepository;
+import com.cms.scheduling.repository.SlotRepository;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -157,7 +157,7 @@ public abstract class AbstractQueueBookingIntegrationTest {
     protected void linkDoctorToClinic(DoctorProfile profile, Clinic clinic, boolean active) {
         RoleAssignment roleAssignment = new RoleAssignment(profile.getAccount(), clinic, RoleAssignment.Role.Doctor);
         if (!active) {
-            roleAssignment.deactivate(com.cms.identity.account.RoleAssignment.DeactivationReason.RESIGNED);
+            roleAssignment.deactivate(com.cms.identity.account.domain.RoleAssignment.DeactivationReason.RESIGNED);
         }
         roleAssignmentRepository.save(roleAssignment);
     }

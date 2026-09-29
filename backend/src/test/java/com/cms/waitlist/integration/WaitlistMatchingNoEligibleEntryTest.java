@@ -2,12 +2,12 @@ package com.cms.waitlist.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.cms.booking.Booking;
-import com.cms.booking.BookingStatus;
+import com.cms.booking.domain.Booking;
+import com.cms.booking.domain.BookingStatus;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfile;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.Slot;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.domain.Slot;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 

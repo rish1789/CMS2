@@ -6,9 +6,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfile;
-import com.cms.patient.account.PatientAccount;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.Slot;
+import com.cms.patient.account.domain.PatientAccount;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.domain.Slot;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 

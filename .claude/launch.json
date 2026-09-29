@@ -3,14 +3,37 @@
   "configurations": [
     {
       "name": "backend",
-      "runtimeExecutable": "C:\\Users\\risha\\AppData\\Local\\Temp\\gradle-8.10\\bin\\gradle.bat",
-      "runtimeArgs": ["-p", "backend", "bootRun"],
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "Get-Content .env | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*=' } | ForEach-Object { $k, $v = $_ -split '=', 2; Set-Item -Path \"Env:$k\" -Value $v }; & 'C:/Users/risha/AppData/Local/Temp/gradle-8.10/bin/gradle.bat' -p backend bootRun"
+      ],
       "port": 8080
+    },
+    {
+      "name": "backend-8081",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "Get-Content .env | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*=' } | ForEach-Object { $k, $v = $_ -split '=', 2; Set-Item -Path \"Env:$k\" -Value $v }; $env:PORT = '8081'; & 'C:/Users/risha/AppData/Local/Temp/gradle-8.10/bin/gradle.bat' -p backend bootRun"
+      ],
+      "port": 8081
     },
     {
       "name": "frontend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "frontend",
+        "run",
+        "dev"
+      ],
       "port": 5173
     }
   ]

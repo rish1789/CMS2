@@ -1,15 +1,15 @@
 package com.cms.scheduling.integration;
 
-import com.cms.identity.account.Account;
-import com.cms.identity.account.AccountRepository;
-import com.cms.identity.account.RoleAssignment;
-import com.cms.identity.account.RoleAssignmentRepository;
-import com.cms.identity.account.StaffJwtService;
+import com.cms.identity.account.domain.Account;
+import com.cms.identity.account.repository.AccountRepository;
+import com.cms.identity.account.domain.RoleAssignment;
+import com.cms.identity.account.repository.RoleAssignmentRepository;
+import com.cms.identity.account.config.StaffJwtService;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.clinic.ClinicRepository;
 import com.cms.identity.doctor.DoctorProfile;
 import com.cms.identity.doctor.DoctorProfileRepository;
-import com.cms.scheduling.ScheduleRepository;
+import com.cms.scheduling.repository.ScheduleRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -94,7 +94,7 @@ public abstract class AbstractScheduleIntegrationTest {
     protected RoleAssignment linkDoctorToClinic(DoctorProfile profile, Clinic clinic, boolean active) {
         RoleAssignment roleAssignment = new RoleAssignment(profile.getAccount(), clinic, RoleAssignment.Role.Doctor);
         if (!active) {
-            roleAssignment.deactivate(com.cms.identity.account.RoleAssignment.DeactivationReason.RESIGNED);
+            roleAssignment.deactivate(com.cms.identity.account.domain.RoleAssignment.DeactivationReason.RESIGNED);
         }
         return roleAssignmentRepository.save(roleAssignment);
     }

@@ -4,6 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { RegistrationForm } from '../../src/features/clinic-registration/RegistrationForm'
 import { RegisterClinicApiError, registerClinic } from '../../src/features/clinic-registration/api'
 
+// 065-phase1-stabilization (BUG-006): delay: null keeps every keystroke's events (onChange, inline
+// validation) but drops user-event's per-keystroke setTimeout(0) yield. With ~60 typed characters
+// per test those yields queue behind other workers' tasks under full-suite parallel load, which
+// pushed these tests past the 5 s default timeout intermittently.
+const TYPING_OPTIONS = { delay: null }
+
 vi.mock('../../src/features/clinic-registration/api', async () => {
   const actual = await vi.importActual<
     typeof import('../../src/features/clinic-registration/api')
@@ -40,7 +46,7 @@ describe('RegistrationForm', () => {
   })
 
   it('submits a valid payload and shows the success state with the generated staff code', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup(TYPING_OPTIONS)
     mockedRegisterClinic.mockResolvedValueOnce({
       clinicId: 'clinic-1',
       clinicName: 'Sunrise Clinic',
@@ -74,7 +80,7 @@ describe('RegistrationForm', () => {
   })
 
   it('shows a duplicate-email error next to the email field', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup(TYPING_OPTIONS)
     mockedRegisterClinic.mockRejectedValueOnce(
       new RegisterClinicApiError({
         error: 'EMAIL_ALREADY_IN_USE',
@@ -92,7 +98,7 @@ describe('RegistrationForm', () => {
   })
 
   it('lists every failed password rule returned by the server', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup(TYPING_OPTIONS)
     mockedRegisterClinic.mockRejectedValueOnce(
       new RegisterClinicApiError({
         error: 'INVALID_PASSWORD',
@@ -113,7 +119,7 @@ describe('RegistrationForm', () => {
   })
 
   it('shows a mobile-format error next to the correct field', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup(TYPING_OPTIONS)
     mockedRegisterClinic.mockRejectedValueOnce(
       new RegisterClinicApiError({
         error: 'INVALID_MOBILE_NUMBER',

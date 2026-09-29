@@ -3,17 +3,17 @@ package com.cms.waitlist.integration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.cms.booking.AppointmentType;
-import com.cms.booking.Booking;
-import com.cms.booking.SlotAlreadyBookedException;
+import com.cms.booking.domain.AppointmentType;
+import com.cms.booking.domain.Booking;
+import com.cms.booking.exception.SlotAlreadyBookedException;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfile;
-import com.cms.patient.account.PatientAccount;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.Slot;
-import com.cms.waitlist.WaitlistEntry;
-import com.cms.waitlist.WaitlistEntryStatus;
-import com.cms.waitlist.WaitlistOfferNotClaimableException;
+import com.cms.patient.account.domain.PatientAccount;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.domain.Slot;
+import com.cms.waitlist.domain.WaitlistEntry;
+import com.cms.waitlist.domain.WaitlistEntryStatus;
+import com.cms.waitlist.exception.WaitlistOfferNotClaimableException;
 import com.cms.waitlist.dto.ClaimWaitlistRequest;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -60,7 +60,7 @@ class WaitlistClaimTest extends AbstractWaitlistIntegrationTest {
                         entry.getId(),
                         someoneElse.getId(),
                         new ClaimWaitlistRequest(appointmentType.getId(), "Someone Else")))
-                .isInstanceOf(com.cms.waitlist.WaitlistEntryNotFoundException.class);
+                .isInstanceOf(com.cms.waitlist.exception.WaitlistEntryNotFoundException.class);
     }
 
     @Test

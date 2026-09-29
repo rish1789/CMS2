@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listMyBookings, type PatientBookingSummary } from './api'
+import { getClinicalRecordAvailability } from '../patient-clinical-records/api'
 import { loadPatientSession } from '../patient-account/token'
 import { todayIsoDate } from '../patient-booking/DateStrip'
 import { ListSkeleton } from '../../components/ListSkeleton'
@@ -38,6 +39,7 @@ export function MyBookings() {
   const [totalCount, setTotalCount] = useState(0)
   const [page, setPage] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [bookingIdsWithRecords, setBookingIdsWithRecords] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!session) return
@@ -46,6 +48,13 @@ export function MyBookings() {
       .then((result) => {
         setBookings(result.bookings)
         setTotalCount(result.totalCount)
+        // 059-patient-clinical-record-access FR-004: a second, separate request - the
+        // availability check lives in the clinical module, not embedded in this response,
+        // specifically to avoid a booking -> clinical module dependency cycle (research.md
+        // Decision 3). A failure here shouldn't block the booking list itself from rendering.
+        getClinicalRecordAvailability(result.bookings.map((b) => b.id), session.token)
+          .then(setBookingIdsWithRecords)
+          .catch(() => setBookingIdsWithRecords(new Set()))
       })
       .catch(() => setError('Failed to load your bookings.'))
   }, [page, session])
@@ -102,6 +111,14 @@ export function MyBookings() {
                       {booking.mode === 'FIXED_TIME' && booking.startTime ? ` · ${formatTime(booking.startTime)}` : ''}
                       {booking.mode === 'QUEUE' && booking.tokenNumber !== null ? ` · Token ${booking.tokenNumber}` : ''}
                     </p>
+                    {/* 062-rejected-clinic-gating FR-010: a system cancellation caused by the clinic's
+                        rejection says why, so the patient isn't left wondering what happened. */}
+                    {booking.status === 'CANCELLED' && booking.cancellationReason === 'CLINIC_REJECTED' && (
+                      <p className="mt-0.5 text-xs text-gray-600">This clinic is no longer accepting appointments.</p>
+                    )}
+                    {bookingIdsWithRecords.has(booking.id) && (
+                      <p className="mt-0.5 text-xs font-medium text-indigo-600">Record available</p>
+                    )}
                   </div>
                   <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(booking.status)}`}>
                     {booking.status === 'ACTIVE' ? 'Active' : 'Cancelled'}

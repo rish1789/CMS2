@@ -6,7 +6,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.identity.account.RoleAssignmentRepository;
+import com.cms.identity.account.repository.RoleAssignmentRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.dao.DataIntegrityViolationException;

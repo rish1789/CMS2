@@ -1,10 +1,11 @@
-import { useParams, useSearchParams } from 'react-router-dom'
+import { Navigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
+import type { ClinicShellOutletContext } from './ClinicShell'
 import { OnboardStaffForm } from '../../features/staff-onboarding/OnboardStaffForm'
-import { ScheduleForm } from '../../features/scheduling/ScheduleForm'
+import { DoctorScheduleManager } from '../../features/scheduling/DoctorScheduleManager'
 import { AppointmentTypeConfigForm } from '../../features/appointment-types/AppointmentTypeConfigForm'
 import { BookSlotForm as StaffBookSlotForm } from '../../features/staff-booking/BookSlotForm'
 import { QueueBookSlotForm as StaffQueueBookSlotForm } from '../../features/staff-booking/QueueBookSlotForm'
-import { WalkInForm } from '../../features/staff-booking/WalkInForm'
+import { FrontDeskWalkInPage } from '../../features/front-desk-walk-in/FrontDeskWalkInPage'
 import { SessionOperationsPanel } from '../../features/session-delay/SessionOperationsPanel'
 import { CancelBookingButton } from '../../features/booking-cancellation/CancelBookingButton'
 import { QueuePositionIndicator } from '../../features/queue-position/QueuePositionIndicator'
@@ -16,6 +17,8 @@ import { StaffJoinWaitlistForm } from '../../features/waitlist/StaffJoinWaitlist
 import { InboxPage } from '../../features/inbox/InboxPage'
 import { BookingContextHeader } from '../../features/booking-detail/BookingContextHeader'
 import { PatientContextHeader } from '../../features/patient-search/PatientContextHeader'
+import { ProtectionFlagsList } from '../../features/clinic-protection/ProtectionFlagsList'
+import { ClinicLimitOverrideForm } from '../../features/clinic-protection/ClinicLimitOverrideForm'
 
 // _diagnostics [HIGH] - [APP_SHELL] - [NO_ROUTING_INFRASTRUCTURE]: one thin page per clinic-scoped
 // tool, extracting ids from the URL and rendering the already-built, already-tested feature
@@ -30,7 +33,7 @@ export function OnboardStaffPage() {
 export function DefineSchedulePage() {
   const { clinicId, doctorProfileId } = useParams<{ clinicId: string; doctorProfileId: string }>()
   if (!clinicId || !doctorProfileId) return null
-  return <ScheduleForm clinicId={clinicId} doctorProfileId={doctorProfileId} />
+  return <DoctorScheduleManager clinicId={clinicId} doctorProfileId={doctorProfileId} />
 }
 
 export function AppointmentTypesPage() {
@@ -55,12 +58,18 @@ export function QueueBookSlotPage() {
   return <StaffQueueBookSlotForm clinicId={clinicId} sessionId={sessionId} doctorProfileId={doctorProfileId} />
 }
 
-export function WalkInPage() {
+// 063-front-desk-walk-in (FR-020): the retired per-session walk-in URL now lands on the front-desk
+// screen with that session pre-selected, so old links and bookmarks keep working.
+export function LegacyWalkInRedirect() {
   const { clinicId, sessionId } = useParams<{ clinicId: string; sessionId: string }>()
-  const [searchParams] = useSearchParams()
-  const doctorProfileId = searchParams.get('doctorProfileId')
-  if (!clinicId || !sessionId || !doctorProfileId) return null
-  return <WalkInForm clinicId={clinicId} sessionId={sessionId} doctorProfileId={doctorProfileId} />
+  if (!clinicId || !sessionId) return null
+  return <Navigate replace to={`/staff/clinics/${clinicId}/walk-in?sessionId=${sessionId}`} />
+}
+
+export function FrontDeskWalkInRoutePage() {
+  const { clinicId } = useParams<{ clinicId: string }>()
+  if (!clinicId) return null
+  return <FrontDeskWalkInPage clinicId={clinicId} />
 }
 
 export function SessionOperationsPage() {
@@ -71,11 +80,17 @@ export function SessionOperationsPage() {
   // present (SessionSlotsView's "Mark complete" link supplies it), it powers the entity-context
   // header only; the panel itself still works from sessionId/slotId alone.
   const bookingId = searchParams.get('bookingId')
+  const { role } = useOutletContext<ClinicShellOutletContext>()
   if (!clinicId || !sessionId || !slotId) return null
   return (
     <div className="space-y-4">
       {bookingId && <BookingContextHeader clinicId={clinicId} bookingId={bookingId} />}
-      <SessionOperationsPanel clinicId={clinicId} sessionId={sessionId} slotId={slotId} />
+      <SessionOperationsPanel
+        clinicId={clinicId}
+        sessionId={sessionId}
+        slotId={slotId}
+        isDoctor={role === 'Doctor'}
+      />
     </div>
   )
 }
@@ -156,4 +171,16 @@ export function InboxRoutePage() {
   const { clinicId } = useParams<{ clinicId: string }>()
   if (!clinicId) return null
   return <InboxPage clinicId={clinicId} />
+}
+
+export function ProtectionFlagsPage() {
+  const { clinicId } = useParams<{ clinicId: string }>()
+  if (!clinicId) return null
+  return <ProtectionFlagsList clinicId={clinicId} />
+}
+
+export function ClinicLimitOverridePage() {
+  const { clinicId } = useParams<{ clinicId: string }>()
+  if (!clinicId) return null
+  return <ClinicLimitOverrideForm clinicId={clinicId} />
 }

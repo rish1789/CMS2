@@ -1,6 +1,6 @@
 package com.cms.booking.dto;
 
-import com.cms.scheduling.Session;
+import com.cms.scheduling.domain.Session;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;

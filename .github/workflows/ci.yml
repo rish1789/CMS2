@@ -44,6 +44,45 @@ jobs:
           name: backend-test-report
           path: backend/build/reports/tests/test
 
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-report
+          path: backend/build/reports/jacoco/test/html
+
+      - name: Cache OWASP Dependency-Check NVD database
+        if: ${{ secrets.NVD_API_KEY != '' }}
+        uses: actions/cache@v4
+        with:
+          path: backend/.dependency-check-data
+          key: dependency-check-data-${{ github.run_id }}
+          restore-keys: |
+            dependency-check-data-
+
+      # The NVD has required an API key for reliable data access since Feb 2023 - without
+      # one, the scan fails outright (confirmed 2026-09-15: "Invalid API Key, length of 0"),
+      # not just slowly. Skip gracefully with a warning until NVD_API_KEY is configured as a
+      # repo secret (free: https://nvd.nist.gov/developers/request-an-api-key), rather than
+      # permanently failing every build with no way to merge.
+      - name: Dependency vulnerability scan (OWASP Dependency-Check)
+        if: ${{ secrets.NVD_API_KEY != '' }}
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: ./gradlew dependencyCheckAnalyze
+
+      - name: Dependency vulnerability scan skipped (no NVD_API_KEY secret)
+        if: ${{ secrets.NVD_API_KEY == '' }}
+        run: |
+          echo "::warning::Skipping OWASP Dependency-Check - no NVD_API_KEY repository secret configured. Add one (free, from https://nvd.nist.gov/developers/request-an-api-key) under Settings > Secrets and variables > Actions to enable this gate."
+
+      - name: Upload dependency-check report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-dependency-check-report
+          path: backend/build/reports/dependency-check-report.html
+
   frontend:
     name: Frontend (TypeScript / Vitest)
     runs-on: ubuntu-latest
@@ -66,6 +105,9 @@ jobs:
 
       - name: Lint (oxlint)
         run: npm run lint
+
+      - name: Dependency audit (fails only on high/critical)
+        run: npm audit --audit-level=high
 
       - name: Type-check
         run: npx tsc -b

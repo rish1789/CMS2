@@ -1,11 +1,12 @@
 package com.cms.patient.api;
 
-import com.cms.patient.account.EmailAlreadyInUseException;
-import com.cms.patient.account.InvalidCredentialsException;
-import com.cms.patient.account.InvalidMobileNumberException;
-import com.cms.patient.account.InvalidPasswordException;
-import com.cms.patient.account.MissingRequiredFieldException;
-import com.cms.patient.account.SignupFailedException;
+import com.cms.patient.account.exception.AccountNotFoundException;
+import com.cms.patient.account.exception.EmailAlreadyInUseException;
+import com.cms.patient.account.exception.IncorrectPasswordException;
+import com.cms.patient.account.exception.InvalidMobileNumberException;
+import com.cms.patient.account.exception.InvalidPasswordException;
+import com.cms.patient.account.exception.MissingRequiredFieldException;
+import com.cms.patient.account.exception.SignupFailedException;
 import com.cms.patient.api.dto.ErrorResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -46,10 +47,18 @@ public class PatientExceptionHandler {
                 .body(ErrorResponse.withField("MISSING_REQUIRED_FIELD", e.getMessage(), e.getField()));
     }
 
-    @ExceptionHandler(InvalidCredentialsException.class)
-    public ResponseEntity<ErrorResponse> handleInvalidCredentials(InvalidCredentialsException e) {
+    /** Login: email matched no registered PatientAccount. */
+    @ExceptionHandler(AccountNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleAccountNotFound(AccountNotFoundException e) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ErrorResponse.of("INVALID_CREDENTIALS", e.getMessage()));
+                .body(ErrorResponse.of("ACCOUNT_NOT_FOUND", e.getMessage()));
+    }
+
+    /** Login: email matched a real PatientAccount, but the password didn't match. */
+    @ExceptionHandler(IncorrectPasswordException.class)
+    public ResponseEntity<ErrorResponse> handleIncorrectPassword(IncorrectPasswordException e) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ErrorResponse.of("INCORRECT_PASSWORD", e.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

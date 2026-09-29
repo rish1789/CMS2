@@ -7,6 +7,14 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
 
+// 054-forms-validation-consistency: onboardStaff migrated onto the shared apiClient - this
+// function's own error path had the identical defaultMessageFor(body) ?? body.message
+// dead-code bug 043 found and fixed elsewhere, discarding both the backend's real message AND
+// its `field` (used by OnboardStaffForm to map MISSING_REQUIRED_FIELD/INVALID_MOBILE_NUMBER to
+// the right input). deactivateStaff/DeactivateStaffApiError below are untouched - out of this
+// feature's scope (EmployeeModal.tsx, not one of the 5 named forms).
+import { apiRequest } from '../../lib/apiClient'
+
 export type StaffRole = 'Doctor' | 'Operations'
 
 export interface OnboardStaffRequest {
@@ -36,24 +44,15 @@ export type OnboardStaffErrorBody =
   | { error: 'FORBIDDEN'; message?: string }
   | { error: 'INVALID_ROLE'; message?: string }
   | { error: 'MISSING_REQUIRED_FIELD'; field: string; message?: string }
-  | { error: 'INVALID_MOBILE_NUMBER'; message?: string }
+  | { error: 'INVALID_MOBILE_NUMBER'; field: string; message?: string }
   | { error: 'EMAIL_ALREADY_IN_USE'; message?: string }
   | { error: 'SPECIALIZATION_MISMATCH'; message?: string }
   | { error: 'ONBOARDING_FAILED'; message?: string }
   | { error: 'CLINIC_NOT_FOUND'; message?: string }
 
-export class OnboardStaffApiError extends Error {
-  readonly body: OnboardStaffErrorBody
-
-  constructor(body: OnboardStaffErrorBody) {
-    super(defaultMessageFor(body) ?? body.message)
-    this.name = 'OnboardStaffApiError'
-    this.body = body
-  }
-}
-
-function defaultMessageFor(body: OnboardStaffErrorBody): string {
-  switch (body.error) {
+function defaultMessageFor(rawBody: unknown): string {
+  const body = rawBody as OnboardStaffErrorBody | undefined
+  switch (body?.error) {
     case 'UNAUTHORIZED':
       return 'Your session has expired. Please sign in again.'
     case 'FORBIDDEN':
@@ -160,24 +159,94 @@ export async function onboardStaff(
   payload: OnboardStaffRequest,
   token: string,
 ): Promise<OnboardStaffResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/clinics/${clinicId}/staff`, {
+  return apiRequest<OnboardStaffResponse>(`/api/v1/clinics/${clinicId}/staff`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(payload),
+    token,
+    body: payload,
+    fallbackMessage: defaultMessageFor,
   })
+}
 
-  if (!response.ok) {
-    let body: OnboardStaffErrorBody
-    try {
-      body = (await response.json()) as OnboardStaffErrorBody
-    } catch {
-      body = { error: 'ONBOARDING_FAILED' }
-    }
-    throw new OnboardStaffApiError(body)
+// real-bug-fix 2026-09-17: mirrors clinic-verification/api.ts's resetClinicAdminPassword/
+// setClinicAdminPassword pair exactly, scoped instead to a ClinicAdmin resetting a Doctor or
+// Operations staff member's login at their own clinic - see StaffPasswordResetService's own
+// Javadoc for why a fellow ClinicAdmin target is rejected (no override).
+export interface ResetStaffPasswordResult {
+  accountId: string
+  email: string
+  staffCode: string
+  temporaryPassword: string
+}
+
+export type ResetStaffPasswordErrorBody =
+  | { error: 'UNAUTHORIZED'; message?: string }
+  | { error: 'FORBIDDEN'; message?: string }
+  | { error: 'NOT_FOUND'; message?: string }
+  | { error: 'INVALID_PASSWORD'; failedRules?: string[]; message?: string }
+
+export class ResetStaffPasswordApiError extends Error {
+  readonly body: ResetStaffPasswordErrorBody
+
+  constructor(body: ResetStaffPasswordErrorBody) {
+    super(defaultResetPasswordMessageFor(body) ?? body.message)
+    this.name = 'ResetStaffPasswordApiError'
+    this.body = body
   }
+}
 
-  return (await response.json()) as OnboardStaffResponse
+function defaultResetPasswordMessageFor(body: ResetStaffPasswordErrorBody): string {
+  switch (body.error) {
+    case 'UNAUTHORIZED':
+      return 'Your session has expired. Please sign in again.'
+    case 'FORBIDDEN':
+      return 'Only a ClinicAdmin for this clinic can reset a staff member’s password here, and not for a fellow ClinicAdmin.'
+    case 'NOT_FOUND':
+      return 'This staff member could not be found at this clinic.'
+    case 'INVALID_PASSWORD':
+      return body.failedRules?.length ? body.failedRules.join(' ') : 'Password does not satisfy the required policy.'
+    default:
+      return 'Something went wrong. Please try again.'
+  }
+}
+
+async function parseResetPasswordError(response: Response): Promise<ResetStaffPasswordApiError> {
+  let body: ResetStaffPasswordErrorBody
+  try {
+    body = (await response.json()) as ResetStaffPasswordErrorBody
+  } catch {
+    body = { error: 'FORBIDDEN' }
+  }
+  return new ResetStaffPasswordApiError(body)
+}
+
+export async function resetStaffPassword(
+  clinicId: string,
+  accountId: string,
+  token: string,
+): Promise<ResetStaffPasswordResult> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/clinics/${clinicId}/staff/${accountId}/reset-password`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!response.ok) {
+    throw await parseResetPasswordError(response)
+  }
+  return (await response.json()) as ResetStaffPasswordResult
+}
+
+export async function setStaffPassword(
+  clinicId: string,
+  accountId: string,
+  newPassword: string,
+  token: string,
+): Promise<ResetStaffPasswordResult> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/clinics/${clinicId}/staff/${accountId}/set-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ newPassword }),
+  })
+  if (!response.ok) {
+    throw await parseResetPasswordError(response)
+  }
+  return (await response.json()) as ResetStaffPasswordResult
 }

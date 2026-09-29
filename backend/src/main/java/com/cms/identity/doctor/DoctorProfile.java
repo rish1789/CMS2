@@ -1,6 +1,6 @@
 package com.cms.identity.doctor;
 
-import com.cms.identity.account.Account;
+import com.cms.identity.account.domain.Account;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

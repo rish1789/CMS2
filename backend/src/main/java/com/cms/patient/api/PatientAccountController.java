@@ -1,6 +1,6 @@
 package com.cms.patient.api;
 
-import com.cms.patient.account.PatientAccountService;
+import com.cms.patient.account.service.PatientAccountService;
 import com.cms.patient.api.dto.ErrorResponse;
 import com.cms.patient.api.dto.LoginRequest;
 import com.cms.patient.api.dto.LoginResponse;

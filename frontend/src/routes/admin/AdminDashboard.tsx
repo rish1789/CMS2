@@ -5,6 +5,8 @@ import { loadSuperAdminSession } from '../../features/super-admin/token'
 import { listClinics } from '../../features/clinic-verification/api'
 import { listDoctors } from '../../features/doctor-verification/api'
 import { ArrowIcon, ClinicIcon, DoctorIcon, IconBadge, SessionIcon } from '../../components/adminIcons'
+import { ShieldIcon } from '../../components/staffIcons'
+import { Card } from '../../components/Card'
 
 // super-admin-console-redesign-2026-09-11: mirrors ClinicToolsDashboard's tile-grid pattern -
 // the console previously had no home of its own, its index route just dumped straight into
@@ -43,16 +45,18 @@ function QueueTile({ to, icon, title, description, count }: QueueTileProps) {
   return (
     <Link
       to={to}
-      className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-all duration-150 ease-out hover:border-indigo-300 hover:shadow-md active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+      className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
     >
-      <div className="flex items-start justify-between gap-2">
-        <IconBadge>{icon}</IconBadge>
-        <CountBadge count={count} />
-      </div>
-      <div>
-        <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
-        <p className="mt-1 text-sm text-gray-600">{description}</p>
-      </div>
+      <Card className="flex flex-col gap-3 hover:border-indigo-300">
+        <div className="flex items-start justify-between gap-2">
+          <IconBadge>{icon}</IconBadge>
+          <CountBadge count={count} />
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+          <p className="mt-1 text-sm text-gray-600">{description}</p>
+        </div>
+      </Card>
     </Link>
   )
 }
@@ -107,18 +111,37 @@ export function AdminDashboard() {
         <h2 className="text-xs font-semibold tracking-wide text-gray-500 uppercase">Platform tools</h2>
         <Link
           to="/super-admin-console/sessions/generate"
-          className="group flex items-center gap-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-all duration-150 ease-out hover:border-indigo-300 hover:shadow-md active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+          className="group block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
         >
-          <IconBadge>
-            <SessionIcon />
-          </IconBadge>
-          <div className="min-w-0 flex-1">
-            <h3 className="text-sm font-semibold text-gray-900">Trigger session generation</h3>
-            <p className="mt-0.5 text-sm text-gray-600">
-              Manually re-run nightly session generation for today's 15-day rolling horizon.
-            </p>
-          </div>
-          <ArrowIcon className="shrink-0 text-gray-300 transition-transform duration-150 ease-out group-hover:translate-x-0.5 group-hover:text-indigo-500" />
+          <Card className="flex items-center gap-4 hover:border-indigo-300">
+            <IconBadge>
+              <SessionIcon />
+            </IconBadge>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-semibold text-gray-900">Trigger session generation</h3>
+              <p className="mt-0.5 text-sm text-gray-600">
+                Manually re-run nightly session generation for today's 15-day rolling horizon.
+              </p>
+            </div>
+            <ArrowIcon className="shrink-0 text-gray-300 transition-transform duration-150 ease-out group-hover:translate-x-0.5 group-hover:text-indigo-500" />
+          </Card>
+        </Link>
+        <Link
+          to="/super-admin-console/protection-settings"
+          className="group block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+        >
+          <Card className="flex items-center gap-4 hover:border-indigo-300">
+            <IconBadge>
+              <ShieldIcon />
+            </IconBadge>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-semibold text-gray-900">Booking protection settings</h3>
+              <p className="mt-0.5 text-sm text-gray-600">
+                Configure booking limits, rate limiting, and suspicious-activity flagging thresholds.
+              </p>
+            </div>
+            <ArrowIcon className="shrink-0 text-gray-300 transition-transform duration-150 ease-out group-hover:translate-x-0.5 group-hover:text-indigo-500" />
+          </Card>
         </Link>
       </div>
     </div>

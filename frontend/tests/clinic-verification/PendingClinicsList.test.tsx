@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PendingClinicsList } from '../../src/features/clinic-verification/PendingClinicsList'
+import { ToastProvider } from '../../src/components/Toast'
 import {
   AdminApiError,
   listClinics,
@@ -13,6 +14,8 @@ import {
   restoreClinic,
   deleteClinic,
   deleteClinicsBulk,
+  resetClinicAdminPassword,
+  setClinicAdminPassword,
 } from '../../src/features/clinic-verification/api'
 import { storeSuperAdminSession } from '../../src/features/super-admin/token'
 
@@ -30,6 +33,8 @@ vi.mock('../../src/features/clinic-verification/api', async () => {
     restoreClinic: vi.fn(),
     deleteClinic: vi.fn(),
     deleteClinicsBulk: vi.fn(),
+    resetClinicAdminPassword: vi.fn(),
+    setClinicAdminPassword: vi.fn(),
   }
 })
 
@@ -41,6 +46,8 @@ const mockedRejectClinicsBulk = vi.mocked(rejectClinicsBulk)
 const mockedRestoreClinic = vi.mocked(restoreClinic)
 const mockedDeleteClinic = vi.mocked(deleteClinic)
 const mockedDeleteClinicsBulk = vi.mocked(deleteClinicsBulk)
+const mockedResetClinicAdminPassword = vi.mocked(resetClinicAdminPassword)
+const mockedSetClinicAdminPassword = vi.mocked(setClinicAdminPassword)
 
 const pendingClinic = {
   clinicId: 'clinic-1',
@@ -97,12 +104,14 @@ const rejectedClinic = {
 function renderWithSession() {
   storeSuperAdminSession({ token: 'super-admin-jwt', username: 'super-admin' })
   render(
-    <MemoryRouter initialEntries={['/super-admin-console/clinics']}>
-      <Routes>
-        <Route path="/staff/login" element={<div>Clinic sign in</div>} />
-        <Route path="/super-admin-console/clinics" element={<PendingClinicsList />} />
-      </Routes>
-    </MemoryRouter>,
+    <ToastProvider>
+      <MemoryRouter initialEntries={['/super-admin-console/clinics']}>
+        <Routes>
+          <Route path="/staff/login" element={<div>Clinic sign in</div>} />
+          <Route path="/super-admin-console/clinics" element={<PendingClinicsList />} />
+        </Routes>
+      </MemoryRouter>
+    </ToastProvider>,
   )
 }
 
@@ -208,6 +217,62 @@ describe('PendingClinicsList', () => {
 
     expect(mockedUnverifyClinic).not.toHaveBeenCalled()
     expect(within(row.closest('tr')!).getByRole('button', { name: /^un-verify$/i })).toBeInTheDocument()
+  })
+
+  // real-bug-fix 2026-09-16: this system has no self-service "forgot password" flow anywhere -
+  // when a clinic's own admin login stops working (found live), this is the only recovery path.
+  // No confirm step (unlike Un-verify) - resetting a password isn't destructive to clinic data.
+  it('resets the clinic admin password and shows the new credential exactly once', async () => {
+    mockedListClinics.mockResolvedValueOnce({ clinics: [pendingClinic], page: 0, pageSize: 15, totalCount: 1 })
+    const user = userEvent.setup()
+    renderWithSession()
+    await waitFor(() => expect(screen.getByText('Sunrise Clinic')).toBeInTheDocument())
+
+    mockedListClinics.mockResolvedValueOnce({ clinics: [verifiedClinic], page: 0, pageSize: 15, totalCount: 1 })
+    await user.click(screen.getByRole('tab', { name: /verified/i }))
+    const row = await screen.findByText('Riverside Clinic')
+
+    mockedResetClinicAdminPassword.mockResolvedValueOnce({
+      accountId: 'account-1',
+      email: 'contact@riverside.example',
+      temporaryPassword: 'N3wP@ssw0rd123',
+    })
+    await user.click(within(row.closest('tr')!).getByRole('button', { name: /reset admin password/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: /password reset/i })
+    expect(within(dialog).getByText('contact@riverside.example')).toBeInTheDocument()
+    expect(within(dialog).getByText('N3wP@ssw0rd123')).toBeInTheDocument()
+    expect(mockedResetClinicAdminPassword).toHaveBeenCalledWith('clinic-2', 'super-admin-jwt')
+
+    await user.click(screen.getByRole('button', { name: /done/i }))
+    expect(screen.queryByRole('dialog', { name: /password reset/i })).not.toBeInTheDocument()
+  })
+
+  // real-bug-fix 2026-09-17: resetClinicAdminPassword only generates a random password - covers
+  // the sibling "Set specific password" action for a chosen value instead.
+  it('lets Super Admin set a specific admin password', async () => {
+    mockedListClinics.mockResolvedValueOnce({ clinics: [pendingClinic], page: 0, pageSize: 15, totalCount: 1 })
+    const user = userEvent.setup()
+    renderWithSession()
+    await waitFor(() => expect(screen.getByText('Sunrise Clinic')).toBeInTheDocument())
+
+    mockedListClinics.mockResolvedValueOnce({ clinics: [verifiedClinic], page: 0, pageSize: 15, totalCount: 1 })
+    await user.click(screen.getByRole('tab', { name: /verified/i }))
+    const row = await screen.findByText('Riverside Clinic')
+
+    await user.click(within(row.closest('tr')!).getByRole('button', { name: /set specific password/i }))
+    await user.type(screen.getByLabelText(/new admin password/i), 'starqweR@1')
+
+    mockedSetClinicAdminPassword.mockResolvedValueOnce({
+      accountId: 'account-1',
+      email: 'contact@riverside.example',
+      temporaryPassword: 'starqweR@1',
+    })
+    await user.click(screen.getByRole('button', { name: /^save$/i }))
+
+    expect(mockedSetClinicAdminPassword).toHaveBeenCalledWith('clinic-2', 'starqweR@1', 'super-admin-jwt')
+    const dialog = await screen.findByRole('dialog', { name: /password reset/i })
+    expect(within(dialog).getByText('starqweR@1')).toBeInTheDocument()
   })
 
   it('single Remove opens the reject modal, requires a reason, and rejects on submit', async () => {

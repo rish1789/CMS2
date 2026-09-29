@@ -2,8 +2,8 @@ package com.cms.patient.record.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.cms.patient.record.Patient;
-import com.cms.patient.record.PatientLinkingService;
+import com.cms.patient.record.domain.Patient;
+import com.cms.patient.record.service.PatientLinkingService;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;

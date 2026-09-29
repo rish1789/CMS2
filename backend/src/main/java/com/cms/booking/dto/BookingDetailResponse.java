@@ -1,6 +1,6 @@
 package com.cms.booking.dto;
 
-import com.cms.booking.Booking;
+import com.cms.booking.domain.Booking;
 import java.time.LocalDate;
 import java.util.UUID;
 

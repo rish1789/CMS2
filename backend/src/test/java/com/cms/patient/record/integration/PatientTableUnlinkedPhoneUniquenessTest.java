@@ -3,7 +3,7 @@ package com.cms.patient.record.integration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.cms.patient.record.Patient;
+import com.cms.patient.record.domain.Patient;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 

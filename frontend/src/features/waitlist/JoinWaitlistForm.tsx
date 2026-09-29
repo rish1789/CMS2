@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { joinWaitlist, WaitlistJoinApiError, type WaitlistEntryResponse } from './api'
+import { joinWaitlist, type WaitlistEntryResponse } from './api'
+import { ApiError } from '../../lib/apiClient'
 import { loadPatientSession } from '../patient-account/token'
 import { PatientDoctorSelect } from '../doctor-picker/PatientDoctorSelect'
 import { IconBadge, CheckIcon } from '../../components/adminIcons'
@@ -34,7 +35,7 @@ export function JoinWaitlistForm({ clinicId, onJoined }: JoinWaitlistFormProps) 
       setEntry(response)
       onJoined?.(response)
     } catch (err) {
-      if (err instanceof WaitlistJoinApiError) {
+      if (err instanceof ApiError) {
         setError(err.message)
       } else {
         setError('Something went wrong. Please try again.')

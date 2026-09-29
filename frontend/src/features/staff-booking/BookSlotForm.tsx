@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from 'react'
-import { bookSlot, BookSlotApiError, type BookingResponse } from './api'
+import { bookSlot, type BookSlotErrorBody, type BookingResponse } from './api'
+import { ApiError } from '../../lib/apiClient'
 import { loadStaffSession, storeStaffSession } from '../staff-login/token'
 import { AppointmentTypeSelect } from '../appointment-types/AppointmentTypeSelect'
 import { PatientPicker } from '../patient-search/PatientPicker'
+import { FormField } from '../../components/FormField'
 
 type PatientMode = 'existing' | 'new'
 
@@ -12,6 +14,11 @@ interface FormState {
   patientName: string
   patientPhone: string
   appointmentTypeId: string
+}
+
+interface FieldErrors {
+  patient?: string
+  appointmentTypeId?: string
 }
 
 const initialState: FormState = {
@@ -32,6 +39,7 @@ export function BookSlotForm({ clinicId, slotId, doctorProfileId }: BookSlotForm
   const [session, setSession] = useState(() => loadStaffSession())
   const [form, setForm] = useState<FormState>(initialState)
   const [formError, setFormError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<BookingResponse | null>(null)
 
@@ -42,8 +50,23 @@ export function BookSlotForm({ clinicId, slotId, doctorProfileId }: BookSlotForm
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!session) return
-    setSubmitting(true)
     setFormError(null)
+
+    const errors: FieldErrors = {}
+    if (form.patientMode === 'existing' && form.patientId.trim() === '') {
+      errors.patient = 'Please select a patient.'
+    } else if (form.patientMode === 'new' && form.patientName.trim() === '') {
+      errors.patient = 'Patient name is required.'
+    }
+    if (form.appointmentTypeId.trim() === '') {
+      errors.appointmentTypeId = 'Please select an appointment type.'
+    }
+    setFieldErrors(errors)
+    if (Object.keys(errors).length > 0) {
+      return
+    }
+
+    setSubmitting(true)
 
     try {
       const response = await bookSlot(
@@ -60,8 +83,9 @@ export function BookSlotForm({ clinicId, slotId, doctorProfileId }: BookSlotForm
       )
       setResult(response)
     } catch (err) {
-      if (err instanceof BookSlotApiError) {
-        if (err.body.error === 'UNAUTHORIZED') {
+      if (err instanceof ApiError) {
+        const body = err.body as BookSlotErrorBody | undefined
+        if (body?.error === 'UNAUTHORIZED') {
           storeStaffSession(null)
           setSession(null)
         }
@@ -134,6 +158,8 @@ export function BookSlotForm({ clinicId, slotId, doctorProfileId }: BookSlotForm
           <label htmlFor="patientId" className="block text-sm font-medium text-gray-700">
             Patient
           </label>
+          {/* PatientPicker manages its own top margin - wrapping it in FormField would double
+              it, so its error is rendered manually below in FormField's own style. */}
           <PatientPicker
             id="patientId"
             required
@@ -142,32 +168,30 @@ export function BookSlotForm({ clinicId, slotId, doctorProfileId }: BookSlotForm
             value={form.patientId}
             onChange={(patientId) => updateField('patientId', patientId)}
           />
+          {fieldErrors.patient && (
+            <p role="alert" className="mt-1 text-sm text-red-600">
+              {fieldErrors.patient}
+            </p>
+          )}
         </div>
       ) : (
         <>
-          <div>
-            <label htmlFor="patientName" className="block text-sm font-medium text-gray-700">
-              Patient name
-            </label>
+          <FormField label="Patient name" htmlFor="patientName" error={fieldErrors.patient}>
             <input
               id="patientName"
-              required
               value={form.patientName}
               onChange={(e) => updateField('patientName', e.target.value)}
-              className="input mt-1"
+              className="input"
             />
-          </div>
-          <div>
-            <label htmlFor="patientPhone" className="block text-sm font-medium text-gray-700">
-              Phone (optional)
-            </label>
+          </FormField>
+          <FormField label="Phone (optional)" htmlFor="patientPhone">
             <input
               id="patientPhone"
               value={form.patientPhone}
               onChange={(e) => updateField('patientPhone', e.target.value)}
-              className="input mt-1"
+              className="input"
             />
-          </div>
+          </FormField>
         </>
       )}
 
@@ -175,14 +199,22 @@ export function BookSlotForm({ clinicId, slotId, doctorProfileId }: BookSlotForm
         <label htmlFor="appointmentTypeId" className="block text-sm font-medium text-gray-700">
           Appointment type
         </label>
+        {/* AppointmentTypeSelect manages its own top margin - see PatientPicker note above.
+            No `required` prop: the pre-submit fieldErrors.appointmentTypeId check below is the
+            one that actually surfaces (native required would otherwise block the submit event
+            itself, showing a browser tooltip instead of this form's own inline error). */}
         <AppointmentTypeSelect
           id="appointmentTypeId"
-          required
           doctorProfileId={doctorProfileId}
           token={session.token}
           value={form.appointmentTypeId}
           onChange={(value) => updateField('appointmentTypeId', value)}
         />
+        {fieldErrors.appointmentTypeId && (
+          <p role="alert" className="mt-1 text-sm text-red-600">
+            {fieldErrors.appointmentTypeId}
+          </p>
+        )}
       </div>
 
       <button

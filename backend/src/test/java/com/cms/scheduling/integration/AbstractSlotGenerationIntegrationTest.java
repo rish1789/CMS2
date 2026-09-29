@@ -1,6 +1,6 @@
 package com.cms.scheduling.integration;
 
-import com.cms.scheduling.SlotRepository;
+import com.cms.scheduling.repository.SlotRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
 

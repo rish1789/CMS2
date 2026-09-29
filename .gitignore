@@ -5,3 +5,14 @@
 
 # Impeccable design-hook tool cache/state (not source)
 .impeccable/
+
+# Root-level build output, caches, IDE files, and logs — backend/.gitignore and
+# frontend/.gitignore already cover their own subtrees; these patterns are for
+# anything produced at the repository root itself.
+build/
+bin/
+.gradle/
+.idea/
+*.iml
+.vscode/
+*.log

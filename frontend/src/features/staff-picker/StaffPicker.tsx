@@ -3,11 +3,13 @@ import { useParams } from 'react-router-dom'
 import { listClinicStaff, type StaffSummary } from './api'
 import { EmployeeModal } from './EmployeeModal'
 import { loadStaffSession } from '../staff-login/token'
-import { ListSkeleton } from '../../components/ListSkeleton'
 import { RoleBadge, type StaffRole } from '../../components/RoleBadge'
 import { FilterSelect } from '../../components/FilterSelect'
 import { avatarGradientClass } from '../../components/avatarGradient'
 import { PaginationControls } from '../../components/PaginationControls'
+import { SortableColumnHeader } from '../../components/SortableColumnHeader'
+import { EmptyState } from '../../components/EmptyState'
+import { LoadingState } from '../../components/LoadingState'
 
 const PAGE_SIZE = 10
 const SEARCH_DEBOUNCE_MS = 300
@@ -15,37 +17,6 @@ const ROLE_FILTERS: Array<StaffRole | 'All'> = ['All', 'ClinicAdmin', 'Doctor', 
 
 type SortKey = 'name' | 'experienceYears' | 'joinedAt'
 type SortDirection = 'asc' | 'desc'
-
-function SortHeader({
-  label,
-  sortKey,
-  activeKey,
-  direction,
-  onSort,
-}: {
-  label: string
-  sortKey: SortKey
-  activeKey: SortKey | null
-  direction: SortDirection
-  onSort: (key: SortKey) => void
-}) {
-  const isActive = activeKey === sortKey
-  return (
-    <th scope="col" className="px-4 py-3 font-semibold">
-      <button
-        type="button"
-        onClick={() => onSort(sortKey)}
-        aria-label={`Sort by ${label}`}
-        className="flex items-center gap-1 text-gray-500 transition-colors duration-150 hover:text-gray-900"
-      >
-        {label}
-        <span aria-hidden="true" className={`text-[10px] ${isActive ? 'text-indigo-600' : 'text-gray-300'}`}>
-          {isActive && direction === 'desc' ? '▼' : '▲'}
-        </span>
-      </button>
-    </th>
-  )
-}
 
 // pagination-unification-2026-09-10: search/role/status/specialization filtering, sorting, and
 // paging all now happen server-side (see staff-picker/api.ts) - this page used to fetch the
@@ -153,7 +124,7 @@ export function StaffPicker() {
         </p>
       )}
 
-      {staff === null && !error && <ListSkeleton rows={3} />}
+      {staff === null && !error && <LoadingState variant="list" rows={3} />}
 
       <div className="flex flex-wrap items-center gap-3">
         <input
@@ -200,11 +171,7 @@ export function StaffPicker() {
         )}
       </div>
 
-      {staff && staff.length === 0 && (
-        <p className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-500 shadow-sm">
-          No staff match your search.
-        </p>
-      )}
+      {staff && staff.length === 0 && <EmptyState message="No staff match your search." />}
 
       {staff && staff.length > 0 && (
         <>
@@ -212,11 +179,11 @@ export function StaffPicker() {
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  <SortHeader
+                  <SortableColumnHeader
                     label="Name"
-                    sortKey="name"
-                    activeKey={sortKey}
-                    direction={sortDirection}
+                    field="name"
+                    currentSort={sortKey ?? ('' as SortKey)}
+                    currentDirection={sortDirection}
                     onSort={handleSort}
                   />
                   <th scope="col" className="px-4 py-3 font-semibold">
@@ -228,18 +195,18 @@ export function StaffPicker() {
                   <th scope="col" className="px-4 py-3 font-semibold">
                     Specialization
                   </th>
-                  <SortHeader
+                  <SortableColumnHeader
                     label="Experience"
-                    sortKey="experienceYears"
-                    activeKey={sortKey}
-                    direction={sortDirection}
+                    field="experienceYears"
+                    currentSort={sortKey ?? ('' as SortKey)}
+                    currentDirection={sortDirection}
                     onSort={handleSort}
                   />
-                  <SortHeader
+                  <SortableColumnHeader
                     label="Joined"
-                    sortKey="joinedAt"
-                    activeKey={sortKey}
-                    direction={sortDirection}
+                    field="joinedAt"
+                    currentSort={sortKey ?? ('' as SortKey)}
+                    currentDirection={sortDirection}
                     onSort={handleSort}
                   />
                 </tr>

@@ -2,8 +2,8 @@ package com.cms.booking.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.cms.booking.AppointmentType;
-import com.cms.booking.DoctorDefaultFee;
+import com.cms.booking.domain.AppointmentType;
+import com.cms.booking.domain.DoctorDefaultFee;
 import com.cms.identity.doctor.DoctorProfile;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;

@@ -2,10 +2,10 @@ package com.cms.patient.record.integration;
 
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.clinic.ClinicRepository;
-import com.cms.patient.account.PatientAccount;
-import com.cms.patient.account.PatientAccountRepository;
-import com.cms.patient.record.Patient;
-import com.cms.patient.record.PatientRepository;
+import com.cms.patient.account.domain.PatientAccount;
+import com.cms.patient.account.repository.PatientAccountRepository;
+import com.cms.patient.record.domain.Patient;
+import com.cms.patient.record.repository.PatientRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

@@ -2,16 +2,16 @@ package com.cms.booking.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.cms.booking.BookingStatus;
+import com.cms.booking.domain.BookingStatus;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfile;
-import com.cms.notification.NotificationEvent;
-import com.cms.patient.account.PatientAccount;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.Slot;
-import com.cms.scheduling.SlotStatus;
-import com.cms.waitlist.WaitlistEntry;
-import com.cms.waitlist.WaitlistEntryStatus;
+import com.cms.notification.domain.NotificationEvent;
+import com.cms.patient.account.domain.PatientAccount;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.domain.Slot;
+import com.cms.scheduling.domain.SlotStatus;
+import com.cms.waitlist.domain.WaitlistEntry;
+import com.cms.waitlist.domain.WaitlistEntryStatus;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -94,5 +94,43 @@ class ClinicDeVerificationCascadeTest extends AbstractDeVerificationCascadeInteg
                 .isEqualTo(BookingStatus.CANCELLED);
         assertThat(bookingRepository.findById(walkInBooking.getId()).orElseThrow().getStatus())
                 .isEqualTo(BookingStatus.CANCELLED);
+    }
+
+    /**
+     * real-bug-fix 2026-09-24: a queue booking exactly as the real flow leaves it - the token Slot
+     * stays OPEN (only fixed-time booking flips a Slot to BOOKED). The shared {@code bookSlot}
+     * fixture forces BOOKED, which is what hid the cascade's queue-mode gap from this suite.
+     */
+    private com.cms.booking.domain.Booking bookQueueTokenAsTheRealFlowDoes(
+            Clinic clinic, DoctorProfile doctor, Session queueSession, PatientAccount patientAccount) {
+        Slot token = addQueueSlot(queueSession, 1);
+        var booking = bookSlot(clinic, doctor, token, patientAccount);
+        token.setStatus(SlotStatus.OPEN);
+        slotRepository.save(token);
+        return booking;
+    }
+
+    /**
+     * real-bug-fix 2026-09-24 (reproduced live): un-verifying left a real-flow queue booking ACTIVE
+     * (the query required a BOOKED slot) and dropped every patient notification (the cascade joined
+     * the already-committed transaction). Both must now persist.
+     */
+    @Test
+    void unverifyingCancelsARealFlowQueueBookingAndPersistsEveryPatientNotification() {
+        Clinic clinic = saveClinic();
+        DoctorProfile doctor = saveDoctorStaffedAt(clinic);
+        PatientAccount queuePatient = savePatientAccount();
+        PatientAccount fixedPatient = savePatientAccount();
+        var queueBooking = bookQueueTokenAsTheRealFlowDoes(clinic, doctor, saveQueueSession(clinic, doctor), queuePatient);
+        Session fixed = saveFixedTimeSessionWithSlots(clinic, doctor);
+        bookSlot(clinic, doctor, slotRepository.findBySession_Id(fixed.getId()).get(0), fixedPatient);
+
+        clinicVerificationService.unverify(clinic.getId());
+
+        assertThat(bookingRepository.findById(queueBooking.getId()).orElseThrow().getStatus())
+                .isEqualTo(BookingStatus.CANCELLED);
+        assertThat(notificationEventRepository.findAll())
+                .extracting(event -> event.getPatientAccount().getId())
+                .containsExactlyInAnyOrder(queuePatient.getId(), fixedPatient.getId());
     }
 }

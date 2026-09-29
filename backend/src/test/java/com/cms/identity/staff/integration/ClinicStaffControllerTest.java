@@ -4,8 +4,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.identity.account.Account;
-import com.cms.identity.account.RoleAssignment;
+import com.cms.identity.account.domain.Account;
+import com.cms.identity.account.domain.RoleAssignment;
 import com.cms.identity.clinic.Clinic;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -32,7 +32,7 @@ class ClinicStaffControllerTest extends AbstractStaffIntegrationTest {
         Clinic clinic = saveClinic("Sunrise Clinic");
         Account operations = saveAccount("ops@example.com", "Str0ng!Pass", "OP-0001");
         RoleAssignment roleAssignment = new RoleAssignment(operations, clinic, RoleAssignment.Role.Operations);
-        roleAssignment.deactivate(com.cms.identity.account.RoleAssignment.DeactivationReason.RESIGNED);
+        roleAssignment.deactivate(com.cms.identity.account.domain.RoleAssignment.DeactivationReason.RESIGNED);
         roleAssignmentRepository.save(roleAssignment);
 
         mockMvc.perform(get("/api/v1/clinics/{clinicId}/staff", clinic.getId())

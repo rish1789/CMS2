@@ -2,7 +2,8 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ClaimOfferCard } from '../../src/features/waitlist/ClaimOfferCard'
-import { claimOffer, declineOffer, WaitlistClaimApiError } from '../../src/features/waitlist/api'
+import { claimOffer, declineOffer } from '../../src/features/waitlist/api'
+import { ApiError } from '../../src/lib/apiClient'
 import { listPatientAppointmentTypes } from '../../src/features/appointment-types/api'
 import { storePatientSession } from '../../src/features/patient-account/token'
 
@@ -113,7 +114,9 @@ describe('ClaimOfferCard', () => {
 
   it('shows the WAITLIST_OFFER_NOT_CLAIMABLE error message', async () => {
     const user = userEvent.setup()
-    mockedClaimOffer.mockRejectedValueOnce(new WaitlistClaimApiError({ error: 'WAITLIST_OFFER_NOT_CLAIMABLE' }))
+    mockedClaimOffer.mockRejectedValueOnce(
+      new ApiError(409, 'This offer is no longer available to claim.', { error: 'WAITLIST_OFFER_NOT_CLAIMABLE' }),
+    )
 
     render(<ClaimOfferCard entryId={ENTRY_ID} offeredDoctorProfileId={DOCTOR_ID} />)
 
@@ -127,7 +130,9 @@ describe('ClaimOfferCard', () => {
 
   it('shows the SLOT_ALREADY_BOOKED error message', async () => {
     const user = userEvent.setup()
-    mockedClaimOffer.mockRejectedValueOnce(new WaitlistClaimApiError({ error: 'SLOT_ALREADY_BOOKED' }))
+    mockedClaimOffer.mockRejectedValueOnce(
+      new ApiError(409, 'This slot was just booked by someone else.', { error: 'SLOT_ALREADY_BOOKED' }),
+    )
 
     render(<ClaimOfferCard entryId={ENTRY_ID} offeredDoctorProfileId={DOCTOR_ID} />)
 
@@ -137,6 +142,24 @@ describe('ClaimOfferCard', () => {
     await user.click(screen.getByRole('button', { name: /claim slot/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/just booked by someone else/i)
+  })
+
+  // 046-frontend-api-client T011: proves the message-priority fix on this feature too - a real
+  // backend-supplied message must win over the generic per-error-code default.
+  it('shows the backend-specific message when present, not the generic per-error-code default', async () => {
+    const user = userEvent.setup()
+    mockedClaimOffer.mockRejectedValueOnce(
+      new ApiError(409, 'Someone else claimed this offer 2 seconds ago.', { error: 'WAITLIST_OFFER_NOT_CLAIMABLE' }),
+    )
+
+    render(<ClaimOfferCard entryId={ENTRY_ID} offeredDoctorProfileId={DOCTOR_ID} />)
+
+    await user.type(screen.getByLabelText(/your name/i), 'Claimant')
+    await screen.findByRole('option', { name: 'General Consultation' })
+    await user.selectOptions(screen.getByLabelText(/appointment type/i), 'apt-1')
+    await user.click(screen.getByRole('button', { name: /claim slot/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Someone else claimed this offer 2 seconds ago.')
   })
 
   it('shows a fallback message when the matched doctor is unknown', () => {

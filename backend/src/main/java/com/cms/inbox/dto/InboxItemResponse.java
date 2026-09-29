@@ -1,8 +1,8 @@
 package com.cms.inbox.dto;
 
-import com.cms.inbox.InboxItem;
-import com.cms.inbox.InboxItemStatus;
-import com.cms.inbox.InboxItemType;
+import com.cms.inbox.domain.InboxItem;
+import com.cms.inbox.domain.InboxItemStatus;
+import com.cms.inbox.domain.InboxItemType;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.util.HashMap;
@@ -42,10 +42,19 @@ public record InboxItemResponse(
 
     private static Map<String, Object> walkInSummary(InboxItem item) {
         LocalTime startTime = item.getBooking().getSlot().getStartTime();
+        String doctorName =
+                item.getBooking().getSlot().getSession().getDoctorProfile().getAccount().getName();
         return Map.of(
                 "bookingId", item.getBooking().getId(),
                 "patientName", item.getBooking().getPatient().getName(),
-                "slotStartTime", startTime == null ? "" : startTime.toString());
+                "doctorName", doctorName,
+                "slotStartTime", startTime == null ? "" : startTime.toString(),
+                // 053: lets the Inbox card show whether the visit has actually been marked
+                // complete (SlotCompletionService) - deliberately just informational, not wired
+                // to Resolve, since a walk-in that no-showed or got cancelled never reaches
+                // COMPLETED and Resolve still needs to work for that case (per product decision:
+                // don't couple the two into one action).
+                "slotStatus", item.getBooking().getSlot().getStatus().name());
     }
 
     private static Map<String, Object> waitlistOfferSummary(InboxItem item) {

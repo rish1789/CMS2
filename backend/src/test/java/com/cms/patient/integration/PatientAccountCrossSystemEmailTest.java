@@ -4,10 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.identity.account.AccountRepository;
-import com.cms.identity.account.RoleAssignmentRepository;
+import com.cms.identity.account.repository.AccountRepository;
+import com.cms.identity.account.repository.RoleAssignmentRepository;
 import com.cms.identity.clinic.ClinicRepository;
-import com.cms.patient.account.PatientAccountRepository;
+import com.cms.patient.account.repository.PatientAccountRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

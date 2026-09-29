@@ -1,31 +1,31 @@
 package com.cms.booking.integration;
 
-import com.cms.booking.AppointmentType;
-import com.cms.booking.AppointmentTypeRepository;
-import com.cms.booking.BookingRepository;
-import com.cms.booking.DoctorDefaultFeeRepository;
-import com.cms.booking.PatientBookingService;
-import com.cms.identity.account.Account;
-import com.cms.identity.account.AccountRepository;
-import com.cms.identity.account.RoleAssignment;
-import com.cms.identity.account.RoleAssignmentRepository;
+import com.cms.booking.domain.AppointmentType;
+import com.cms.booking.repository.AppointmentTypeRepository;
+import com.cms.booking.repository.BookingRepository;
+import com.cms.booking.repository.DoctorDefaultFeeRepository;
+import com.cms.booking.service.PatientBookingService;
+import com.cms.identity.account.domain.Account;
+import com.cms.identity.account.repository.AccountRepository;
+import com.cms.identity.account.domain.RoleAssignment;
+import com.cms.identity.account.repository.RoleAssignmentRepository;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.clinic.ClinicRepository;
 import com.cms.identity.doctor.DoctorProfile;
 import com.cms.identity.doctor.DoctorProfileRepository;
-import com.cms.patient.account.JwtService;
-import com.cms.patient.account.PatientAccount;
-import com.cms.patient.account.PatientAccountRepository;
-import com.cms.patient.record.Patient;
-import com.cms.patient.record.PatientRepository;
-import com.cms.scheduling.Schedule;
-import com.cms.scheduling.ScheduleMode;
-import com.cms.scheduling.ScheduleRepository;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.SessionGenerationService;
-import com.cms.scheduling.SessionRepository;
-import com.cms.scheduling.Slot;
-import com.cms.scheduling.SlotRepository;
+import com.cms.patient.account.config.JwtService;
+import com.cms.patient.account.domain.PatientAccount;
+import com.cms.patient.account.repository.PatientAccountRepository;
+import com.cms.patient.record.domain.Patient;
+import com.cms.patient.record.repository.PatientRepository;
+import com.cms.scheduling.domain.Schedule;
+import com.cms.scheduling.domain.ScheduleMode;
+import com.cms.scheduling.repository.ScheduleRepository;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.service.SessionGenerationService;
+import com.cms.scheduling.repository.SessionRepository;
+import com.cms.scheduling.domain.Slot;
+import com.cms.scheduling.repository.SlotRepository;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -150,7 +150,7 @@ public abstract class AbstractPatientBookingIntegrationTest {
     protected void linkDoctorToClinic(DoctorProfile profile, Clinic clinic, boolean active) {
         RoleAssignment roleAssignment = new RoleAssignment(profile.getAccount(), clinic, RoleAssignment.Role.Doctor);
         if (!active) {
-            roleAssignment.deactivate(com.cms.identity.account.RoleAssignment.DeactivationReason.RESIGNED);
+            roleAssignment.deactivate(com.cms.identity.account.domain.RoleAssignment.DeactivationReason.RESIGNED);
         }
         roleAssignmentRepository.save(roleAssignment);
     }
@@ -167,13 +167,25 @@ public abstract class AbstractPatientBookingIntegrationTest {
      * from {@code LocalDate.now()}, not a hardcoded date - {@code PatientBookingService
      * .listOpenSlots}/{@code bookSlot} now floor to today-or-later, so a fixed past-tense date
      * here would silently stop producing any bookable fixture the moment "today" passed it.
+     *
+     * <p>065-phase1-stabilization: dated tomorrow, explicitly - a today-dated 09:00 slot is elapsed
+     * (unbookable, never offered) for most of the day, which made these fixtures depend on the time
+     * the suite runs.
      */
     protected Session saveFixedTimeSessionWithSlots(Clinic clinic, DoctorProfile doctor) {
         Schedule schedule = scheduleRepository.save(new Schedule(
                 doctor, clinic, EnumSet.allOf(DayOfWeek.class),
                 LocalTime.of(9, 0), LocalTime.of(13, 0), ScheduleMode.FIXED_TIME, 15));
-        sessionGenerationService.generate(LocalDate.now());
-        return sessionRepository.findBySchedule_Id(schedule.getId()).get(0);
+        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        sessionGenerationService.generate(tomorrow);
+        return sessionOn(schedule, tomorrow);
+    }
+
+    private Session sessionOn(Schedule schedule, LocalDate date) {
+        return sessionRepository.findBySchedule_Id(schedule.getId()).stream()
+                .filter(s -> s.getSessionDate().equals(date))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("No session generated on " + date));
     }
 
     protected Slot anOpenSlotOf(Session session) {
@@ -193,7 +205,7 @@ public abstract class AbstractPatientBookingIntegrationTest {
         Session session = sessionRepository.save(new Session(
                 schedule, clinic, doctor, LocalDate.now().minusDays(1), ScheduleMode.FIXED_TIME,
                 LocalTime.of(9, 0), LocalTime.of(9, 15), 15));
-        return slotRepository.save(new Slot(session, LocalTime.of(9, 0), LocalTime.of(9, 15), false));
+        return slotRepository.save(new Slot(session, LocalTime.of(9, 0), LocalTime.of(9, 15)));
     }
 
     /** A Queue-mode Session with one manually-created OPEN token Slot (simulating QueueSlotService's on-demand creation), for asserting the patient-listing query excludes it. */

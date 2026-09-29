@@ -1,6 +1,6 @@
 package com.cms.booking.dto;
 
-import com.cms.booking.AppointmentType;
+import com.cms.booking.domain.AppointmentType;
 import java.math.BigDecimal;
 import java.util.UUID;
 

@@ -5,8 +5,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.booking.Booking;
-import com.cms.scheduling.SlotStatus;
+import com.cms.booking.domain.Booking;
+import com.cms.scheduling.domain.SlotStatus;
 import java.time.LocalTime;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -37,7 +37,7 @@ class StaffBookingCancellationSuccessTest extends AbstractBookingCancellationInt
         var slot = slotRepository.findById(booking.getSlot().getId()).orElseThrow();
         assertThat(slot.getStatus()).isEqualTo(SlotStatus.OPEN);
         assertThat(bookingRepository.findById(booking.getId()).orElseThrow().getStatus())
-                .isEqualTo(com.cms.booking.BookingStatus.CANCELLED);
+                .isEqualTo(com.cms.booking.domain.BookingStatus.CANCELLED);
     }
 
     @Test
@@ -50,7 +50,7 @@ class StaffBookingCancellationSuccessTest extends AbstractBookingCancellationInt
         cancel(clinic.getId().toString(), original.getId().toString(), token).andExpect(status().isOk());
 
         var newPatient = patientRepository.save(
-                new com.cms.patient.record.Patient(clinic, null, "Rebooking Patient " + java.util.UUID.randomUUID(), null));
+                new com.cms.patient.record.domain.Patient(clinic, null, "Rebooking Patient " + java.util.UUID.randomUUID(), null));
         Booking rebooked = bookingRepository.saveAndFlush(new Booking(
                 slotRepository.findById(original.getSlot().getId()).orElseThrow(),
                 newPatient,
@@ -61,6 +61,6 @@ class StaffBookingCancellationSuccessTest extends AbstractBookingCancellationInt
         assertThat(rebooked.getId()).isNotEqualTo(original.getId());
         assertThat(bookingRepository.findById(original.getId())).isPresent();
         assertThat(bookingRepository.findById(original.getId()).orElseThrow().getStatus())
-                .isEqualTo(com.cms.booking.BookingStatus.CANCELLED);
+                .isEqualTo(com.cms.booking.domain.BookingStatus.CANCELLED);
     }
 }

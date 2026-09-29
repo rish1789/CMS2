@@ -37,6 +37,6 @@ class StaffBookingExistingPatientTest extends AbstractStaffBookingIntegrationTes
 
         var reloadedSlot = slotRepository.findById(slot.getId()).orElseThrow();
         org.assertj.core.api.Assertions.assertThat(reloadedSlot.getStatus())
-                .isEqualTo(com.cms.scheduling.SlotStatus.BOOKED);
+                .isEqualTo(com.cms.scheduling.domain.SlotStatus.BOOKED);
     }
 }

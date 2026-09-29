@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Log in — Carepoint</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F5F7F3;
+    --bg-panel: #FFFFFF;
+    --ink: #16241F;
+    --ink-soft: #4B5A54;
+    --ink-faint: #7C8B85;
+    --teal: #1F5D50;
+    --teal-deep: #143F37;
+    --amber: #E0973A;
+    --line: #DDE4DE;
+    --shadow: rgba(20, 40, 34, 0.08);
+    --focus: #1F5D50;
+    --error: #B3432B;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      --bg: #101613; --bg-panel: #17201C; --ink: #EAF0EC; --ink-soft: #B7C4BE;
+      --ink-faint: #7E8D87; --teal: #4FA391; --teal-deep: #6CBBA8; --amber: #F0AC58;
+      --line: #2A3733; --shadow: rgba(0, 0, 0, 0.35); --error: #E08065;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #101613; --bg-panel: #17201C; --ink: #EAF0EC; --ink-soft: #B7C4BE;
+    --ink-faint: #7E8D87; --teal: #4FA391; --teal-deep: #6CBBA8; --amber: #F0AC58;
+    --line: #2A3733; --shadow: rgba(0, 0, 0, 0.35); --error: #E08065;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  body { min-height: 100vh; display: flex; flex-direction: column; }
+
+  .wrap { width: 100%; max-width: 1180px; margin: 0 auto; padding: 0 32px; }
+
+  header.site { padding: 28px 0 0; }
+  header.site .wrap { display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: "Newsreader", Georgia, serif; font-size: 1.35rem; font-weight: 600; color: var(--ink); text-decoration: none; }
+  .brand-mark {
+    width: 30px; height: 30px; border-radius: 8px; background: var(--teal);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .brand-mark svg { width: 16px; height: 16px; }
+  nav.quiet a {
+    color: var(--ink-soft); text-decoration: none; font-size: 0.94rem; font-weight: 500;
+    padding: 6px 2px; border-bottom: 1px solid transparent;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+  nav.quiet a:hover, nav.quiet a:focus-visible { color: var(--ink); border-color: var(--line); }
+
+  main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 48px 0; }
+
+  .auth-card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 40px 36px 34px;
+    box-shadow: 0 2px 10px var(--shadow);
+  }
+
+  .auth-card h1 {
+    font-family: "Newsreader", Georgia, serif;
+    font-weight: 500;
+    font-style: italic;
+    font-size: 1.9rem;
+    line-height: 1.2;
+    margin: 0 0 8px;
+    color: var(--ink);
+  }
+  .auth-sub {
+    font-size: 0.98rem;
+    color: var(--ink-soft);
+    margin: 0 0 30px;
+    line-height: 1.5;
+  }
+
+  .field { margin-bottom: 20px; }
+  .field-row {
+    display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 7px;
+  }
+  label {
+    display: block;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .field-row label { margin-bottom: 0; }
+  .link-small {
+    font-size: 0.85rem;
+    color: var(--teal);
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .link-small:hover { text-decoration: underline; }
+
+  input[type="email"], input[type="password"] {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 9px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 0.98rem;
+    font-family: inherit;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  input::placeholder { color: var(--ink-faint); }
+  input:focus-visible {
+    outline: none;
+    border-color: var(--focus);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 18%, transparent);
+  }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 100%;
+    padding: 14px 20px;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    border: 1px solid transparent;
+    background: var(--teal);
+    color: #FFFFFF;
+    box-shadow: 0 1px 2px var(--shadow);
+    transition: background 0.15s ease;
+    margin-top: 6px;
+  }
+  .btn:hover { background: var(--teal-deep); }
+  .btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .divider {
+    display: flex; align-items: center; gap: 12px;
+    margin: 26px 0 20px;
+    color: var(--ink-faint);
+    font-size: 0.85rem;
+  }
+  .divider::before, .divider::after {
+    content: ""; flex: 1; height: 1px; background: var(--line);
+  }
+
+  .signup-line {
+    text-align: center;
+    font-size: 0.94rem;
+    color: var(--ink-soft);
+  }
+  .signup-line a { color: var(--teal); font-weight: 600; text-decoration: none; }
+  .signup-line a:hover { text-decoration: underline; }
+
+  footer.site {
+    border-top: 1px solid var(--line);
+    padding: 22px 0 26px;
+  }
+  footer.site .wrap {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px;
+  }
+  .foot-left { color: var(--ink-faint); font-size: 0.85rem; }
+  .foot-right a {
+    color: var(--ink-faint); font-size: 0.85rem; text-decoration: none;
+  }
+  .foot-right a:hover { color: var(--ink-soft); }
+
+  @media (max-width: 480px) {
+    .wrap { padding: 0 20px; }
+    .auth-card { padding: 32px 24px 28px; border-radius: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <a href="#home" class="brand">
+      <span class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 3L4 7V12C4 16.5 7.4 20.7 12 22C16.6 20.7 20 16.5 20 12V7L12 3Z" stroke="white" stroke-width="1.6" stroke-linejoin="round"/>
+          <path d="M9 12.5L11 14.5L15 10" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      Carepoint
+    </a>
+    <nav class="quiet">
+      <a href="#clinic-login">Clinic login</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="auth-card">
+    <h1>Welcome back.</h1>
+    <p class="auth-sub">Use the same account at every clinic you visit.</p>
+
+    <form>
+      <div class="field">
+        <label for="email">Email</label>
+        <div style="margin-top:7px;">
+          <input type="email" id="email" name="email" placeholder="you@example.com" autocomplete="email" required>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-row">
+          <label for="password">Password</label>
+          <a href="#forgot" class="link-small">Forgot password?</a>
+        </div>
+        <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password" required>
+      </div>
+
+      <button type="submit" class="btn">Log in</button>
+    </form>
+
+    <div class="divider">New to Carepoint?</div>
+    <p class="signup-line"><a href="#signup">Create an account</a> to get started.</p>
+  </div>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="foot-left">© 2026 Carepoint</div>
+    <div class="foot-right">
+      <a href="#clinic-login">Clinic login</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -9,6 +9,12 @@ import {
 } from '../../src/features/external-record-references/api'
 import { storeStaffSession } from '../../src/features/staff-login/token'
 
+// 065-phase1-stabilization (BUG-006): delay: null keeps every keystroke's events (onChange, inline
+// validation) but drops user-event's per-keystroke setTimeout(0) yield. With ~60 typed characters
+// per test those yields queue behind other workers' tasks under full-suite parallel load, which
+// pushed these tests past the 5 s default timeout intermittently.
+const TYPING_OPTIONS = { delay: null }
+
 vi.mock('../../src/features/external-record-references/api', async () => {
   const actual = await vi.importActual<typeof import('../../src/features/external-record-references/api')>(
     '../../src/features/external-record-references/api',
@@ -34,7 +40,7 @@ describe('ExternalRecordReferenceForm', () => {
   })
 
   it('creates a reference and lists it afterward', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup(TYPING_OPTIONS)
     mockedList.mockResolvedValueOnce([])
     mockedCreate.mockResolvedValueOnce({
       id: 'ref-1',
@@ -84,7 +90,7 @@ describe('ExternalRecordReferenceForm', () => {
   })
 
   it('shows the FORBIDDEN error message', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup(TYPING_OPTIONS)
     mockedList.mockResolvedValueOnce([])
     mockedCreate.mockRejectedValueOnce(new ExternalRecordReferenceApiError({ error: 'FORBIDDEN' }))
 
@@ -107,6 +113,19 @@ describe('ExternalRecordReferenceForm', () => {
     render(<ExternalRecordReferenceForm clinicId={CLINIC_ID} bookingId={BOOKING_ID} />)
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/could not be found/i)
+    expect(screen.queryByLabelText('Record type')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /save reference/i })).not.toBeInTheDocument()
+  })
+
+  // real-bug-fix 2026-09-17: same reasoning as the booking-not-found case above - a caller who
+  // isn't the treating doctor used to see this message as a banner above a form that was still
+  // live and submittable, inviting a doomed resubmit of the same denied request.
+  it('blocks the form entirely when the caller is not the treating doctor', async () => {
+    mockedList.mockRejectedValueOnce(new ExternalRecordReferenceApiError({ error: 'FORBIDDEN' }))
+
+    render(<ExternalRecordReferenceForm clinicId={CLINIC_ID} bookingId={BOOKING_ID} />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/only the treating doctor/i)
     expect(screen.queryByLabelText('Record type')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /save reference/i })).not.toBeInTheDocument()
   })

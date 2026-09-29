@@ -2,10 +2,8 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CancelFromCutoffForm } from '../../src/features/partial-session-cancellation/CancelFromCutoffForm'
-import {
-  cancelFromCutoff,
-  PartialCancellationApiError,
-} from '../../src/features/partial-session-cancellation/api'
+import { cancelFromCutoff } from '../../src/features/partial-session-cancellation/api'
+import { ApiError } from '../../src/lib/apiClient'
 import { storeStaffSession } from '../../src/features/staff-login/token'
 
 vi.mock('../../src/features/partial-session-cancellation/api', async () => {
@@ -82,7 +80,9 @@ describe('CancelFromCutoffForm', () => {
   })
 
   it('shows the FORBIDDEN error message', async () => {
-    mockedCancelFromCutoff.mockRejectedValueOnce(new PartialCancellationApiError({ error: 'FORBIDDEN' }))
+    mockedCancelFromCutoff.mockRejectedValueOnce(
+      new ApiError(403, 'Only front-desk Operations staff or a ClinicAdmin can cancel this session.', { error: 'FORBIDDEN' }),
+    )
 
     render(<CancelFromCutoffForm clinicId={CLINIC_ID} sessionId={SESSION_ID} />)
     await fillRangeAndConfirm('14:00', '16:00')
@@ -92,7 +92,7 @@ describe('CancelFromCutoffForm', () => {
 
   it('shows the INVALID_CANCELLATION_RANGE error message when "to" is not after "from"', async () => {
     mockedCancelFromCutoff.mockRejectedValueOnce(
-      new PartialCancellationApiError({ error: 'INVALID_CANCELLATION_RANGE' }),
+      new ApiError(400, 'The end time must be after the start time.', { error: 'INVALID_CANCELLATION_RANGE' }),
     )
 
     render(<CancelFromCutoffForm clinicId={CLINIC_ID} sessionId={SESSION_ID} />)

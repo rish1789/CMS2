@@ -5,8 +5,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.scheduling.ScheduleSessionGenerator;
-import com.cms.scheduling.Session;
+import com.cms.scheduling.service.ScheduleSessionGenerator;
+import com.cms.scheduling.domain.Session;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -71,7 +71,7 @@ class EditScheduleTest extends AbstractSessionGenerationIntegrationTest {
                 .allSatisfy(s -> assertThat(s.getStartTime().toString()).isEqualTo("10:00"));
     }
 
-    private com.cms.scheduling.Schedule reloadSchedule(UUID scheduleId) {
+    private com.cms.scheduling.domain.Schedule reloadSchedule(UUID scheduleId) {
         return scheduleRepository.findById(scheduleId).orElseThrow();
     }
 
@@ -94,7 +94,7 @@ class EditScheduleTest extends AbstractSessionGenerationIntegrationTest {
                 .andExpect(jsonPath("$.error").value("INVALID_SCHEDULE"));
 
         var reloaded = reloadSchedule(schedule.getId());
-        assertThat(reloaded.getMode()).isEqualTo(com.cms.scheduling.ScheduleMode.FIXED_TIME);
+        assertThat(reloaded.getMode()).isEqualTo(com.cms.scheduling.domain.ScheduleMode.FIXED_TIME);
         assertThat(reloaded.getStartTime().toString()).isEqualTo("09:00");
     }
 
@@ -105,15 +105,15 @@ class EditScheduleTest extends AbstractSessionGenerationIntegrationTest {
         String token = clinicAdminToken(clinic);
 
         // Schedule A: Mon 9-11
-        var scheduleA = scheduleRepository.save(new com.cms.scheduling.Schedule(
+        var scheduleA = scheduleRepository.save(new com.cms.scheduling.domain.Schedule(
                 doctor, clinic, java.util.Set.of(java.time.DayOfWeek.MONDAY),
                 java.time.LocalTime.of(9, 0), java.time.LocalTime.of(11, 0),
-                com.cms.scheduling.ScheduleMode.QUEUE, null));
+                com.cms.scheduling.domain.ScheduleMode.QUEUE, null));
         // Schedule B: Mon 12-13 (no overlap with A initially)
-        var scheduleB = scheduleRepository.save(new com.cms.scheduling.Schedule(
+        var scheduleB = scheduleRepository.save(new com.cms.scheduling.domain.Schedule(
                 doctor, clinic, java.util.Set.of(java.time.DayOfWeek.MONDAY),
                 java.time.LocalTime.of(12, 0), java.time.LocalTime.of(13, 0),
-                com.cms.scheduling.ScheduleMode.QUEUE, null));
+                com.cms.scheduling.domain.ScheduleMode.QUEUE, null));
 
         // Edit B to now overlap A -> rejected
         edit(

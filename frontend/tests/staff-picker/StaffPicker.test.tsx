@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { StaffPicker } from '../../src/features/staff-picker/StaffPicker'
 import { listClinicStaff, type ListClinicStaffParams, type StaffSummary } from '../../src/features/staff-picker/api'
-import { deactivateStaff } from '../../src/features/staff-onboarding/api'
+import { deactivateStaff, resetStaffPassword, setStaffPassword } from '../../src/features/staff-onboarding/api'
 import { storeStaffSession } from '../../src/features/staff-login/token'
 
 vi.mock('../../src/features/staff-picker/api', async () => {
@@ -18,11 +18,13 @@ vi.mock('../../src/features/staff-onboarding/api', async () => {
   const actual = await vi.importActual<typeof import('../../src/features/staff-onboarding/api')>(
     '../../src/features/staff-onboarding/api',
   )
-  return { ...actual, deactivateStaff: vi.fn() }
+  return { ...actual, deactivateStaff: vi.fn(), resetStaffPassword: vi.fn(), setStaffPassword: vi.fn() }
 })
 
 const mockedListClinicStaff = vi.mocked(listClinicStaff)
 const mockedDeactivateStaff = vi.mocked(deactivateStaff)
+const mockedResetStaffPassword = vi.mocked(resetStaffPassword)
+const mockedSetStaffPassword = vi.mocked(setStaffPassword)
 
 // pagination-unification-2026-09-10: search/role/status/specialization filtering, sorting, and
 // paging all moved server-side, so every one of those interactions now issues a real (mocked)
@@ -85,6 +87,8 @@ describe('StaffPicker (041-staff-console-pickers T035/US4)', () => {
     sessionStorage.clear()
     mockedListClinicStaff.mockReset()
     mockedDeactivateStaff.mockReset()
+    mockedResetStaffPassword.mockReset()
+    mockedSetStaffPassword.mockReset()
   })
 
   const TWO_STAFF: StaffSummary[] = [
@@ -207,11 +211,19 @@ describe('StaffPicker (041-staff-console-pickers T035/US4)', () => {
     await screen.findByText('Jamie Ops')
 
     const rowNames = () => screen.getAllByRole('row').slice(1).map((row) => row.textContent ?? '')
-    await userEvent.click(screen.getByRole('button', { name: /sort by name/i }))
+    // 053-tables-lists-consistency: SortableColumnHeader's button accessible name is the plain
+    // column label ("Name"), not the local SortHeader's old "Sort by Name" pattern - and its
+    // <th> aria-sort attribute is a stronger, more direct proof of sort-direction state than
+    // text alone. Re-queried fresh before each click (not cached) - the table unmounts/remounts
+    // between fetches (the loading state swaps in), so a `<th>` reference from before the first
+    // click goes stale by the second.
+    await userEvent.click(within(screen.getByRole('columnheader', { name: 'Name' })).getByRole('button', { name: 'Name' }))
     await waitFor(() => expect(rowNames()[0]).toContain('Dr. Sharma')) // ascending: D before J
+    expect(await screen.findByRole('columnheader', { name: 'Name' })).toHaveAttribute('aria-sort', 'ascending')
 
-    await userEvent.click(screen.getByRole('button', { name: /sort by name/i }))
+    await userEvent.click(within(screen.getByRole('columnheader', { name: 'Name' })).getByRole('button', { name: 'Name' }))
     await waitFor(() => expect(rowNames()[0]).toContain('Jamie Ops')) // second click reverses to descending
+    expect(await screen.findByRole('columnheader', { name: 'Name' })).toHaveAttribute('aria-sort', 'descending')
   })
 
   it('defaults to Active and can reveal Inactive/All staff, with Actions disabled for an inactive row', async () => {
@@ -311,5 +323,91 @@ describe('StaffPicker (041-staff-console-pickers T035/US4)', () => {
     await userEvent.type(screen.getByLabelText(/jump to page/i), '999')
     await userEvent.click(screen.getByRole('button', { name: /^go$/i }))
     expect(await screen.findByText('Page 3 of 3')).toBeInTheDocument()
+  })
+
+  // real-bug-fix 2026-09-17: ClinicAdmin resetting a locked-out Doctor/Operations login -
+  // previously only Super Admin could do this, and only for a ClinicAdmin's own account.
+  it('resets a Doctor’s password and shows the one-time result modal', async () => {
+    installFakeStaffBackend(TWO_STAFF)
+    mockedResetStaffPassword.mockResolvedValueOnce({
+      accountId: 'account-1',
+      email: 'dr.sharma@clinic.example',
+      staffCode: 'DR-1001',
+      temporaryPassword: 'Gener4ted!Pass',
+    })
+    renderWithSession()
+
+    await screen.findByText('Jamie Ops') // renderWithSession's own account is Dr. Sharma (account-1) - use the other row
+    await userEvent.click(screen.getByRole('button', { name: /jamie ops/i }))
+    const dialog = screen.getByRole('dialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: /actions/i }))
+
+    await userEvent.click(within(dialog).getByRole('button', { name: /^reset password$/i }))
+
+    expect(mockedResetStaffPassword).toHaveBeenCalledWith('clinic-1', 'account-9', 'staff-jwt')
+    expect(await screen.findByText('Password reset')).toBeInTheDocument()
+    expect(screen.getByText('Gener4ted!Pass')).toBeInTheDocument()
+    expect(screen.getByText(/hand this new password to the staff member directly/i)).toBeInTheDocument()
+  })
+
+  it('sets a specific chosen password after typing it in', async () => {
+    installFakeStaffBackend(TWO_STAFF)
+    mockedSetStaffPassword.mockResolvedValueOnce({
+      accountId: 'account-9',
+      email: 'jamie.ops@clinic.example',
+      staffCode: 'OP-9001',
+      temporaryPassword: 'Chosen!Pass123',
+    })
+    renderWithSession()
+
+    await userEvent.click(await screen.findByRole('button', { name: /jamie ops/i }))
+    const dialog = screen.getByRole('dialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: /actions/i }))
+
+    await userEvent.click(within(dialog).getByRole('button', { name: /set specific password/i }))
+    await userEvent.type(within(dialog).getByLabelText(/new password/i), 'Chosen!Pass123')
+    await userEvent.click(within(dialog).getByRole('button', { name: /^save$/i }))
+
+    expect(mockedSetStaffPassword).toHaveBeenCalledWith('clinic-1', 'account-9', 'Chosen!Pass123', 'staff-jwt')
+    expect(await screen.findByText('Chosen!Pass123')).toBeInTheDocument()
+  })
+
+  it('offers no password action for the logged-in user’s own row', async () => {
+    installFakeStaffBackend(TWO_STAFF)
+    renderWithSession() // session accountId is 'account-1', matching Dr. Sharma
+
+    await screen.findByText('Dr. Sharma')
+    await userEvent.click(screen.getByRole('button', { name: /dr\. sharma/i }))
+    const dialog = screen.getByRole('dialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: /actions/i }))
+
+    expect(within(dialog).getByText(/use your own account settings/i)).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: /^reset password$/i })).not.toBeInTheDocument()
+  })
+
+  it('offers no password action for a fellow ClinicAdmin, with an explanatory message', async () => {
+    const fellowAdmin: StaffSummary = {
+      roleAssignmentId: 'role-assignment-5',
+      accountId: 'account-5',
+      name: 'Other Admin',
+      staffCode: 'CA-5001',
+      role: 'ClinicAdmin',
+      email: 'other-admin@clinic.example',
+      mobile: null,
+      specialization: null,
+      experienceYears: null,
+      joinedAt: '2024-01-01T00:00:00Z',
+      active: true,
+    }
+    installFakeStaffBackend([...TWO_STAFF, fellowAdmin])
+    renderWithSession()
+
+    await userEvent.selectOptions(await screen.findByLabelText(/filter staff by role/i), 'ClinicAdmin')
+    await userEvent.click(await screen.findByRole('button', { name: /other admin/i }))
+    const dialog = screen.getByRole('dialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: /actions/i }))
+
+    expect(within(dialog).getByText(/can only be reset by super admin/i)).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: /^reset password$/i })).not.toBeInTheDocument()
   })
 })

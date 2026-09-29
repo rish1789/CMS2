@@ -2,9 +2,9 @@ package com.cms.scheduling.integration;
 
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfile;
-import com.cms.scheduling.QueueSlotService;
-import com.cms.scheduling.ScheduleMode;
-import com.cms.scheduling.Session;
+import com.cms.scheduling.service.QueueSlotService;
+import com.cms.scheduling.domain.ScheduleMode;
+import com.cms.scheduling.domain.Session;
 import java.time.LocalDate;
 import org.springframework.beans.factory.annotation.Autowired;
 

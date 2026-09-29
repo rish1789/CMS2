@@ -2,15 +2,15 @@ package com.cms.waitlist.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.cms.booking.Booking;
+import com.cms.booking.domain.Booking;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfile;
-import com.cms.notification.NotificationEvent;
-import com.cms.patient.account.PatientAccount;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.Slot;
-import com.cms.waitlist.WaitlistEntry;
-import com.cms.waitlist.WaitlistEntryStatus;
+import com.cms.notification.domain.NotificationEvent;
+import com.cms.patient.account.domain.PatientAccount;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.domain.Slot;
+import com.cms.waitlist.domain.WaitlistEntry;
+import com.cms.waitlist.domain.WaitlistEntryStatus;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;

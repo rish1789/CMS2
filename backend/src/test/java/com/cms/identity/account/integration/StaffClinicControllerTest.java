@@ -4,8 +4,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.identity.account.RoleAssignment;
-import com.cms.identity.account.StaffJwtService;
+import com.cms.identity.account.domain.RoleAssignment;
+import com.cms.identity.account.config.StaffJwtService;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.staff.integration.AbstractStaffIntegrationTest;
 import org.junit.jupiter.api.Test;
@@ -49,7 +49,7 @@ class StaffClinicControllerTest extends AbstractStaffIntegrationTest {
         Clinic clinic = saveClinic("Sunrise Clinic");
         var account = saveAccount("deactivated.role@example.com", "Str0ng!Pass", "OP-1002");
         RoleAssignment roleAssignment = new RoleAssignment(account, clinic, RoleAssignment.Role.Operations);
-        roleAssignment.deactivate(com.cms.identity.account.RoleAssignment.DeactivationReason.RESIGNED);
+        roleAssignment.deactivate(com.cms.identity.account.domain.RoleAssignment.DeactivationReason.RESIGNED);
         roleAssignmentRepository.save(roleAssignment);
         String token = staffJwtService.issueToken(account.getId());
 

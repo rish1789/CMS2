@@ -1,11 +1,11 @@
 package com.cms.identity.clinic;
 
-import com.cms.identity.account.Account;
-import com.cms.identity.account.AccountRepository;
-import com.cms.identity.account.PasswordPolicyValidator;
-import com.cms.identity.account.RoleAssignment;
-import com.cms.identity.account.RoleAssignmentRepository;
-import com.cms.identity.account.StaffCodeGenerator;
+import com.cms.identity.account.domain.Account;
+import com.cms.identity.account.repository.AccountRepository;
+import com.cms.identity.account.service.PasswordPolicyValidator;
+import com.cms.identity.account.domain.RoleAssignment;
+import com.cms.identity.account.repository.RoleAssignmentRepository;
+import com.cms.identity.account.service.StaffCodeGenerator;
 import com.cms.identity.api.dto.RegisterClinicRequest;
 import com.cms.identity.api.dto.RegisterClinicResponse;
 import com.cms.common.IndianMobileNumberValidator;

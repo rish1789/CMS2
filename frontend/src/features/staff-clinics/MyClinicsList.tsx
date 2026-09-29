@@ -30,7 +30,11 @@ export function MyClinicsList() {
   }, [page])
 
   return (
-    <div className="space-y-4">
+    // 056-design-copy-quality-pass: this page has no sidebar and previously relied on
+    // StaffShell's own mx-auto max-w-5xl for its reading width - that cap moved off StaffShell
+    // (ClinicShell needs full width for its sidebar), so it's reproduced here to keep this
+    // page's own appearance unchanged.
+    <div className="mx-auto max-w-5xl space-y-4">
       <div>
         <h1 className="text-lg font-semibold text-gray-900">Your clinics</h1>
         <p className="mt-0.5 text-sm text-gray-600">Clinics where you hold an active role. Pick one to continue.</p>

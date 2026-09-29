@@ -146,6 +146,11 @@ export function OpenSlotList({ clinicId, doctorId }: OpenSlotListProps) {
     setBookedSlot(null)
   }
 
+  function handleCloseModal() {
+    setSelectedSlotId(null)
+    setBookedSlot(null)
+  }
+
   if (!session) {
     return (
       <div className="max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -251,6 +256,7 @@ export function OpenSlotList({ clinicId, doctorId }: OpenSlotListProps) {
           clinicId={clinicId}
           slot={selectedSlot}
           token={session.token}
+          onClose={handleCloseModal}
           onBooked={(booking) => handleBooked(selectedSlot, booking)}
         />
       )}

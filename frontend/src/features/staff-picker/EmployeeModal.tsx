@@ -1,7 +1,17 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react'
-import { deactivateStaff, DeactivateStaffApiError, type DeactivationReason } from '../staff-onboarding/api'
+import { useRef, useState } from 'react'
+import {
+  deactivateStaff,
+  DeactivateStaffApiError,
+  resetStaffPassword,
+  setStaffPassword,
+  ResetStaffPasswordApiError,
+  type DeactivationReason,
+  type ResetStaffPasswordResult,
+} from '../staff-onboarding/api'
 import { loadStaffSession, storeStaffSession } from '../staff-login/token'
 import { RoleBadge } from '../../components/RoleBadge'
+import { Modal, type ModalHandle } from '../../components/Modal'
+import { ResetPasswordResultModal } from '../../components/ResetPasswordResultModal'
 import type { StaffSummary } from './api'
 
 const REASON_OPTIONS: { value: DeactivationReason; label: string }[] = [
@@ -40,15 +50,55 @@ export function EmployeeModal({ member, clinicId, isSelf, onClose, onDeactivated
   const [reason, setReason] = useState<DeactivationReason | ''>('')
   const [phase, setPhase] = useState<'idle' | 'confirming' | 'submitting'>('idle')
   const [error, setError] = useState<string | null>(null)
-  const dialogRef = useRef<HTMLDialogElement>(null)
+  const modalRef = useRef<ModalHandle>(null)
 
-  useEffect(() => {
-    dialogRef.current?.showModal()
-  }, [])
+  // real-bug-fix 2026-09-17: password reset/set, mirroring the Super Admin console's identical
+  // "reset (auto-generate) or set a specific one" pair for a ClinicAdmin's own login.
+  const [passwordMode, setPasswordMode] = useState<'idle' | 'choosing'>('idle')
+  const [chosenPassword, setChosenPassword] = useState('')
+  const [passwordSubmitting, setPasswordSubmitting] = useState(false)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [passwordResult, setPasswordResult] = useState<ResetStaffPasswordResult | null>(null)
 
-  function handleBackdropClick(event: MouseEvent<HTMLDialogElement>) {
-    if (event.target === dialogRef.current) {
-      dialogRef.current?.close()
+  async function handleResetPassword() {
+    const session = loadStaffSession()
+    if (!session) return
+    setPasswordSubmitting(true)
+    setPasswordError(null)
+    try {
+      const result = await resetStaffPassword(clinicId, member.accountId, session.token)
+      setPasswordResult(result)
+    } catch (err) {
+      if (err instanceof ResetStaffPasswordApiError) {
+        if (err.body.error === 'UNAUTHORIZED') storeStaffSession(null)
+        setPasswordError(err.message)
+      } else {
+        setPasswordError('Something went wrong. Please try again.')
+      }
+    } finally {
+      setPasswordSubmitting(false)
+    }
+  }
+
+  async function handleSetPassword() {
+    const session = loadStaffSession()
+    if (!session || !chosenPassword) return
+    setPasswordSubmitting(true)
+    setPasswordError(null)
+    try {
+      const result = await setStaffPassword(clinicId, member.accountId, chosenPassword, session.token)
+      setPasswordResult(result)
+      setPasswordMode('idle')
+      setChosenPassword('')
+    } catch (err) {
+      if (err instanceof ResetStaffPasswordApiError) {
+        if (err.body.error === 'UNAUTHORIZED') storeStaffSession(null)
+        setPasswordError(err.message)
+      } else {
+        setPasswordError('Something went wrong. Please try again.')
+      }
+    } finally {
+      setPasswordSubmitting(false)
     }
   }
 
@@ -74,11 +124,10 @@ export function EmployeeModal({ member, clinicId, isSelf, onClose, onDeactivated
   }
 
   return (
-    <dialog
-      ref={dialogRef}
+    <Modal
+      ref={modalRef}
       onClose={onClose}
-      onClick={handleBackdropClick}
-      aria-label={`${member.name} details`}
+      ariaLabel={`${member.name} details`}
       className="m-auto flex w-full max-w-lg flex-col overflow-hidden rounded-xl border-0 bg-white p-0 shadow-xl backdrop:bg-gray-900/50 sm:flex-row"
     >
       <div className="flex shrink-0 gap-1 border-b border-gray-200 bg-gray-50 p-2 sm:w-36 sm:flex-col sm:border-b-0 sm:border-r">
@@ -124,7 +173,7 @@ export function EmployeeModal({ member, clinicId, isSelf, onClose, onDeactivated
           </h2>
           <button
             type="button"
-            onClick={() => dialogRef.current?.close()}
+            onClick={() => modalRef.current?.close()}
             aria-label="Close"
             className="rounded-md p-1 text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-600"
           >
@@ -143,81 +192,169 @@ export function EmployeeModal({ member, clinicId, isSelf, onClose, onDeactivated
             <InfoRow label="Years of Service" value={yearsOfService(member.joinedAt)} />
           </dl>
         ) : (
-          <div className="space-y-3">
-            {isSelf ? (
-              <p className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
-                You can't deactivate your own account.
-              </p>
-            ) : !member.active ? (
-              <p className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
-                This employee is already inactive.
-              </p>
-            ) : (
-              <>
-                {error && (
-                  <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">
-                    {error}
-                  </p>
-                )}
-                {phase !== 'confirming' && (
-                  <>
-                    <label htmlFor="deactivation-reason" className="block text-sm font-medium text-gray-700">
-                      Reason
-                    </label>
-                    <select
-                      id="deactivation-reason"
-                      value={reason}
-                      onChange={(event) => setReason(event.target.value as DeactivationReason)}
-                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-                    >
-                      <option value="">Select a reason…</option>
-                      {REASON_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      disabled={!reason}
-                      onClick={() => setPhase('confirming')}
-                      className="w-full rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-700 transition-colors duration-150 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      Deactivate
-                    </button>
-                  </>
-                )}
-                {(phase === 'confirming' || phase === 'submitting') && (
-                  <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                    <p className="text-sm text-amber-900">
-                      Are you sure you want to deactivate <strong>{member.name}</strong>? They will immediately
-                      lose access to the system.
+          <div className="space-y-5">
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-gray-900">Password</h3>
+              {isSelf ? (
+                <p className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
+                  Use your own account settings to change your password.
+                </p>
+              ) : member.role === 'ClinicAdmin' ? (
+                <p className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
+                  A fellow ClinicAdmin's password can only be reset by Super Admin.
+                </p>
+              ) : (
+                <>
+                  {passwordError && (
+                    <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+                      {passwordError}
                     </p>
-                    <div className="flex gap-2">
+                  )}
+                  {passwordMode === 'idle' ? (
+                    <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={handleConfirmDeactivate}
-                        disabled={phase === 'submitting'}
-                        className="rounded-lg bg-red-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-150 ease-out hover:bg-red-500 disabled:opacity-50"
+                        onClick={handleResetPassword}
+                        disabled={passwordSubmitting}
+                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {phase === 'submitting' ? 'Deactivating…' : 'Confirm'}
+                        {passwordSubmitting ? 'Resetting…' : 'Reset password'}
                       </button>
                       <button
                         type="button"
-                        onClick={() => setPhase('idle')}
-                        disabled={phase === 'submitting'}
-                        className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        onClick={() => setPasswordMode('choosing')}
+                        disabled={passwordSubmitting}
+                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        Cancel
+                        Set specific password
                       </button>
                     </div>
-                  </div>
-                )}
-              </>
-            )}
+                  ) : (
+                    <div className="space-y-2">
+                      <label htmlFor="specific-password" className="block text-sm font-medium text-gray-700">
+                        New password
+                      </label>
+                      <input
+                        id="specific-password"
+                        type="text"
+                        value={chosenPassword}
+                        onChange={(event) => setChosenPassword(event.target.value)}
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={handleSetPassword}
+                          disabled={passwordSubmitting || !chosenPassword}
+                          className="rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-150 ease-out hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {passwordSubmitting ? 'Saving…' : 'Save'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPasswordMode('idle')
+                            setChosenPassword('')
+                            setPasswordError(null)
+                          }}
+                          disabled={passwordSubmitting}
+                          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="space-y-3 border-t border-gray-100 pt-4">
+              <h3 className="text-sm font-medium text-gray-900">Deactivation</h3>
+              {isSelf ? (
+                <p className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
+                  You can't deactivate your own account.
+                </p>
+              ) : !member.active ? (
+                <p className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
+                  This employee is already inactive.
+                </p>
+              ) : (
+                <>
+                  {error && (
+                    <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+                      {error}
+                    </p>
+                  )}
+                  {phase !== 'confirming' && (
+                    <>
+                      <label htmlFor="deactivation-reason" className="block text-sm font-medium text-gray-700">
+                        Reason
+                      </label>
+                      <select
+                        id="deactivation-reason"
+                        value={reason}
+                        onChange={(event) => setReason(event.target.value as DeactivationReason)}
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                      >
+                        <option value="">Select a reason…</option>
+                        {REASON_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        disabled={!reason}
+                        onClick={() => setPhase('confirming')}
+                        className="w-full rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-700 transition-colors duration-150 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Deactivate
+                      </button>
+                    </>
+                  )}
+                  {(phase === 'confirming' || phase === 'submitting') && (
+                    <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                      <p className="text-sm text-amber-900">
+                        Are you sure you want to deactivate <strong>{member.name}</strong>? They will immediately
+                        lose access to the system.
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={handleConfirmDeactivate}
+                          disabled={phase === 'submitting'}
+                          className="rounded-lg bg-red-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-150 ease-out hover:bg-red-500 disabled:opacity-50"
+                        >
+                          {phase === 'submitting' ? 'Deactivating…' : 'Confirm'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPhase('idle')}
+                          disabled={phase === 'submitting'}
+                          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>
-    </dialog>
+
+      {passwordResult && (
+        <ResetPasswordResultModal
+          email={passwordResult.email}
+          temporaryPassword={passwordResult.temporaryPassword}
+          recipientLabel="staff member"
+          onClose={() => setPasswordResult(null)}
+        />
+      )}
+    </Modal>
   )
 }

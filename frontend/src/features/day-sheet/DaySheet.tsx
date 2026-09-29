@@ -1,11 +1,19 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { listSessions, type DoctorSummary, type SessionSummary } from './api'
+import { listClinicDoctors } from '../doctor-picker/api'
 import { loadStaffSession } from '../staff-login/token'
-import { ListSkeleton } from '../../components/ListSkeleton'
 import { avatarGradientClass } from '../../components/avatarGradient'
+import { PaginationControls } from '../../components/PaginationControls'
+import { EmptyState } from '../../components/EmptyState'
+import { LoadingState } from '../../components/LoadingState'
 
 const SESSIONS_PAGE_SIZE = 20
+const DOCTOR_SEARCH_DEBOUNCE_MS = 300
+// real-bug-fix 2026-09-17: covers a typical clinic's full roster in one request without
+// building out a paginated combobox - listClinicDoctors' own `q` param (wired in below) is
+// what actually keeps this correct if a clinic ever exceeds it, not raising this number.
+const ALL_DOCTORS_PAGE_SIZE = 100
 
 function formatSessionDate(isoDate: string): string {
   const parsed = new Date(`${isoDate}T00:00:00`)
@@ -38,13 +46,27 @@ function modeBadgeClass(mode: SessionSummary['mode']): string {
 export function DaySheet() {
   const { clinicId } = useParams<{ clinicId: string }>()
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null)
-  const [doctors, setDoctors] = useState<DoctorSummary[]>([])
+  // real-bug-fix 2026-09-17: previously sourced from listSessions' own `doctors` field, which
+  // SessionRepository.findDistinctDoctorsInWindow derives from doctors who already have a
+  // generated Session in the 14-day window - a newly-onboarded or just-edited doctor's schedule
+  // has none yet (session generation only runs nightly, or on manual trigger), so they were
+  // invisible in this search bar with no indication anything was wrong, purely a data-timing
+  // gap unrelated to whether they're actually staffed. This now comes from listClinicDoctors -
+  // every doctor staffed at the clinic, independent of session generation.
+  const [allDoctors, setAllDoctors] = useState<DoctorSummary[]>([])
+  // The current page's own doctors (from listSessions' response) - kept separately from
+  // allDoctors purely for the merged single-doctor tab badge below, which needs a staffCode
+  // that's guaranteed present the moment a Session exists (unlike SessionSummary itself, which
+  // only carries doctorName/doctorProfileId) - no session-generation timing gap applies here,
+  // since a page of Sessions already implies its doctor has at least one generated.
+  const [sessionDoctors, setSessionDoctors] = useState<DoctorSummary[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [pageSize, setPageSize] = useState(SESSIONS_PAGE_SIZE)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(0)
   const [doctorFilter, setDoctorFilter] = useState('All')
   const [doctorSearchText, setDoctorSearchText] = useState('')
+  const [doctorSearchInput, setDoctorSearchInput] = useState('')
 
   useEffect(() => {
     if (!clinicId) return
@@ -58,16 +80,55 @@ export function DaySheet() {
     })
       .then((result) => {
         setSessions(result.sessions)
-        setDoctors(result.doctors)
+        setSessionDoctors(result.doctors)
         setTotalCount(result.totalCount)
         setPageSize(result.pageSize)
       })
       .catch(() => setError('Failed to load sessions.'))
   }, [clinicId, page, doctorFilter])
 
-  if (!clinicId) return null
+  // The clinic's full doctor roster, loaded once independent of session data - a search-bar
+  // option list that depends on session generation having already run is exactly the bug above.
+  useEffect(() => {
+    if (!clinicId) return
+    const session = loadStaffSession()
+    if (!session) return
+    listClinicDoctors(clinicId, session.token, { size: ALL_DOCTORS_PAGE_SIZE })
+      .then((result) => setAllDoctors(result.doctors))
+      .catch(() => {
+        // Non-fatal: the day sheet itself still works, only the search bar's suggestion list
+        // stays empty - the sessions fetch above surfaces its own error banner already.
+      })
+  }, [clinicId])
 
-  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+  // real-bug-fix 2026-09-17: "more power" for the search bar - a clinic with more doctors than
+  // ALL_DOCTORS_PAGE_SIZE (or a doctor onboarded after that initial fetch) still needs to be
+  // findable by typing. Debounced server-side search merges hits into the known set instead of
+  // replacing it, so results already shown never disappear mid-search. Mirrors PatientSearch/
+  // StaffPicker's own identical 300ms debounce precedent.
+  useEffect(() => {
+    if (!clinicId) return
+    const term = doctorSearchInput.trim()
+    if (term.length < 2) return
+    const timer = setTimeout(() => {
+      const session = loadStaffSession()
+      if (!session) return
+      listClinicDoctors(clinicId, session.token, { q: term, size: ALL_DOCTORS_PAGE_SIZE })
+        .then((result) => {
+          setAllDoctors((prev) => {
+            const byId = new Map(prev.map((doctor) => [doctor.doctorProfileId, doctor]))
+            for (const doctor of result.doctors) byId.set(doctor.doctorProfileId, doctor)
+            return Array.from(byId.values())
+          })
+        })
+        .catch(() => {
+          // Non-fatal - the locally-known doctor list (if any match) stays usable.
+        })
+    }, DOCTOR_SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [clinicId, doctorSearchInput])
+
+  if (!clinicId) return null
 
   // When every session on this page belongs to the same doctor - either because the doctor
   // filter is active, or just incidentally (a clinic with one scheduled doctor) - repeating
@@ -77,7 +138,7 @@ export function DaySheet() {
   const distinctDoctorIds = new Set((sessions ?? []).map((s) => s.doctorProfileId))
   const singleDoctor =
     sessions && sessions.length > 0 && distinctDoctorIds.size === 1
-      ? doctors.find((doctor) => doctor.doctorProfileId === sessions[0].doctorProfileId)
+      ? sessionDoctors.find((doctor) => doctor.doctorProfileId === sessions[0].doctorProfileId)
       : null
 
   // A plain <select> doesn't scale to a clinic with many doctors - scrolling through a flat
@@ -91,7 +152,7 @@ export function DaySheet() {
 
   function findDoctorByExactSearchText(text: string): DoctorSummary | undefined {
     const normalized = text.trim().toLowerCase()
-    return doctors.find(
+    return allDoctors.find(
       (doctor) =>
         doctor.name.toLowerCase() === normalized ||
         doctor.staffCode.toLowerCase() === normalized ||
@@ -101,6 +162,7 @@ export function DaySheet() {
 
   function handleDoctorSearchChange(text: string) {
     setDoctorSearchText(text)
+    setDoctorSearchInput(text)
     if (text.trim() === '') {
       setDoctorFilter('All')
       setPage(0)
@@ -120,7 +182,7 @@ export function DaySheet() {
       setDoctorSearchText('')
       return
     }
-    const current = doctors.find((doctor) => doctor.doctorProfileId === doctorFilter)
+    const current = allDoctors.find((doctor) => doctor.doctorProfileId === doctorFilter)
     setDoctorSearchText(current ? doctorSearchLabel(current) : '')
   }
 
@@ -137,7 +199,7 @@ export function DaySheet() {
         </p>
       )}
 
-      {doctors.length > 0 && (
+      {allDoctors.length > 0 && (
         <div className="max-w-xs">
           <label htmlFor="doctor-search" className="sr-only">
             Filter by doctor
@@ -154,19 +216,17 @@ export function DaySheet() {
             className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
           />
           <datalist id="doctor-search-options">
-            {doctors.map((doctor) => (
+            {allDoctors.map((doctor) => (
               <option key={doctor.doctorProfileId} value={doctorSearchLabel(doctor)} />
             ))}
           </datalist>
         </div>
       )}
 
-      {sessions === null && !error && <ListSkeleton rows={4} />}
+      {sessions === null && !error && <LoadingState variant="list" rows={4} />}
 
       {sessions && sessions.length === 0 && (
-        <p className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-500 shadow-sm">
-          No sessions scheduled in the next 14 days.
-        </p>
+        <EmptyState message="No sessions scheduled in the next 14 days." />
       )}
 
       {sessions && sessions.length > 0 && (
@@ -183,8 +243,16 @@ export function DaySheet() {
               <span className="text-sm font-semibold text-gray-900">{singleDoctor.name}</span>
             </div>
           )}
+          {/* 055-responsive-mobile-pass: `contain-layout` fixes a real, verified tablet-width
+              (~768px) bug - this table's own `min-w-[560px]` was leaking past this wrapper's
+              `overflow-x-auto` into the page's own scrollWidth (a known browser quirk with
+              table intrinsic sizing inside flex layouts), causing genuine page-body horizontal
+              scroll even though the wrapper visually clipped/scrolled the table correctly.
+              `contain: layout` isolates the wrapper as a containment boundary without touching
+              the table's own column-sizing algorithm - confirmed zero effect on column widths
+              at desktop width. */}
           <div
-            className={`overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm ${singleDoctor ? '-mt-px rounded-tl-none' : ''}`}
+            className={`overflow-x-auto contain-layout rounded-xl border border-gray-200 bg-white shadow-sm ${singleDoctor ? '-mt-px rounded-tl-none' : ''}`}
           >
             <table className="w-full min-w-[560px] text-left text-sm">
               <thead>
@@ -252,8 +320,16 @@ export function DaySheet() {
                         {formatSessionTimeRange(s.startTime, s.endTime)}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${modeBadgeClass(s.mode)}`}>
-                          {s.mode === 'FIXED_TIME' ? 'Fixed-Time' : 'Queue'}
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${modeBadgeClass(s.mode)}`}>
+                            {s.mode === 'FIXED_TIME' ? 'Fixed-Time' : 'Queue'}
+                          </span>
+                          {/* 065-phase1-stabilization (owner decision 3): a whole-cancelled session. */}
+                          {s.cancelled && (
+                            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-gray-600 ring-1 ring-inset ring-gray-300">
+                              Cancelled
+                            </span>
+                          )}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -288,29 +364,13 @@ export function DaySheet() {
               </tbody>
             </table>
           </div>
-          <div className="flex items-center justify-between text-sm text-gray-500">
-            <p>
-              Page {page + 1} of {totalPages} ({totalCount} sessions)
-            </p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setPage((current) => Math.max(0, current - 1))}
-                disabled={page === 0}
-                className="rounded-lg border border-gray-300 px-3 py-1.5 font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                onClick={() => setPage((current) => Math.min(totalPages - 1, current + 1))}
-                disabled={page + 1 >= totalPages}
-                className="rounded-lg border border-gray-300 px-3 py-1.5 font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
-          </div>
+          <PaginationControls
+            page={page}
+            pageSize={pageSize}
+            totalCount={totalCount}
+            onPageChange={setPage}
+            itemLabel="sessions"
+          />
         </>
       )}
     </div>

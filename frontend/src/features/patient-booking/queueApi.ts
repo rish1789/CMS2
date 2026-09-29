@@ -1,6 +1,8 @@
 // Client for POST /api/v1/patients/clinics/{clinicId}/sessions/{sessionId}/queue-bookings
 // See specs/022-queue-token-booking/contracts/queue-booking.md
 
+import { rateLimitMessage } from '../../lib/rateLimitMessage'
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
 
 export interface PatientQueueBookSlotRequest {
@@ -24,14 +26,19 @@ export type QueueBookSlotErrorBody =
   | { error: 'NOT_A_QUEUE_SESSION'; message?: string }
   | { error: 'APPOINTMENT_TYPE_NOT_FOUND'; message?: string }
   | { error: 'NO_FEE_CONFIGURED'; message?: string }
+  | { error: 'CLINIC_NOT_ACCEPTING_APPOINTMENTS'; message?: string }
   | { error: 'UNAUTHORIZED'; message?: string }
   | { error: 'TOKEN_ISSUANCE_FAILED'; message?: string }
+  // 060-booking-abuse-prevention: BOOKING_LIMIT_REACHED's message is already the exact,
+  // non-accusatory text to show (FR-005); RATE_LIMITED additionally carries retryAfterSeconds.
+  | { error: 'BOOKING_LIMIT_REACHED'; message?: string }
+  | { error: 'RATE_LIMITED'; message?: string; retryAfterSeconds?: number }
 
 export class QueueBookSlotApiError extends Error {
   readonly body: QueueBookSlotErrorBody
 
   constructor(body: QueueBookSlotErrorBody) {
-    super(defaultMessageFor(body) ?? body.message)
+    super(defaultMessageFor(body))
     this.name = 'QueueBookSlotApiError'
     this.body = body
   }
@@ -51,6 +58,12 @@ function defaultMessageFor(body: QueueBookSlotErrorBody): string {
       return 'Please log in to book into this queue.'
     case 'TOKEN_ISSUANCE_FAILED':
       return 'Could not issue a queue token right now — please try again shortly.'
+    case 'BOOKING_LIMIT_REACHED':
+      return body.message ?? "You've reached your current appointment limit."
+    case 'RATE_LIMITED':
+      return rateLimitMessage(body.retryAfterSeconds)
+    case 'CLINIC_NOT_ACCEPTING_APPOINTMENTS':
+      return 'This clinic is not accepting appointments.'
     default:
       return 'Something went wrong. Please try again.'
   }

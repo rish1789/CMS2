@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "C:\\Users\\risha\\AppData\\Local\\Temp\\gradle-8.10\\bin\\gradle.bat",
+      "runtimeArgs": ["-p", "backend", "bootRun", "--args=--admin.super-admin.username=super-admin --admin.super-admin.password=SuperAdmin!2026 --admin.super-admin.jwt.secret=wbNuLb4l5sYJK5kkA+um5eeSTrUXLR8YX5Jo35asenIdda2Qj6UIJ/G0dt9zEYPL --staff.jwt.secret=4U4Y+dAx6RfJ68O60o1yafjblw8HuCfKI9QuaQcXQHN9tlX4guRNQoT66D+/oaFC --patient.jwt.secret=9MY5fnWCajg9rS/non2Lu0EOVbzYgREv9WHSexY6Jf2bSOl7nf6Y1a9J1/aSt8eV"],
+      "port": 8080
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
+      "port": 5173
+    }
+  ]
+}

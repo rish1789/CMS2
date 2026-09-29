@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { searchPatients, type PatientSearchResult } from './api'
 
 // _diagnostics [P0] - [staff-console-audit-2026-09-10] - [RAW_ID_ENTRY]: backs the raw free-text
-// "Patient ID" inputs in WalkInForm/BookSlotForm that previously required staff to already know
+// "Patient ID" inputs in the (since retired) WalkInForm and BookSlotForm that previously required staff to already know
 // a patient's UUID out-of-band - a front-desk clerk has no way to produce one for a patient
 // standing at the counter. Debounced server-side search (not a preloaded <datalist>) so this
 // scales to a clinic with hundreds of patients, matching PatientSearch's own search endpoint.

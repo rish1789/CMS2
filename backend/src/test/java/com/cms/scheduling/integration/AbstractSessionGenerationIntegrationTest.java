@@ -2,10 +2,10 @@ package com.cms.scheduling.integration;
 
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfile;
-import com.cms.scheduling.Schedule;
-import com.cms.scheduling.ScheduleMode;
-import com.cms.scheduling.SessionGenerationService;
-import com.cms.scheduling.SessionRepository;
+import com.cms.scheduling.domain.Schedule;
+import com.cms.scheduling.domain.ScheduleMode;
+import com.cms.scheduling.service.SessionGenerationService;
+import com.cms.scheduling.repository.SessionRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.DayOfWeek;
 import java.time.LocalTime;

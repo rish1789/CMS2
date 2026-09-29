@@ -35,3 +35,19 @@ export function storePatientSession(session: StoredPatientSession | null): void 
     // sessionStorage unavailable - session just won't survive a reload.
   }
 }
+
+// 056-design-copy-quality-pass (2026-09-16 dashboard rebuild): PatientAccount (backend
+// domain/PatientAccount.java) has no name field at all - only email, password hash, mobile,
+// notification opt-ins. There is no "the patient's name" concept at the account level anywhere
+// in this system (names only exist on per-clinic Patient records, which may differ or not
+// exist yet). Adding a real name field would be a schema change (migration + signup field +
+// backfill decision), not a restyle - out of scope here. This derives a first-name-like display
+// string from the email's local part instead, the same honest-fallback approach this codebase
+// already uses elsewhere (LoginForm's own post-login state shows the email, not a fabricated
+// name) - "priya.sharma@example.com" -> "Priya Sharma", "priya@example.com" -> "Priya".
+export function deriveDisplayNameFromEmail(email: string): string {
+  const localPart = email.split('@')[0] || email
+  const words = localPart.split(/[._-]+/).filter(Boolean)
+  if (words.length === 0) return email
+  return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+}

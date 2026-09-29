@@ -22,8 +22,10 @@ public class DiscoveryController {
             @RequestParam(name = "specialization", required = false) String specialization,
             @RequestParam(name = "minExperienceYears", required = false) Integer minExperienceYears,
             @RequestParam(name = "sort", required = false) String sort,
-            @RequestParam(name = "direction", required = false) String direction) {
-        return discoverySearchService.search(q, city, specialization, minExperienceYears, sort, direction);
+            @RequestParam(name = "direction", required = false) String direction,
+            @RequestParam(name = "page", required = false) Integer page,
+            @RequestParam(name = "size", required = false) Integer size) {
+        return discoverySearchService.search(q, city, specialization, minExperienceYears, sort, direction, page, size);
     }
 
     /** patient-search-advanced-filtering: drives the City filter dropdown. */

@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { ToastProvider } from './components/Toast'
 import { HomePage } from './routes/HomePage'
 import { NotFoundPage } from './routes/NotFoundPage'
 import { PublicHeader } from './routes/PublicHeader'
@@ -16,18 +17,21 @@ import {
   AnonymizePatientPage,
   AppointmentTypesPage,
   BookSlotPage,
+  ClinicLimitOverridePage,
   ConsultationNotePage,
   DefineSchedulePage,
   ExternalRecordReferencePage,
   InboxRoutePage,
   OnboardStaffPage,
   PrescriptionPage,
+  ProtectionFlagsPage,
   QueueBookSlotPage,
   SessionOperationsPage,
   StaffCancelBookingPage,
   StaffJoinWaitlistPage,
   StaffQueuePositionPage,
-  WalkInPage,
+  FrontDeskWalkInRoutePage,
+  LegacyWalkInRedirect,
 } from './routes/staff/ClinicToolPages'
 
 import { PatientLoginPage } from './routes/patient/PatientLoginPage'
@@ -50,12 +54,14 @@ import { AdminSectionShell } from './routes/admin/AdminSectionShell'
 import { PendingClinicsList } from './features/clinic-verification/PendingClinicsList'
 import { PendingDoctorsList } from './features/doctor-verification/PendingDoctorsList'
 import { TriggerSessionGeneration } from './features/session-generation/TriggerSessionGeneration'
+import { ProtectionSettingsPage } from './features/admin-protection-settings/ProtectionSettingsPage'
 
 import { DaySheet } from './features/day-sheet/DaySheet'
 import { SessionSlotsView } from './features/day-sheet/SessionSlotsView'
 import { PatientSearch } from './features/patient-search/PatientSearch'
 import { DoctorPicker } from './features/doctor-picker/DoctorPicker'
 import { StaffPicker } from './features/staff-picker/StaffPicker'
+import { PatientHubPage } from './routes/staff/PatientHubPage'
 
 // _diagnostics [HIGH] - [APP_SHELL] - [NO_ROUTING_INFRASTRUCTURE]: the umbrella finding - App.tsx
 // previously rendered exactly one component (RegistrationForm) and no router of any kind existed
@@ -63,8 +69,9 @@ import { StaffPicker } from './features/staff-picker/StaffPicker'
 // individually wired to their backend contracts, but unreachable by a real user.
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
+    <ToastProvider>
+      <BrowserRouter>
+        <Routes>
         <Route path="/" element={<HomePage />} />
         <Route
           path="/register"
@@ -128,16 +135,23 @@ function App() {
               <Route path="doctors/:doctorProfileId/appointment-types" element={<AppointmentTypesPage />} />
               <Route path="slots/:slotId/book" element={<BookSlotPage />} />
               <Route path="sessions/:sessionId/queue-book" element={<QueueBookSlotPage />} />
-              <Route path="sessions/:sessionId/walk-in" element={<WalkInPage />} />
+              <Route path="walk-in" element={<FrontDeskWalkInRoutePage />} />
+              <Route path="sessions/:sessionId/walk-in" element={<LegacyWalkInRedirect />} />
               <Route path="sessions/:sessionId/operations" element={<SessionOperationsPage />} />
               <Route path="bookings/:bookingId/cancel" element={<StaffCancelBookingPage />} />
               <Route path="bookings/:bookingId/queue-position" element={<StaffQueuePositionPage />} />
               <Route path="bookings/:bookingId/consultation-note" element={<ConsultationNotePage />} />
               <Route path="bookings/:bookingId/prescription" element={<PrescriptionPage />} />
               <Route path="bookings/:bookingId/external-record" element={<ExternalRecordReferencePage />} />
+              <Route path="patients/:patientId" element={<PatientHubPage />} />
               <Route path="patients/:patientId/anonymize" element={<AnonymizePatientPage />} />
               <Route path="waitlist/join" element={<StaffJoinWaitlistPage />} />
               <Route path="inbox" element={<InboxRoutePage />} />
+              {/* 060-booking-abuse-prevention T052: ClinicAdmin-only, gated the same way as
+                  every other admin-only staff screen (Sidebar's roles filter + the page's own
+                  backend-enforced 403). */}
+              <Route path="protection" element={<ProtectionFlagsPage />} />
+              <Route path="protection/limit-override" element={<ClinicLimitOverridePage />} />
               {/* 041-staff-console-pickers: browse/pick views replacing typed-ID entry */}
               <Route path="day-sheet" element={<DaySheet />} />
               <Route path="day-sheet/:sessionId" element={<SessionSlotsView />} />
@@ -156,13 +170,15 @@ function App() {
               <Route path="clinics" element={<PendingClinicsList />} />
               <Route path="doctors" element={<PendingDoctorsList />} />
               <Route path="sessions/generate" element={<TriggerSessionGeneration />} />
+              <Route path="protection-settings" element={<ProtectionSettingsPage />} />
             </Route>
           </Route>
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />
-      </Routes>
-    </BrowserRouter>
+        </Routes>
+      </BrowserRouter>
+    </ToastProvider>
   )
 }
 

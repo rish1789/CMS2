@@ -1,6 +1,6 @@
 package com.cms.patient.integration;
 
-import com.cms.patient.account.PatientAccountRepository;
+import com.cms.patient.account.repository.PatientAccountRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;

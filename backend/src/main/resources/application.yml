@@ -16,6 +16,22 @@ spring:
 server:
   port: ${PORT:8080}
 
+# 045-backend-module-layering FR-005/FR-006: only /actuator/health is registered as a web
+# endpoint at all (no /env, /beans, /metrics, etc. exist to be reached even if a security gap
+# existed) - see com.cms.common.ActuatorSecurityConfig for the explicit @Order(7) filter chain
+# that additionally denies every other /actuator/** path, since none of the app's other 6
+# chains match that prefix and it would otherwise fall through completely ungoverned (same
+# class of gap as the /docs and /api-docs paths noted below, but those are meant to be public -
+# actuator's non-health endpoints must not be).
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
 # Interactive OpenAPI/Swagger docs (see com.cms.common.OpenApiConfig for the API metadata).
 # UI at /docs, raw OpenAPI 3 JSON spec at /api-docs. Neither path is under /api/v1/**, so none
 # of the app's 6 path-scoped SecurityFilterChains match them - they're served unauthenticated,
@@ -46,6 +62,11 @@ app:
   rate-limit:
     max-attempts: ${RATE_LIMIT_MAX_ATTEMPTS:30}
     window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
+  # 047-backend-hardening FR-002: off by default (fail-safe) - see
+  # com.cms.notification.service.LoggingNotificationSender. Override via NOTIFICATION_LOG_PII
+  # only for local debugging, never in a real deployment.
+  notification:
+    log-pii: ${NOTIFICATION_LOG_PII:false}
 
 # T004 (002-patient-account-login): HMAC signing secret for patient-scoped JWTs.
 # _diagnostics [MAJOR] - [full-repo-audit] - [UNSAFE_JWT_DEFAULT]: deliberately NO default

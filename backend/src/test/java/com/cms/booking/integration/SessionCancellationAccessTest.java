@@ -4,7 +4,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.scheduling.Session;
+import com.cms.scheduling.domain.Session;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -25,7 +25,7 @@ class SessionCancellationAccessTest extends AbstractSessionCancellationIntegrati
         var clinic = saveClinic();
         var doctor = saveDoctorStaffedAt(clinic);
         Session session = saveFixedTimeSessionWithSlots(clinic, doctor);
-        List<com.cms.scheduling.Slot> slots = slotRepository.findBySession_Id(session.getId());
+        List<com.cms.scheduling.domain.Slot> slots = slotRepository.findBySession_Id(session.getId());
         bookSlot(clinic, doctor, slots.get(0));
 
         cancel(clinic.getId().toString(), session.getId().toString(), unrelatedStaffToken())
@@ -38,7 +38,7 @@ class SessionCancellationAccessTest extends AbstractSessionCancellationIntegrati
         var clinic = saveClinic();
         var doctor = saveDoctorStaffedAt(clinic);
         Session session = saveFixedTimeSessionWithSlots(clinic, doctor);
-        List<com.cms.scheduling.Slot> slots = slotRepository.findBySession_Id(session.getId());
+        List<com.cms.scheduling.domain.Slot> slots = slotRepository.findBySession_Id(session.getId());
         bookSlot(clinic, doctor, slots.get(0));
 
         cancel(clinic.getId().toString(), session.getId().toString(), doctorToken(doctor))
@@ -52,7 +52,7 @@ class SessionCancellationAccessTest extends AbstractSessionCancellationIntegrati
         var otherClinic = saveClinic();
         var doctor = saveDoctorStaffedAt(clinic);
         Session session = saveFixedTimeSessionWithSlots(clinic, doctor);
-        List<com.cms.scheduling.Slot> slots = slotRepository.findBySession_Id(session.getId());
+        List<com.cms.scheduling.domain.Slot> slots = slotRepository.findBySession_Id(session.getId());
         bookSlot(clinic, doctor, slots.get(0));
 
         cancel(otherClinic.getId().toString(), session.getId().toString(), clinicAdminToken(otherClinic))

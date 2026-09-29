@@ -2,7 +2,7 @@ package com.cms.scheduling.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.cms.scheduling.Session;
+import com.cms.scheduling.domain.Session;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.List;

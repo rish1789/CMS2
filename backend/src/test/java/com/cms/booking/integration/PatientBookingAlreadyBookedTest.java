@@ -5,8 +5,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.booking.PatientBookingService;
-import com.cms.booking.SlotAlreadyBookedException;
+import com.cms.booking.service.PatientBookingService;
+import com.cms.booking.exception.SlotAlreadyBookedException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;

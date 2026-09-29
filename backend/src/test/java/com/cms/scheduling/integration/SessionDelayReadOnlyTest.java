@@ -2,8 +2,8 @@ package com.cms.scheduling.integration;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
-import com.cms.scheduling.Slot;
-import com.cms.scheduling.SlotStatus;
+import com.cms.scheduling.domain.Slot;
+import com.cms.scheduling.domain.SlotStatus;
 import java.time.LocalTime;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;

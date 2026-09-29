@@ -2,7 +2,8 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { JoinWaitlistForm } from '../../src/features/waitlist/JoinWaitlistForm'
-import { joinWaitlist, WaitlistJoinApiError } from '../../src/features/waitlist/api'
+import { joinWaitlist } from '../../src/features/waitlist/api'
+import { ApiError } from '../../src/lib/apiClient'
 import { listPatientClinicDoctors } from '../../src/features/doctor-picker/api'
 import { storePatientSession } from '../../src/features/patient-account/token'
 
@@ -105,7 +106,9 @@ describe('JoinWaitlistForm', () => {
 
   it('shows the WAITLIST_TARGET_REQUIRED error message', async () => {
     const user = userEvent.setup()
-    mockedJoinWaitlist.mockRejectedValueOnce(new WaitlistJoinApiError({ error: 'WAITLIST_TARGET_REQUIRED' }))
+    mockedJoinWaitlist.mockRejectedValueOnce(
+      new ApiError(400, 'Please choose either a doctor or a specialization.', { error: 'WAITLIST_TARGET_REQUIRED' }),
+    )
 
     render(<JoinWaitlistForm clinicId={CLINIC_ID} />)
 
@@ -118,7 +121,9 @@ describe('JoinWaitlistForm', () => {
 
   it('shows the DOCTOR_NOT_STAFFED_AT_CLINIC error message', async () => {
     const user = userEvent.setup()
-    mockedJoinWaitlist.mockRejectedValueOnce(new WaitlistJoinApiError({ error: 'DOCTOR_NOT_STAFFED_AT_CLINIC' }))
+    mockedJoinWaitlist.mockRejectedValueOnce(
+      new ApiError(400, 'That doctor is not staffed at this clinic.', { error: 'DOCTOR_NOT_STAFFED_AT_CLINIC' }),
+    )
 
     render(<JoinWaitlistForm clinicId={CLINIC_ID} />)
 

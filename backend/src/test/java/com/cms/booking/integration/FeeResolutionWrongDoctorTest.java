@@ -2,8 +2,8 @@ package com.cms.booking.integration;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.cms.booking.AppointmentType;
-import com.cms.booking.AppointmentTypeNotFoundException;
+import com.cms.booking.domain.AppointmentType;
+import com.cms.booking.exception.AppointmentTypeNotFoundException;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 

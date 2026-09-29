@@ -1,5 +1,8 @@
 package com.cms.identity.account;
 
+import com.cms.identity.account.service.PasswordPolicyValidator;
+
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;

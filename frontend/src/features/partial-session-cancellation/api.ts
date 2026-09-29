@@ -1,7 +1,8 @@
 // Client for POST /api/v1/clinics/{clinicId}/sessions/{sessionId}/cancel-from-cutoff
 // See specs/030-partial-cutoff-session-cancellation/contracts/partial-session-cancellation.md
+// 046-frontend-api-client: migrated onto the shared apiClient (see its own ApiError export).
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
+import { apiRequest } from '../../lib/apiClient'
 
 export interface SessionCancellationResponse {
   sessionId: string
@@ -14,18 +15,9 @@ export type PartialCancellationErrorBody =
   | { error: 'UNAUTHORIZED'; message?: string }
   | { error: 'INVALID_CANCELLATION_RANGE'; message?: string }
 
-export class PartialCancellationApiError extends Error {
-  readonly body: PartialCancellationErrorBody
-
-  constructor(body: PartialCancellationErrorBody) {
-    super(defaultMessageFor(body) ?? body.message)
-    this.name = 'PartialCancellationApiError'
-    this.body = body
-  }
-}
-
-function defaultMessageFor(body: PartialCancellationErrorBody): string {
-  switch (body.error) {
+function defaultMessageFor(body: unknown): string {
+  const error = (body as PartialCancellationErrorBody | undefined)?.error
+  switch (error) {
     case 'FORBIDDEN':
       return 'Only front-desk Operations staff or a ClinicAdmin can cancel this session.'
     case 'SESSION_NOT_FOUND':
@@ -46,24 +38,8 @@ export async function cancelFromCutoff(
   toTime: string,
   token: string,
 ): Promise<SessionCancellationResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/clinics/${clinicId}/sessions/${sessionId}/cancel-from-cutoff`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ cutoffTime, toTime }),
-  })
-
-  if (!response.ok) {
-    let body: PartialCancellationErrorBody
-    try {
-      body = (await response.json()) as PartialCancellationErrorBody
-    } catch {
-      body = { error: 'SESSION_NOT_FOUND' }
-    }
-    throw new PartialCancellationApiError(body)
-  }
-
-  return (await response.json()) as SessionCancellationResponse
+  return apiRequest<SessionCancellationResponse>(
+    `/api/v1/clinics/${clinicId}/sessions/${sessionId}/cancel-from-cutoff`,
+    { method: 'POST', token, body: { cutoffTime, toTime }, fallbackMessage: defaultMessageFor },
+  )
 }

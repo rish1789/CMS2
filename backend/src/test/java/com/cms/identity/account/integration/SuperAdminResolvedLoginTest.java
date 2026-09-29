@@ -6,7 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.identity.admin.SuperAdminJwtService;
+import com.cms.identity.admin.config.SuperAdminJwtService;
 import com.cms.identity.staff.integration.AbstractStaffIntegrationTest;
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -53,12 +53,26 @@ class SuperAdminResolvedLoginTest extends AbstractStaffIntegrationTest {
     }
 
     @Test
-    void wrongSuperAdminPasswordRejectedWithSameShapeAsUnknownStaffIdentifier() throws Exception {
+    void wrongSuperAdminPasswordReturnsIncorrectPasswordNotAccountNotFound() throws Exception {
+        // The Super Admin username is a real, known identifier - a wrong password for it must
+        // report INCORRECT_PASSWORD, not fall through to the staff lookup (which can never match
+        // it) and misreport ACCOUNT_NOT_FOUND. See StaffAuthService.login's identifierMatches
+        // branch.
         String wrongPasswordBody =
                 """
                 { "identifier": "%s", "password": "not-the-real-password" }
                 """
                         .formatted(SUPER_ADMIN_USERNAME);
+
+        mockMvc.perform(post("/api/v1/staff/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(wrongPasswordBody))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("INCORRECT_PASSWORD"));
+    }
+
+    @Test
+    void unknownStaffIdentifierReturnsAccountNotFound() throws Exception {
         String unknownStaffBody =
                 """
                 { "identifier": "does.not.exist@sunrise-clinic.example", "password": "Incorrect1!" }
@@ -66,15 +80,9 @@ class SuperAdminResolvedLoginTest extends AbstractStaffIntegrationTest {
 
         mockMvc.perform(post("/api/v1/staff/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(wrongPasswordBody))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("INVALID_CREDENTIALS"));
-
-        mockMvc.perform(post("/api/v1/staff/login")
-                        .contentType(MediaType.APPLICATION_JSON)
                         .content(unknownStaffBody))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("INVALID_CREDENTIALS"));
+                .andExpect(jsonPath("$.error").value("ACCOUNT_NOT_FOUND"));
     }
 
     private static String extractToken(MvcResult result) throws Exception {

@@ -28,7 +28,7 @@ class SessionGenerationNoDuplicateOnRepeatTest extends AbstractSessionGeneration
     void repeatedGenerationOnALaterDateOnlyAddsNewlyInRangeDates() {
         var clinic = saveClinic();
         var doctor = saveDoctorStaffedAt(clinic);
-        var schedule = saveEveryDaySchedule(clinic, doctor, com.cms.scheduling.ScheduleMode.QUEUE, null);
+        var schedule = saveEveryDaySchedule(clinic, doctor, com.cms.scheduling.domain.ScheduleMode.QUEUE, null);
         LocalDate runDate = LocalDate.of(2026, 9, 3);
 
         int firstRun = sessionGenerationService.generate(runDate);

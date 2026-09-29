@@ -2,16 +2,16 @@ package com.cms.inbox.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.cms.booking.AppointmentType;
-import com.cms.booking.Booking;
+import com.cms.booking.domain.AppointmentType;
+import com.cms.booking.domain.Booking;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfile;
-import com.cms.inbox.InboxItem;
-import com.cms.inbox.InboxItemType;
-import com.cms.patient.account.PatientAccount;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.Slot;
-import com.cms.waitlist.WaitlistEntry;
+import com.cms.inbox.domain.InboxItem;
+import com.cms.inbox.domain.InboxItemType;
+import com.cms.patient.account.domain.PatientAccount;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.domain.Slot;
+import com.cms.waitlist.domain.WaitlistEntry;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -46,7 +46,7 @@ class InboxCreationTest extends AbstractInboxIntegrationTest {
         Clinic clinic = saveClinic();
         DoctorProfile doctor = saveDoctorStaffedAt(clinic);
         Session session = saveFixedTimeSessionWithSlots(clinic, doctor);
-        Slot openSlot = aRegularOpenSlotOf(session);
+        Slot openSlot = anOpenSlotOf(session);
         PatientAccount patientAccount = savePatientAccount();
         WaitlistEntry entry = saveWaitingEntry(clinic, patientAccount, doctor, Instant.now());
 

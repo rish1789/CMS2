@@ -6,14 +6,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfile;
-import com.cms.scheduling.Schedule;
-import com.cms.scheduling.ScheduleMode;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.SessionGenerationService;
-import com.cms.scheduling.SessionRepository;
-import com.cms.scheduling.Slot;
-import com.cms.scheduling.SlotRepository;
-import com.cms.scheduling.SlotStatus;
+import com.cms.scheduling.domain.Schedule;
+import com.cms.scheduling.domain.ScheduleMode;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.service.SessionGenerationService;
+import com.cms.scheduling.repository.SessionRepository;
+import com.cms.scheduling.domain.Slot;
+import com.cms.scheduling.repository.SlotRepository;
+import com.cms.scheduling.domain.SlotStatus;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;

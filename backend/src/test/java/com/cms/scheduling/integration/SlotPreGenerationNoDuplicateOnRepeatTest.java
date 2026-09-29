@@ -2,7 +2,7 @@ package com.cms.scheduling.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.cms.scheduling.ScheduleMode;
+import com.cms.scheduling.domain.ScheduleMode;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +14,7 @@ class SlotPreGenerationNoDuplicateOnRepeatTest extends AbstractSlotGenerationInt
         var clinic = saveClinic();
         var doctor = saveDoctorStaffedAt(clinic);
         // 50-minute window, 15-minute slots: 3 full slots fit (45 min); a 4th would overrun by 5 min.
-        var schedule = scheduleRepository.save(new com.cms.scheduling.Schedule(
+        var schedule = scheduleRepository.save(new com.cms.scheduling.domain.Schedule(
                 doctor, clinic, java.util.EnumSet.allOf(java.time.DayOfWeek.class),
                 java.time.LocalTime.of(9, 0), java.time.LocalTime.of(9, 50), ScheduleMode.FIXED_TIME, 15));
         LocalDate runDate = LocalDate.of(2026, 9, 3);

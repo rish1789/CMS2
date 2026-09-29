@@ -1,6 +1,6 @@
 package com.cms.clinical.dto;
 
-import com.cms.clinical.ExternalRecordReference;
+import com.cms.clinical.domain.ExternalRecordReference;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;

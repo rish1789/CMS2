@@ -1,12 +1,15 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { IconBadge, ClinicIcon } from '../../components/adminIcons'
 import { BookingIcon } from '../../components/patientIcons'
 import { SearchIcon } from '../../components/staffIcons'
 import { NextAppointmentCard } from '../../features/patient-bookings/NextAppointmentCard'
+import { deriveDisplayNameFromEmail, loadPatientSession } from '../../features/patient-account/token'
 
-// patient-booking-flow-rebuild: replaces the previous raw "type a Clinic/Booking/Session ID"
-// forms with real browse/pick entry points, mirroring ClinicToolsDashboard's staff-side tile
-// shape - the same icon-badge, hover, and active-press treatment used across the app.
+// 056-design-copy-quality-pass (2026-09-16 dashboard rebuild): order and copy match
+// design/patient-dashboard-reference.html's structure (Find a doctor, My bookings, My
+// clinics); descriptions kept close to this project's own already-specific existing copy
+// (never flagged as a "childish copy" problem) rather than a full rewrite.
 const TILES = [
   {
     title: 'Find a doctor',
@@ -15,39 +18,52 @@ const TILES = [
     icon: <SearchIcon />,
   },
   {
-    title: 'My clinics',
-    description: "Clinics you've visited before - book a slot, join a queue, or join a waitlist.",
-    to: '/patient/clinics',
-    icon: <ClinicIcon />,
-  },
-  {
     title: 'My bookings',
-    description: "Your booked slots, joined queues, and waitlist status - view details, cancel, or claim an offer.",
+    description: 'Your upcoming visits, queue position, and waitlist status — all in one place.',
     to: '/patient/bookings',
     icon: <BookingIcon />,
+  },
+  {
+    title: 'My clinics',
+    description: "Clinics you've visited before. Book again or join a queue in one tap.",
+    to: '/patient/clinics',
+    icon: <ClinicIcon />,
   },
 ]
 
 export function PatientDashboard() {
+  const [session] = useState(() => loadPatientSession())
+  const displayName = session ? deriveDisplayNameFromEmail(session.email) : ''
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-lg font-semibold text-gray-900">Welcome back</h1>
-        <p className="mt-0.5 text-sm text-gray-600">Find a doctor, manage your bookings, or check your waitlist status.</p>
-      </div>
+    <div>
+      <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
+        Welcome back{displayName ? `, ${displayName}` : ''}.
+      </h1>
+      <p className="mt-2 mb-8 max-w-xl text-base text-gray-600">
+        Find a doctor, manage your bookings, or check your waitlist status.
+      </p>
+
       <NextAppointmentCard />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
         {TILES.map((tile) => (
           <Link
             key={tile.title}
             to={tile.to}
-            className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-all duration-150 ease-out hover:border-indigo-300 hover:shadow-md active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+            className="group block rounded-2xl border border-gray-200 bg-white p-6 transition-all duration-150 ease-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
           >
             <IconBadge>{tile.icon}</IconBadge>
-            <div>
-              <h3 className="text-sm font-semibold text-gray-900">{tile.title}</h3>
-              <p className="mt-1 text-sm text-gray-600">{tile.description}</p>
-            </div>
+            <h2 className="mt-4 flex items-center justify-between text-base font-semibold text-gray-900">
+              {tile.title}
+              <span
+                aria-hidden="true"
+                className="font-normal text-gray-400 transition-all duration-150 ease-out group-hover:translate-x-0.5 group-hover:text-indigo-600"
+              >
+                →
+              </span>
+            </h2>
+            <p className="mt-2 text-sm text-gray-500">{tile.description}</p>
           </Link>
         ))}
       </div>

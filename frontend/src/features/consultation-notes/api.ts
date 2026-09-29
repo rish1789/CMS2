@@ -1,7 +1,10 @@
 // Client for POST/GET /api/v1/clinics/{clinicId}/bookings/{bookingId}/consultation-notes
 // See specs/034-consultation-note-creation/contracts/consultation-note.md
+// 054-forms-validation-consistency: migrated onto the shared apiClient - this file had the
+// identical defaultMessageFor(body) ?? body.message dead-code bug 043 found and fixed
+// elsewhere. `ConsultationNoteApiError` is gone; callers catch the shared `ApiError`.
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
+import { apiRequest } from '../../lib/apiClient'
 
 export interface ConsultationNoteResponse {
   id: string
@@ -23,18 +26,9 @@ export type ConsultationNoteErrorBody =
   // unhandled 500) is never mistaken for "no note yet".
   | { error: 'UNKNOWN'; message?: string }
 
-export class ConsultationNoteApiError extends Error {
-  readonly body: ConsultationNoteErrorBody
-
-  constructor(body: ConsultationNoteErrorBody) {
-    super(defaultMessageFor(body) ?? body.message)
-    this.name = 'ConsultationNoteApiError'
-    this.body = body
-  }
-}
-
-function defaultMessageFor(body: ConsultationNoteErrorBody): string {
-  switch (body.error) {
+function defaultMessageFor(rawBody: unknown): string {
+  const body = rawBody as ConsultationNoteErrorBody | undefined
+  switch (body?.error) {
     case 'BOOKING_NOT_FOUND':
       return 'This booking could not be found.'
     case 'FORBIDDEN':
@@ -56,29 +50,15 @@ export async function createConsultationNote(
   content: string,
   token: string,
 ): Promise<ConsultationNoteResponse> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/v1/clinics/${clinicId}/bookings/${bookingId}/consultation-notes`,
+  return apiRequest<ConsultationNoteResponse>(
+    `/api/v1/clinics/${clinicId}/bookings/${bookingId}/consultation-notes`,
     {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ content }),
+      token,
+      body: { content },
+      fallbackMessage: defaultMessageFor,
     },
   )
-
-  if (!response.ok) {
-    let body: ConsultationNoteErrorBody
-    try {
-      body = (await response.json()) as ConsultationNoteErrorBody
-    } catch {
-      body = { error: 'BOOKING_NOT_FOUND' }
-    }
-    throw new ConsultationNoteApiError(body)
-  }
-
-  return (await response.json()) as ConsultationNoteResponse
 }
 
 export async function getConsultationNote(
@@ -86,22 +66,8 @@ export async function getConsultationNote(
   bookingId: string,
   token: string,
 ): Promise<ConsultationNoteResponse> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/v1/clinics/${clinicId}/bookings/${bookingId}/consultation-notes`,
-    {
-      headers: { Authorization: `Bearer ${token}` },
-    },
+  return apiRequest<ConsultationNoteResponse>(
+    `/api/v1/clinics/${clinicId}/bookings/${bookingId}/consultation-notes`,
+    { token, fallbackMessage: defaultMessageFor },
   )
-
-  if (!response.ok) {
-    let body: ConsultationNoteErrorBody
-    try {
-      body = (await response.json()) as ConsultationNoteErrorBody
-    } catch {
-      body = { error: 'UNKNOWN' }
-    }
-    throw new ConsultationNoteApiError(body)
-  }
-
-  return (await response.json()) as ConsultationNoteResponse
 }

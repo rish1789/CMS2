@@ -14,7 +14,7 @@ class SessionGenerationManualTriggerAuthTest extends AbstractSessionGenerationIn
     void superAdminCredentialsSucceedAndReturnTheCreatedCount() throws Exception {
         var clinic = saveClinic();
         var doctor = saveDoctorStaffedAt(clinic);
-        var schedule = saveEveryDaySchedule(clinic, doctor, com.cms.scheduling.ScheduleMode.QUEUE, null);
+        var schedule = saveEveryDaySchedule(clinic, doctor, com.cms.scheduling.domain.ScheduleMode.QUEUE, null);
 
         mockMvc.perform(post("/api/v1/admin/sessions/generate")
                         .header(HttpHeaders.AUTHORIZATION, superAdminAuthHeader()))

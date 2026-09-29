@@ -1,4 +1,4 @@
-import { useLocation, useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { OpenSlotList } from '../../features/patient-booking/OpenSlotList'
 import { QueueBookSlotForm } from '../../features/patient-booking/QueueBookSlotForm'
 import { QueueSessionList } from '../../features/patient-booking/QueueSessionList'
@@ -9,6 +9,8 @@ import { JoinWaitlistForm } from '../../features/waitlist/JoinWaitlistForm'
 import { MyWaitlistEntries } from '../../features/waitlist/MyWaitlistEntries'
 import { MyClinics } from '../../features/patient-clinics/MyClinics'
 import { MyBookings } from '../../features/patient-bookings/MyBookings'
+import { VisitRecordSection } from '../../features/patient-clinical-records/VisitRecordSection'
+import { LiveScheduleStatusIndicator } from '../../features/session-delay/LiveScheduleStatusIndicator'
 
 export function BookAtClinicPage() {
   const { clinicId } = useParams<{ clinicId: string }>()
@@ -37,12 +39,14 @@ interface QueueBookRouterState {
 export function PatientQueueBookPage() {
   const { clinicId, sessionId } = useParams<{ clinicId: string; sessionId: string }>()
   const location = useLocation()
+  const navigate = useNavigate()
   const state = (location.state as QueueBookRouterState | null) ?? {}
   if (!clinicId || !sessionId) return null
   return (
     <QueueBookSlotForm
       clinicId={clinicId}
       sessionId={sessionId}
+      onClose={() => navigate(`/patient/clinics/${clinicId}/queue-sessions`)}
       appointmentTypes={state.appointmentTypes}
       doctorName={state.doctorName}
       sessionDate={state.sessionDate}
@@ -112,8 +116,10 @@ export function PatientBookingDetailPage() {
   if (!bookingId) return null
   return (
     <div className="mx-auto max-w-md space-y-4">
+      <LiveScheduleStatusIndicator mode="patient" bookingId={bookingId} />
       <QueuePositionIndicator mode="patient" bookingId={bookingId} />
       <CancelBookingButton mode="patient" bookingId={bookingId} />
+      <VisitRecordSection bookingId={bookingId} />
     </div>
   )
 }

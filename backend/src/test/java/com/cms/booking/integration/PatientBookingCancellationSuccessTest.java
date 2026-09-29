@@ -5,9 +5,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.booking.Booking;
-import com.cms.booking.BookingCancellationReason;
-import com.cms.scheduling.SlotStatus;
+import com.cms.booking.domain.Booking;
+import com.cms.booking.domain.BookingCancellationReason;
+import com.cms.scheduling.domain.SlotStatus;
 import java.time.LocalTime;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;

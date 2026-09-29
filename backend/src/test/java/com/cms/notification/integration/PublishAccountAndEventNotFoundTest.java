@@ -2,8 +2,8 @@ package com.cms.notification.integration;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.cms.notification.NotificationEventNotFoundException;
-import com.cms.notification.PatientAccountNotFoundException;
+import com.cms.notification.exception.NotificationEventNotFoundException;
+import com.cms.notification.exception.PatientAccountNotFoundException;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 

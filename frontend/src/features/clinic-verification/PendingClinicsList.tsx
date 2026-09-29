@@ -9,17 +9,22 @@ import {
   restoreClinic,
   deleteClinic,
   deleteClinicsBulk,
+  resetClinicAdminPassword,
+  setClinicAdminPassword,
   AdminApiError,
   type ClinicListStatus,
   type ClinicSortField,
   type ClinicSummary,
+  type ResetAdminPasswordResult,
   type SortDirection,
 } from './api'
 import { loadSuperAdminSession, storeSuperAdminSession } from '../super-admin/token'
 import { PaginationControls } from '../../components/PaginationControls'
-import { ListSkeleton } from '../../components/ListSkeleton'
+import { EmptyState } from '../../components/EmptyState'
+import { LoadingState } from '../../components/LoadingState'
 import { RejectConfirmModal } from '../../components/RejectConfirmModal'
 import { DeleteConfirmModal } from '../../components/DeleteConfirmModal'
+import { ResetPasswordResultModal } from '../../components/ResetPasswordResultModal'
 import { SortableColumnHeader } from '../../components/SortableColumnHeader'
 import { REJECTION_REASON_OPTIONS, type RejectionReason } from '../../components/rejectionReason'
 import { ClinicIcon, IconBadge } from '../../components/adminIcons'
@@ -64,6 +69,15 @@ export function PendingClinicsList() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [rejectItems, setRejectItems] = useState<{ id: string; label: string }[] | null>(null)
   const [deleteItems, setDeleteItems] = useState<{ id: string; label: string }[] | null>(null)
+  // real-bug-fix 2026-09-16: this system has no self-service "forgot password" flow anywhere -
+  // when a clinic's own admin login stops working, this is the only recovery path.
+  const [resettingPasswordId, setResettingPasswordId] = useState<string | null>(null)
+  const [resetPasswordResult, setResetPasswordResult] = useState<ResetAdminPasswordResult | null>(null)
+  // real-bug-fix 2026-09-17: resetClinicAdminPassword only generates a random password - this
+  // covers setting a specific chosen one instead.
+  const [settingPasswordId, setSettingPasswordId] = useState<string | null>(null)
+  const [newPasswordInput, setNewPasswordInput] = useState('')
+  const [savingPasswordId, setSavingPasswordId] = useState<string | null>(null)
 
   // stress-test-2026-09-11: server-side search/sort/reason-filter, not a client-side filter over
   // a downloaded page - the queue is expected to hold hundreds to thousands of clinics.
@@ -194,6 +208,55 @@ export function PendingClinicsList() {
       }
     } finally {
       setActioningId(null)
+    }
+  }
+
+  // real-bug-fix 2026-09-16: no confirmation step, unlike Un-verify/Delete - resetting a
+  // password isn't destructive to any clinic data, it's the recovery action itself, and the
+  // new credential is shown immediately after (ResetPasswordResultModal).
+  async function handleResetAdminPassword(clinic: ClinicSummary) {
+    const session = loadSuperAdminSession()
+    if (!session) {
+      handleUnauthorized()
+      return
+    }
+    setResettingPasswordId(clinic.clinicId)
+    setError(null)
+    try {
+      const result = await resetClinicAdminPassword(clinic.clinicId, session.token)
+      setResetPasswordResult(result)
+    } catch (err) {
+      if (err instanceof AdminApiError && err.status === 401) {
+        handleUnauthorized()
+      } else {
+        setError(err instanceof Error ? err.message : 'Could not reset the admin password.')
+      }
+    } finally {
+      setResettingPasswordId(null)
+    }
+  }
+
+  async function handleSetAdminPassword(clinic: ClinicSummary) {
+    const session = loadSuperAdminSession()
+    if (!session) {
+      handleUnauthorized()
+      return
+    }
+    setSavingPasswordId(clinic.clinicId)
+    setError(null)
+    try {
+      const result = await setClinicAdminPassword(clinic.clinicId, newPasswordInput, session.token)
+      setResetPasswordResult(result)
+      setSettingPasswordId(null)
+      setNewPasswordInput('')
+    } catch (err) {
+      if (err instanceof AdminApiError && err.status === 401) {
+        handleUnauthorized()
+      } else {
+        setError(err instanceof Error ? err.message : 'Could not set the admin password.')
+      }
+    } finally {
+      setSavingPasswordId(null)
     }
   }
 
@@ -386,13 +449,17 @@ export function PendingClinicsList() {
           <label htmlFor="clinic-search" className="sr-only">
             Search clinics
           </label>
+          {/* 055-responsive-mobile-pass: was `w-72 max-w-full`, which doesn't clamp to the
+              wrapped flex row's available width at mobile (same real bug found and fixed in
+              DoctorPicker.tsx's identical search input - measured page-body horizontal
+              overflow). `w-full sm:w-72` fixes it while keeping the desktop appearance. */}
           <input
             id="clinic-search"
             type="search"
             value={searchInput}
             onChange={(event) => handleSearchChange(event.target.value)}
             placeholder="Search by name, address, or contact"
-            className="w-72 max-w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 sm:w-72"
           />
         </div>
       </div>
@@ -439,17 +506,20 @@ export function PendingClinicsList() {
         </div>
       )}
 
-      {loading && <ListSkeleton rows={4} />}
+      {loading && <LoadingState variant="list" rows={4} />}
 
       {!loading && clinics.length === 0 && (
-        <p className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-500 shadow-sm">
-          {searchTerm || reasonFilter ? 'No clinics match your search/filter.' : 'No clinics in this list.'}
-        </p>
+        <EmptyState message={searchTerm || reasonFilter ? 'No clinics match your search/filter.' : 'No clinics in this list.'} />
       )}
 
       {!loading && clinics.length > 0 && (
         <>
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+          {/* 055-responsive-mobile-pass: `contain-layout` fixes a real, verified tablet-width
+              (~768px) bug - this table's own `min-w-[640px]` was leaking past this wrapper's
+              `overflow-x-auto` into the page's own scrollWidth (a known browser quirk with
+              table intrinsic sizing inside flex layouts), causing genuine page-body horizontal
+              scroll - see the identical fix and its explanation in DaySheet.tsx. */}
+          <div className="overflow-x-auto contain-layout rounded-xl border border-gray-200 bg-white shadow-sm">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -579,14 +649,61 @@ export function PendingClinicsList() {
                               Back
                             </button>
                           </div>
+                        ) : settingPasswordId === clinic.clinicId ? (
+                          <div className="flex flex-wrap items-center justify-end gap-2">
+                            <input
+                              type="text"
+                              aria-label="New admin password"
+                              value={newPasswordInput}
+                              onChange={(e) => setNewPasswordInput(e.target.value)}
+                              placeholder="New password"
+                              className="input w-40 text-sm"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleSetAdminPassword(clinic)}
+                              disabled={savingPasswordId === clinic.clinicId || newPasswordInput.trim() === ''}
+                              className="rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-150 ease-out hover:bg-indigo-500 disabled:opacity-50 disabled:pointer-events-none"
+                            >
+                              {savingPasswordId === clinic.clinicId ? 'Saving…' : 'Save'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSettingPasswordId(null)
+                                setNewPasswordInput('')
+                              }}
+                              disabled={savingPasswordId === clinic.clinicId}
+                              className="rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => setConfirmingActionId(clinic.clinicId)}
-                            className="rounded-lg border border-red-300 bg-white px-3.5 py-2 text-sm font-medium text-red-700 transition-colors duration-150 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
-                          >
-                            Un-verify
-                          </button>
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleResetAdminPassword(clinic)}
+                              disabled={resettingPasswordId === clinic.clinicId}
+                              className="rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2"
+                            >
+                              {resettingPasswordId === clinic.clinicId ? 'Resetting…' : 'Reset admin password'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSettingPasswordId(clinic.clinicId)}
+                              className="rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2"
+                            >
+                              Set specific password
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmingActionId(clinic.clinicId)}
+                              className="rounded-lg border border-red-300 bg-white px-3.5 py-2 text-sm font-medium text-red-700 transition-colors duration-150 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                            >
+                              Un-verify
+                            </button>
+                          </div>
                         ))}
                       {tab === 'rejected' && (
                         <div className="flex justify-end gap-2">
@@ -638,6 +755,14 @@ export function PendingClinicsList() {
           entityNoun="clinic"
           onClose={() => setDeleteItems(null)}
           onSubmit={handleDeleteSubmit}
+        />
+      )}
+
+      {resetPasswordResult && (
+        <ResetPasswordResultModal
+          email={resetPasswordResult.email}
+          temporaryPassword={resetPasswordResult.temporaryPassword}
+          onClose={() => setResetPasswordResult(null)}
         />
       )}
     </div>

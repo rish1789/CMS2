@@ -1,43 +1,44 @@
 package com.cms.waitlist.integration;
 
-import com.cms.booking.AppointmentType;
-import com.cms.booking.AppointmentTypeRepository;
-import com.cms.booking.Booking;
-import com.cms.booking.BookingCancellationService;
-import com.cms.booking.BookingRepository;
-import com.cms.booking.SessionCancellationService;
-import com.cms.booking.SessionPartialCancellationService;
-import com.cms.identity.account.Account;
-import com.cms.identity.account.AccountRepository;
-import com.cms.identity.account.RoleAssignment;
-import com.cms.identity.account.RoleAssignmentRepository;
-import com.cms.identity.account.StaffJwtService;
+import com.cms.booking.domain.AppointmentType;
+import com.cms.booking.repository.AppointmentTypeRepository;
+import com.cms.booking.domain.Booking;
+import com.cms.booking.service.BookingCancellationService;
+import com.cms.booking.repository.BookingRepository;
+import com.cms.booking.service.SessionCancellationService;
+import com.cms.booking.service.SessionPartialCancellationService;
+import com.cms.identity.account.domain.Account;
+import com.cms.identity.account.repository.AccountRepository;
+import com.cms.identity.account.domain.RoleAssignment;
+import com.cms.identity.account.repository.RoleAssignmentRepository;
+import com.cms.identity.account.config.StaffJwtService;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.clinic.ClinicRepository;
 import com.cms.identity.doctor.DoctorProfile;
 import com.cms.identity.doctor.DoctorProfileRepository;
-import com.cms.notification.NotificationEventRepository;
-import com.cms.patient.account.JwtService;
-import com.cms.patient.account.PatientAccount;
-import com.cms.patient.account.PatientAccountRepository;
-import com.cms.patient.record.Patient;
-import com.cms.patient.record.PatientRepository;
-import com.cms.scheduling.NoShowDetectionService;
-import com.cms.scheduling.Schedule;
-import com.cms.scheduling.ScheduleMode;
-import com.cms.scheduling.ScheduleRepository;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.SessionGenerationService;
-import com.cms.scheduling.SessionRepository;
-import com.cms.scheduling.Slot;
-import com.cms.scheduling.SlotRepository;
-import com.cms.scheduling.SlotStatus;
-import com.cms.waitlist.WaitlistClaimService;
-import com.cms.waitlist.WaitlistEntry;
-import com.cms.waitlist.WaitlistEntryRepository;
-import com.cms.waitlist.WaitlistEntryStatus;
-import com.cms.waitlist.WaitlistExpirySweepService;
-import com.cms.waitlist.WaitlistReleaseService;
+import com.cms.notification.repository.NotificationEventRepository;
+import com.cms.patient.account.config.JwtService;
+import com.cms.patient.account.domain.PatientAccount;
+import com.cms.patient.account.repository.PatientAccountRepository;
+import com.cms.patient.record.domain.Patient;
+import com.cms.patient.record.repository.PatientRepository;
+import com.cms.scheduling.service.NoShowDetectionService;
+import com.cms.scheduling.domain.Schedule;
+import com.cms.scheduling.domain.ScheduleMode;
+import com.cms.scheduling.repository.ScheduleRepository;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.service.SessionGenerationService;
+import com.cms.scheduling.repository.SessionRepository;
+import com.cms.scheduling.domain.Slot;
+import com.cms.scheduling.repository.SessionCancellationRepository;
+import com.cms.scheduling.repository.SlotRepository;
+import com.cms.scheduling.domain.SlotStatus;
+import com.cms.waitlist.service.WaitlistClaimService;
+import com.cms.waitlist.domain.WaitlistEntry;
+import com.cms.waitlist.repository.WaitlistEntryRepository;
+import com.cms.waitlist.domain.WaitlistEntryStatus;
+import com.cms.waitlist.service.WaitlistExpirySweepService;
+import com.cms.waitlist.service.WaitlistReleaseService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.math.BigDecimal;
@@ -127,6 +128,9 @@ public abstract class AbstractWaitlistIntegrationTest {
     protected SlotRepository slotRepository;
 
     @Autowired
+    protected SessionCancellationRepository sessionCancellationRepository;
+
+    @Autowired
     protected SessionGenerationService sessionGenerationService;
 
     @Autowired
@@ -176,6 +180,8 @@ public abstract class AbstractWaitlistIntegrationTest {
         patientAccountRepository.deleteAll();
         appointmentTypeRepository.deleteAll();
         slotRepository.deleteAll();
+        // 065-phase1-stabilization: cancellation records reference session and account (no cascade).
+        sessionCancellationRepository.deleteAll();
         sessionRepository.deleteAll();
         scheduleRepository.deleteAll();
         doctorProfileRepository.deleteAll();
@@ -204,7 +210,7 @@ public abstract class AbstractWaitlistIntegrationTest {
     protected void linkDoctorToClinic(DoctorProfile profile, Clinic clinic, boolean active) {
         RoleAssignment roleAssignment = new RoleAssignment(profile.getAccount(), clinic, RoleAssignment.Role.Doctor);
         if (!active) {
-            roleAssignment.deactivate(com.cms.identity.account.RoleAssignment.DeactivationReason.RESIGNED);
+            roleAssignment.deactivate(com.cms.identity.account.domain.RoleAssignment.DeactivationReason.RESIGNED);
         }
         roleAssignmentRepository.save(roleAssignment);
     }
@@ -258,20 +264,35 @@ public abstract class AbstractWaitlistIntegrationTest {
 
     /**
      * A Fixed-Time Schedule (every day, 9-13, 15-min) generated into a Session with Slots, for a
-     * doctor staffed at the given clinic - dated in the past (not just "not a fixed calendar
-     * date") so 021's no-show sweep ({@code WaitlistMatchingExclusivityTest
-     * .noShowReleaseNeverBumpsTheWaitlist}) can fire deterministically: {@code
-     * NoShowDetectionService.detectAndMarkNoShows} only marks a Slot whose {@code
-     * sessionDate}+{@code startTime}, plus a 10-minute grace period, is already before {@code
-     * LocalDateTime.now()} - generating from today (or later) would make that condition depend
-     * on what time of day the test happens to run, not just what day it is.
+     * doctor staffed at the given clinic - dated tomorrow, so every slot is still bookable and
+     * therefore offerable. 065-phase1-stabilization: the waitlist is never offered a past-dated or
+     * elapsed slot, so the former yesterday-dated fixture could no longer produce an offer (and a
+     * today-dated one would depend on the time of day the suite runs).
      */
     protected Session saveFixedTimeSessionWithSlots(Clinic clinic, DoctorProfile doctor) {
+        return saveFixedTimeSessionWithSlotsOn(clinic, doctor, LocalDate.now().plusDays(1));
+    }
+
+    /**
+     * The same fixture dated yesterday, for 021's no-show sweep ({@code
+     * WaitlistMatchingExclusivityTest.noShowReleaseNeverBumpsTheWaitlist}): {@code
+     * NoShowDetectionService.detectAndMarkNoShows} only marks a Slot whose {@code sessionDate}+
+     * {@code startTime}, plus a 10-minute grace period, is already before {@code
+     * LocalDateTime.now()} - a past date makes that deterministic regardless of time of day.
+     */
+    protected Session savePastFixedTimeSessionWithSlots(Clinic clinic, DoctorProfile doctor) {
+        return saveFixedTimeSessionWithSlotsOn(clinic, doctor, LocalDate.now().minusDays(1));
+    }
+
+    private Session saveFixedTimeSessionWithSlotsOn(Clinic clinic, DoctorProfile doctor, LocalDate date) {
         Schedule schedule = scheduleRepository.save(new Schedule(
                 doctor, clinic, EnumSet.allOf(DayOfWeek.class),
                 LocalTime.of(9, 0), LocalTime.of(13, 0), ScheduleMode.FIXED_TIME, 15));
-        sessionGenerationService.generate(LocalDate.now().minusDays(1));
-        return sessionRepository.findBySchedule_Id(schedule.getId()).get(0);
+        sessionGenerationService.generate(date);
+        return sessionRepository.findBySchedule_Id(schedule.getId()).stream()
+                .filter(s -> s.getSessionDate().equals(date))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("No session generated on " + date));
     }
 
     /**

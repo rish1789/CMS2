@@ -6,8 +6,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.patient.record.Patient;
-import com.cms.scheduling.SlotStatus;
+import com.cms.patient.record.domain.Patient;
+import com.cms.scheduling.domain.SlotStatus;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;

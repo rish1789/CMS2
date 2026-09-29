@@ -20,10 +20,16 @@ export interface LoginStaffResponse {
 
 // _diagnostics [MEDIUM] - [STAFF_LOGIN] - [TYPE_MISMATCH]: POST /api/v1/staff/login never actually
 // returns "UNAUTHORIZED" - that code belongs to a different, JWT-gated endpoint family
-// (StaffAuthenticationEntryPoint). This endpoint returns INVALID_CREDENTIALS (401) or
-// MISSING_REQUIRED_FIELD (400).
+// (StaffAuthenticationEntryPoint). This endpoint returns ACCOUNT_NOT_FOUND/INCORRECT_PASSWORD
+// (401) or MISSING_REQUIRED_FIELD (400).
+// ACCOUNT_NOT_FOUND (no matching email/staff code/Super Admin username) and INCORRECT_PASSWORD
+// (identifier resolved, password didn't match) are reported separately - a product decision
+// accepting the resulting user-enumeration tradeoff in exchange for a more specific login error.
 export type LoginStaffErrorBody =
-  | { error: 'INVALID_CREDENTIALS'; message?: string }
+  | { error: 'ACCOUNT_NOT_FOUND'; message?: string }
+  | { error: 'INCORRECT_PASSWORD'; message?: string }
+  // 062-rejected-clinic-gating FR-007: every role this account holds is Doctor/Operations at a rejected clinic.
+  | { error: 'CLINIC_NOT_ACTIVE'; message?: string }
   | { error: 'MISSING_REQUIRED_FIELD'; field?: string; message?: string }
 
 export class LoginStaffApiError extends Error {
@@ -48,7 +54,9 @@ export async function loginStaff(payload: LoginStaffRequest): Promise<LoginStaff
     try {
       body = (await response.json()) as LoginStaffErrorBody
     } catch {
-      body = { error: 'INVALID_CREDENTIALS' }
+      // Response body didn't parse as JSON - we can't tell which of the two failure modes
+      // this was, so fall back to the generic wording rather than guessing one.
+      body = { error: 'ACCOUNT_NOT_FOUND', message: 'Invalid email or password.' }
     }
     throw new LoginStaffApiError(body)
   }

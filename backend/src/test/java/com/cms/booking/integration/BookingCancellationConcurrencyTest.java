@@ -2,10 +2,10 @@ package com.cms.booking.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.cms.booking.Booking;
-import com.cms.booking.BookingCancelledEvent;
-import com.cms.booking.BookingCancellationService;
-import com.cms.booking.BookingNotCancellableException;
+import com.cms.booking.domain.Booking;
+import com.cms.booking.domain.BookingCancelledEvent;
+import com.cms.booking.service.BookingCancellationService;
+import com.cms.booking.exception.BookingNotCancellableException;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.concurrent.Callable;

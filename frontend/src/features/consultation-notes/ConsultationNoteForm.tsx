@@ -2,10 +2,12 @@ import { useEffect, useState, type FormEvent } from 'react'
 import {
   createConsultationNote,
   getConsultationNote,
-  ConsultationNoteApiError,
+  type ConsultationNoteErrorBody,
   type ConsultationNoteResponse,
 } from './api'
 import { loadStaffSession } from '../staff-login/token'
+import { ApiError } from '../../lib/apiClient'
+import { FormField } from '../../components/FormField'
 
 export interface ConsultationNoteFormProps {
   clinicId: string
@@ -19,10 +21,16 @@ export function ConsultationNoteForm({ clinicId, bookingId }: ConsultationNoteFo
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [contentError, setContentError] = useState<string | null>(null)
   // staff-console-audit-2026-09-10 P2: distinct from `error` below - this blocks the form
   // entirely instead of showing a banner above a form that's still live and submittable for a
   // booking that doesn't exist.
   const [bookingNotFound, setBookingNotFound] = useState(false)
+  // real-bug-fix 2026-09-17: same reasoning as bookingNotFound above - a FORBIDDEN response
+  // (anyone but the treating doctor) used to fall through to the generic `error` banner while
+  // the textarea and Save button stayed live and submittable underneath it, inviting a doomed
+  // resubmit of the same denied request.
+  const [accessDeniedMessage, setAccessDeniedMessage] = useState<string | null>(null)
 
   useEffect(() => {
     if (!session) {
@@ -36,11 +44,16 @@ export function ConsultationNoteForm({ clinicId, bookingId }: ConsultationNoteFo
       })
       .catch((err: unknown) => {
         if (cancelled) return
-        if (err instanceof ConsultationNoteApiError && err.body.error === 'CONSULTATION_NOTE_NOT_FOUND') {
+        const body = err instanceof ApiError ? (err.body as ConsultationNoteErrorBody | undefined) : undefined
+        if (body?.error === 'CONSULTATION_NOTE_NOT_FOUND') {
           return
         }
-        if (err instanceof ConsultationNoteApiError && err.body.error === 'BOOKING_NOT_FOUND') {
+        if (body?.error === 'BOOKING_NOT_FOUND') {
           setBookingNotFound(true)
+          return
+        }
+        if (body?.error === 'FORBIDDEN') {
+          setAccessDeniedMessage(err instanceof Error ? err.message : 'Only the treating doctor may write or view this note.')
           return
         }
         setError(err instanceof Error ? err.message : 'Failed to load note.')
@@ -56,14 +69,21 @@ export function ConsultationNoteForm({ clinicId, bookingId }: ConsultationNoteFo
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!session) return
-    setSubmitting(true)
     setError(null)
+
+    if (content.trim() === '') {
+      setContentError('Consultation note content cannot be blank.')
+      return
+    }
+    setContentError(null)
+
+    setSubmitting(true)
 
     try {
       const created = await createConsultationNote(clinicId, bookingId, content, session.token)
       setNote(created)
     } catch (err) {
-      if (err instanceof ConsultationNoteApiError) {
+      if (err instanceof ApiError) {
         setError(err.message)
       } else {
         setError('Something went wrong. Please try again.')
@@ -97,6 +117,14 @@ export function ConsultationNoteForm({ clinicId, bookingId }: ConsultationNoteFo
     )
   }
 
+  if (accessDeniedMessage) {
+    return (
+      <p role="alert" className="mx-auto max-w-md rounded-md bg-red-50 p-3 text-sm text-red-700">
+        {accessDeniedMessage}
+      </p>
+    )
+  }
+
   if (note) {
     return (
       <div className="mx-auto max-w-md space-y-2 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
@@ -119,19 +147,16 @@ export function ConsultationNoteForm({ clinicId, bookingId }: ConsultationNoteFo
           {error}
         </p>
       )}
-      <div>
-        <label htmlFor="content" className="block text-sm font-medium text-gray-700">
-          Consultation note
-        </label>
+      <FormField label="Consultation note" htmlFor="content" error={contentError ?? undefined}>
         <textarea
           id="content"
           required
           rows={5}
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          className="input mt-1"
+          className="input"
         />
-      </div>
+      </FormField>
       <button
         type="submit"
         disabled={submitting}

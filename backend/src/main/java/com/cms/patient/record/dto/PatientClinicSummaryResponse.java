@@ -1,6 +1,6 @@
 package com.cms.patient.record.dto;
 
-import com.cms.patient.record.Patient;
+import com.cms.patient.record.domain.Patient;
 import java.util.UUID;
 
 /** patient-booking-flow-rebuild: one row in "My clinics" - mirrors {@code ClinicMembershipResponse}'s staff-side shape. */

@@ -1,5 +1,11 @@
 // Client for POST/GET /api/v1/clinics/{clinicId}/doctors/{doctorProfileId}/schedules
 // See specs/013-recurring-schedule-definition/contracts/schedule.md
+// 054-forms-validation-consistency: migrated onto the shared apiClient (043's own fix,
+// applied here for the first time) - this file had the identical defaultMessageFor(body) ??
+// body.message dead-code bug 043 found and fixed elsewhere, independently discarding the
+// backend's real message. `ScheduleApiError` is gone; callers catch the shared `ApiError`.
+
+import { apiRequest, ApiError } from '../../lib/apiClient'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
 
@@ -11,6 +17,9 @@ export interface CreateScheduleRequest {
   endTime: string
   mode: ScheduleMode
   slotIntervalMinutes?: number
+  // 055-schedule-break-window: both set, or both omitted.
+  breakStartTime?: string
+  breakEndTime?: string
 }
 
 export interface ScheduleResponse {
@@ -22,6 +31,8 @@ export interface ScheduleResponse {
   endTime: string
   mode: ScheduleMode
   slotIntervalMinutes: number | null
+  breakStartTime?: string | null
+  breakEndTime?: string | null
 }
 
 export type ScheduleApiErrorBody =
@@ -34,18 +45,9 @@ export type ScheduleApiErrorBody =
   | { error: 'SCHEDULE_OVERLAP'; message?: string }
   | { error: 'SCHEDULE_NOT_FOUND'; message?: string }
 
-export class ScheduleApiError extends Error {
-  readonly body: ScheduleApiErrorBody
-
-  constructor(body: ScheduleApiErrorBody) {
-    super(defaultMessageFor(body) ?? body.message)
-    this.name = 'ScheduleApiError'
-    this.body = body
-  }
-}
-
-function defaultMessageFor(body: ScheduleApiErrorBody): string {
-  switch (body.error) {
+function defaultMessageFor(body: unknown): string {
+  const error = (body as ScheduleApiErrorBody | undefined)?.error
+  switch (error) {
     case 'UNAUTHORIZED':
       return 'Your session has expired. Please sign in again.'
     case 'FORBIDDEN':
@@ -73,29 +75,12 @@ export async function createSchedule(
   payload: CreateScheduleRequest,
   token: string,
 ): Promise<ScheduleResponse> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/v1/clinics/${clinicId}/doctors/${doctorProfileId}/schedules`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(payload),
-    },
-  )
-
-  if (!response.ok) {
-    let body: ScheduleApiErrorBody
-    try {
-      body = (await response.json()) as ScheduleApiErrorBody
-    } catch {
-      body = { error: 'INVALID_SCHEDULE' }
-    }
-    throw new ScheduleApiError(body)
-  }
-
-  return (await response.json()) as ScheduleResponse
+  return apiRequest<ScheduleResponse>(`/api/v1/clinics/${clinicId}/doctors/${doctorProfileId}/schedules`, {
+    method: 'POST',
+    token,
+    body: payload,
+    fallbackMessage: defaultMessageFor,
+  })
 }
 
 export async function editSchedule(
@@ -105,29 +90,15 @@ export async function editSchedule(
   payload: CreateScheduleRequest,
   token: string,
 ): Promise<ScheduleResponse> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/v1/clinics/${clinicId}/doctors/${doctorProfileId}/schedules/${scheduleId}`,
+  return apiRequest<ScheduleResponse>(
+    `/api/v1/clinics/${clinicId}/doctors/${doctorProfileId}/schedules/${scheduleId}`,
     {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(payload),
+      token,
+      body: payload,
+      fallbackMessage: defaultMessageFor,
     },
   )
-
-  if (!response.ok) {
-    let body: ScheduleApiErrorBody
-    try {
-      body = (await response.json()) as ScheduleApiErrorBody
-    } catch {
-      body = { error: 'INVALID_SCHEDULE' }
-    }
-    throw new ScheduleApiError(body)
-  }
-
-  return (await response.json()) as ScheduleResponse
 }
 
 export async function listSchedules(
@@ -135,24 +106,37 @@ export async function listSchedules(
   doctorProfileId: string,
   token: string,
 ): Promise<ScheduleResponse[]> {
+  return apiRequest<ScheduleResponse[]>(`/api/v1/clinics/${clinicId}/doctors/${doctorProfileId}/schedules`, {
+    token,
+    fallbackMessage: defaultMessageFor,
+  })
+}
+
+// 055-schedule-break-window: a plain fetch, not apiRequest - this endpoint's success response
+// is a bodyless 200 OK (ScheduleDeletionController is void, matching the codebase's existing
+// void-DELETE convention), and apiRequest's response.json() on a success path would throw on
+// an empty body. Mirrors session-cancellation/api.ts's deleteSession for the same reason.
+export async function deleteSchedule(
+  clinicId: string,
+  doctorProfileId: string,
+  scheduleId: string,
+  token: string,
+): Promise<void> {
   const response = await fetch(
-    `${API_BASE_URL}/api/v1/clinics/${clinicId}/doctors/${doctorProfileId}/schedules`,
+    `${API_BASE_URL}/api/v1/clinics/${clinicId}/doctors/${doctorProfileId}/schedules/${scheduleId}`,
     {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
     },
   )
 
   if (!response.ok) {
-    let body: ScheduleApiErrorBody
+    let body: unknown
     try {
-      body = (await response.json()) as ScheduleApiErrorBody
+      body = await response.json()
     } catch {
-      body = { error: 'FORBIDDEN' }
+      body = undefined
     }
-    throw new ScheduleApiError(body)
+    throw new ApiError(response.status, defaultMessageFor(body), body)
   }
-
-  return (await response.json()) as ScheduleResponse[]
 }

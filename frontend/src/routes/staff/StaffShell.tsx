@@ -39,7 +39,11 @@ export function StaffShell() {
           </div>
         )}
       </header>
-      <main className="mx-auto max-w-5xl p-6 sm:p-8">
+      {/* 056-design-copy-quality-pass: no width cap here - StaffShell's <Outlet/> renders
+          both the sidebar-less /staff picker (MyClinicsList, which now carries its own
+          reading-width wrapper) and every sidebar-bearing /staff/clinics/:id/* route
+          (ClinicShell, which needs the full width for its edge-docked sidebar). */}
+      <main className="p-6 sm:p-8">
         <Outlet />
       </main>
     </div>

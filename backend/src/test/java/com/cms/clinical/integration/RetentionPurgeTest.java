@@ -2,12 +2,12 @@ package com.cms.clinical.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.cms.booking.Booking;
+import com.cms.booking.domain.Booking;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfile;
-import com.cms.patient.record.Patient;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.Slot;
+import com.cms.patient.record.domain.Patient;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.domain.Slot;
 import org.junit.jupiter.api.Test;
 
 /** 038 US1: T004-T010. */

@@ -5,7 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.booking.PatientBookingService;
+import com.cms.booking.service.PatientBookingService;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -80,7 +80,7 @@ class PatientBookingFirstTimeLinkTest extends AbstractPatientBookingIntegrationT
         var clinic = saveClinic();
         var doctor = saveDoctorStaffedAt(clinic);
         var session = saveFixedTimeSessionWithSlots(clinic, doctor);
-        List<com.cms.scheduling.Slot> slots = slotRepository.findBySession_Id(session.getId());
+        List<com.cms.scheduling.domain.Slot> slots = slotRepository.findBySession_Id(session.getId());
         var slotA = slots.get(0);
         var slotB = slots.get(1);
         var appointmentType = saveAppointmentTypeWithOverride(doctor, new BigDecimal("300.00"));

@@ -5,8 +5,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.scheduling.Slot;
-import com.cms.scheduling.SlotStatus;
+import com.cms.scheduling.domain.Slot;
+import com.cms.scheduling.domain.SlotStatus;
 import java.time.LocalTime;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -50,16 +50,34 @@ class SlotCompletionRejectionTest extends AbstractSessionDelayIntegrationTest {
                 .andExpect(jsonPath("$.error").value("SLOT_NOT_COMPLETABLE"));
     }
 
+    /** 064-queue-send-in-complete (FR-003): a queue token now completes through the same action (previously NOT_A_FIXED_TIME_SESSION). */
     @Test
-    void completingAQueueModeSessionsSlotIsRejected() throws Exception {
+    void completingAWaitingQueueTokenNowSucceeds() throws Exception {
         var clinic = saveClinic();
         var doctor = saveDoctorStaffedAt(clinic);
         Slot slot = saveQueueSlot(clinic, doctor, SlotStatus.BOOKED);
         String token = clinicAdminToken(clinic);
 
+        complete(clinic.getId().toString(), slot.getId().toString(), token).andExpect(status().isOk());
+
+        Slot completed = slotRepository.findById(slot.getId()).orElseThrow();
+        assertThat(completed.getStatus()).isEqualTo(SlotStatus.COMPLETED);
+        assertThat(completed.getCompletedAt()).isNotNull();
+    }
+
+    // real-bug-fix 2026-09-16: found live - a ClinicAdmin marked a slot scheduled for 15:15
+    // completed at 15:03, twelve minutes before its scheduled start even arrived. Nothing
+    // previously stopped this.
+    @Test
+    void completingABookedSlotBeforeItsScheduledStartTimeIsRejected() throws Exception {
+        var clinic = saveClinic();
+        var doctor = saveDoctorStaffedAt(clinic);
+        Slot slot = saveFixedTimeSlotAt(clinic, doctor, LocalTime.now().plusMinutes(15), SlotStatus.BOOKED);
+        String token = clinicAdminToken(clinic);
+
         complete(clinic.getId().toString(), slot.getId().toString(), token)
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error").value("NOT_A_FIXED_TIME_SESSION"));
+                .andExpect(jsonPath("$.error").value("SLOT_NOT_YET_STARTED"));
 
         assertThat(slotRepository.findById(slot.getId()).orElseThrow().getStatus()).isEqualTo(SlotStatus.BOOKED);
     }

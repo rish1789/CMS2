@@ -1,8 +1,12 @@
 // Client for GET /api/v1/patients/clinics/{clinicId}/slots and
 // POST /api/v1/patients/clinics/{clinicId}/slots/{slotId}/book
 // See specs/021-patient-self-service-booking/contracts/patient-booking.md
+// 046-frontend-api-client: migrated onto the shared apiClient (see its own ApiError export).
+// This was the file where the defaultMessageFor(body) ?? body.message dead-code bug was
+// directly confirmed - defaultMessageFor always returned a string, so the backend's real
+// body.message was unreachable. Fixed by the shared client's message-priority order.
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
+import { apiRequest } from '../../lib/apiClient'
 
 export interface AppointmentTypeOption {
   id: string
@@ -75,16 +79,10 @@ export async function listQueueSessions(
   if (params.size !== undefined) query.set('size', String(params.size))
   const queryString = query.toString()
 
-  const response = await fetch(
-    `${API_BASE_URL}/api/v1/patients/clinics/${clinicId}/queue-sessions${queryString ? `?${queryString}` : ''}`,
-    { headers: { Authorization: `Bearer ${token}` } },
+  return apiRequest<QueueSessionListResult>(
+    `/api/v1/patients/clinics/${clinicId}/queue-sessions${queryString ? `?${queryString}` : ''}`,
+    { token, fallbackMessage: 'Could not load queue sessions.' },
   )
-
-  if (!response.ok) {
-    throw new Error('Could not load queue sessions.')
-  }
-
-  return (await response.json()) as QueueSessionListResult
 }
 
 // pagination-unification-2026-09-10: paginated server-side - a clinic-wide open-slot listing
@@ -102,16 +100,10 @@ export async function listOpenSlots(
   if (params.size !== undefined) query.set('size', String(params.size))
   const queryString = query.toString()
 
-  const response = await fetch(
-    `${API_BASE_URL}/api/v1/patients/clinics/${clinicId}/slots${queryString ? `?${queryString}` : ''}`,
-    { headers: { Authorization: `Bearer ${token}` } },
+  return apiRequest<OpenSlotListResult>(
+    `/api/v1/patients/clinics/${clinicId}/slots${queryString ? `?${queryString}` : ''}`,
+    { token, fallbackMessage: 'Could not load open slots.' },
   )
-
-  if (!response.ok) {
-    throw new Error('Could not load open slots.')
-  }
-
-  return (await response.json()) as OpenSlotListResult
 }
 
 export interface PatientBookSlotRequest {
@@ -135,20 +127,12 @@ export type BookSlotErrorBody =
   | { error: 'SLOT_ALREADY_BOOKED'; message?: string }
   | { error: 'SLOT_DATE_IN_THE_PAST'; message?: string }
   | { error: 'NO_FEE_CONFIGURED'; message?: string }
+  | { error: 'CLINIC_NOT_ACCEPTING_APPOINTMENTS'; message?: string }
   | { error: 'UNAUTHORIZED'; message?: string }
 
-export class BookSlotApiError extends Error {
-  readonly body: BookSlotErrorBody
-
-  constructor(body: BookSlotErrorBody) {
-    super(defaultMessageFor(body) ?? body.message)
-    this.name = 'BookSlotApiError'
-    this.body = body
-  }
-}
-
-function defaultMessageFor(body: BookSlotErrorBody): string {
-  switch (body.error) {
+function defaultMessageFor(body: unknown): string {
+  const error = (body as BookSlotErrorBody | undefined)?.error
+  switch (error) {
     case 'SLOT_NOT_FOUND':
       return 'This slot could not be found.'
     case 'APPOINTMENT_TYPE_NOT_FOUND':
@@ -161,6 +145,8 @@ function defaultMessageFor(body: BookSlotErrorBody): string {
       return 'No fee is configured for this doctor/appointment type — booking is blocked.'
     case 'UNAUTHORIZED':
       return 'Please log in to book a slot.'
+    case 'CLINIC_NOT_ACCEPTING_APPOINTMENTS':
+      return 'This clinic is not accepting appointments.'
     default:
       return 'Something went wrong. Please try again.'
   }
@@ -172,24 +158,10 @@ export async function bookSlot(
   payload: PatientBookSlotRequest,
   token: string,
 ): Promise<BookingResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/patients/clinics/${clinicId}/slots/${slotId}/book`, {
+  return apiRequest<BookingResponse>(`/api/v1/patients/clinics/${clinicId}/slots/${slotId}/book`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(payload),
+    token,
+    body: payload,
+    fallbackMessage: defaultMessageFor,
   })
-
-  if (!response.ok) {
-    let body: BookSlotErrorBody
-    try {
-      body = (await response.json()) as BookSlotErrorBody
-    } catch {
-      body = { error: 'SLOT_NOT_FOUND' }
-    }
-    throw new BookSlotApiError(body)
-  }
-
-  return (await response.json()) as BookingResponse
 }

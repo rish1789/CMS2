@@ -5,9 +5,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.booking.BookingCancelledEvent;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.Slot;
+import com.cms.booking.domain.BookingCancelledEvent;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.domain.Slot;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;

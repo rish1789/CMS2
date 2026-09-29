@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PendingDoctorsList } from '../../src/features/doctor-verification/PendingDoctorsList'
+import { ToastProvider } from '../../src/components/Toast'
 import {
   AdminApiError,
   listDoctors,
@@ -111,12 +112,14 @@ const rejectedDoctor = {
 function renderWithSession() {
   storeSuperAdminSession({ token: 'super-admin-jwt', username: 'super-admin' })
   render(
-    <MemoryRouter initialEntries={['/super-admin-console/doctors']}>
-      <Routes>
-        <Route path="/staff/login" element={<div>Clinic sign in</div>} />
-        <Route path="/super-admin-console/doctors" element={<PendingDoctorsList />} />
-      </Routes>
-    </MemoryRouter>,
+    <ToastProvider>
+      <MemoryRouter initialEntries={['/super-admin-console/doctors']}>
+        <Routes>
+          <Route path="/staff/login" element={<div>Clinic sign in</div>} />
+          <Route path="/super-admin-console/doctors" element={<PendingDoctorsList />} />
+        </Routes>
+      </MemoryRouter>
+    </ToastProvider>,
   )
 }
 

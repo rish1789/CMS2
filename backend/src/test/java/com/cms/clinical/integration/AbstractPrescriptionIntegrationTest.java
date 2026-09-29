@@ -1,9 +1,9 @@
 package com.cms.clinical.integration;
 
-import com.cms.clinical.PrescriptionRepository;
-import com.cms.clinical.PrescriptionService;
-import com.cms.identity.account.Account;
-import com.cms.identity.account.RoleAssignment;
+import com.cms.clinical.repository.PrescriptionRepository;
+import com.cms.clinical.service.PrescriptionService;
+import com.cms.identity.account.domain.Account;
+import com.cms.identity.account.domain.RoleAssignment;
 import com.cms.identity.clinic.Clinic;
 import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;

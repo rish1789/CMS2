@@ -2,12 +2,12 @@ package com.cms.booking.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.cms.booking.Booking;
-import com.cms.booking.BookingCancellationService;
-import com.cms.booking.BookingNotCancellableException;
-import com.cms.booking.BookingStatus;
-import com.cms.booking.SessionAlreadyCancelledException;
-import com.cms.scheduling.Session;
+import com.cms.booking.domain.Booking;
+import com.cms.booking.service.BookingCancellationService;
+import com.cms.booking.exception.BookingNotCancellableException;
+import com.cms.booking.domain.BookingStatus;
+import com.cms.booking.exception.SessionAlreadyCancelledException;
+import com.cms.scheduling.domain.Session;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -23,14 +23,14 @@ class SessionCancellationConcurrencyTest extends AbstractSessionCancellationInte
     private BookingCancellationService bookingCancellationService;
 
     @Autowired
-    private com.cms.booking.SessionCancellationService sessionCancellationService;
+    private com.cms.booking.service.SessionCancellationService sessionCancellationService;
 
     @Test
     void wholeSessionCancellationAndIndividualCancellationRacingOnTheSameBookingOnlyOneWins() throws Exception {
         var clinic = saveClinic();
         var doctor = saveDoctorStaffedAt(clinic);
         Session session = saveFixedTimeSessionWithSlots(clinic, doctor);
-        List<com.cms.scheduling.Slot> slots = slotRepository.findBySession_Id(session.getId());
+        List<com.cms.scheduling.domain.Slot> slots = slotRepository.findBySession_Id(session.getId());
         Booking booking = bookSlot(clinic, doctor, slots.get(0));
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -47,7 +47,7 @@ class SessionCancellationConcurrencyTest extends AbstractSessionCancellationInte
             Callable<Boolean> sessionCancel = () -> {
                 Session freshSession = sessionRepository.findById(session.getId()).orElseThrow();
                 try {
-                    return sessionCancellationService.cancelSession(freshSession) == 1;
+                    return sessionCancellationService.cancelSession(freshSession, doctor.getAccount().getId()) == 1;
                 } catch (SessionAlreadyCancelledException e) {
                     return false;
                 }

@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SignupForm } from '../../src/features/patient-account/SignupForm'
 import { LoginForm } from '../../src/features/patient-account/LoginForm'
+import { ToastProvider } from '../../src/components/Toast'
+import { MemoryRouter } from 'react-router-dom'
 import {
   SignupPatientApiError,
   LoginPatientApiError,
@@ -147,13 +149,27 @@ describe('SignupForm', () => {
   })
 })
 
+// 056-design-copy-quality-pass (login-page rebuild): LoginForm's pre-login heading is now
+// itself "Welcome back." (matching design/patient-login-reference.html), and it now renders a
+// real `<Link>` ("Create an account") plus a "Forgot password?" button wired to useToast - so
+// tests need a Router + ToastProvider ancestor that the old, plainer form didn't require.
+function renderLoginForm() {
+  render(
+    <MemoryRouter>
+      <ToastProvider>
+        <LoginForm />
+      </ToastProvider>
+    </MemoryRouter>,
+  )
+}
+
 describe('LoginForm', () => {
   beforeEach(() => {
     mockedLoginPatient.mockReset()
   })
 
   it('renders no social-login/SSO field', () => {
-    render(<LoginForm />)
+    renderLoginForm()
 
     expect(screen.queryByText(/sign in with google/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/sso/i)).not.toBeInTheDocument()
@@ -167,29 +183,63 @@ describe('LoginForm', () => {
       email: 'priya@example.com',
     })
 
-    render(<LoginForm />)
+    renderLoginForm()
     await user.type(screen.getByLabelText(/email/i), 'priya@example.com')
     await user.type(screen.getByLabelText(/password/i), 'Str0ng!Pass')
     await user.click(screen.getByRole('button', { name: /log in/i }))
 
+    // Asserts the specific interpolated-email text from the post-login result branch, not the
+    // generic /welcome back/i regex - the pre-login heading is now ALSO "Welcome back." (per
+    // the reference design), so a loose regex would pass even without a real login happening.
     await waitFor(() => {
-      expect(screen.getByText(/welcome back/i)).toBeInTheDocument()
+      expect(screen.getByText('Welcome back, priya@example.com.')).toBeInTheDocument()
     })
   })
 
-  it('shows an identical error for wrong password and unknown email (no information leak)', async () => {
+  it('shows a distinct error for an unregistered email', async () => {
     const user = userEvent.setup()
     mockedLoginPatient.mockRejectedValueOnce(
-      new LoginPatientApiError({ error: 'INVALID_CREDENTIALS', message: 'Invalid email or password.' }),
+      new LoginPatientApiError({ error: 'ACCOUNT_NOT_FOUND', message: 'No account found with that email.' }),
     )
 
-    render(<LoginForm />)
+    renderLoginForm()
     await user.type(screen.getByLabelText(/email/i), 'unknown@example.com')
     await user.type(screen.getByLabelText(/password/i), 'whatever')
     await user.click(screen.getByRole('button', { name: /log in/i }))
 
     await waitFor(() => {
-      expect(screen.getByText(/invalid email or password/i)).toBeInTheDocument()
+      expect(screen.getByText(/no account found with that email/i)).toBeInTheDocument()
     })
+  })
+
+  it('shows a distinct error for a wrong password on a registered email', async () => {
+    const user = userEvent.setup()
+    mockedLoginPatient.mockRejectedValueOnce(
+      new LoginPatientApiError({ error: 'INCORRECT_PASSWORD', message: 'Incorrect password.' }),
+    )
+
+    renderLoginForm()
+    await user.type(screen.getByLabelText(/email/i), 'priya@example.com')
+    await user.type(screen.getByLabelText(/password/i), 'wrong-password')
+    await user.click(screen.getByRole('button', { name: /log in/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/incorrect password/i)).toBeInTheDocument()
+    })
+  })
+
+  it('shows an informational toast for "Forgot password?" instead of a dead link', async () => {
+    const user = userEvent.setup()
+    renderLoginForm()
+
+    await user.click(screen.getByRole('button', { name: 'Forgot password?' }))
+
+    expect(await screen.findByText(/password reset isn't available yet/i)).toBeInTheDocument()
+  })
+
+  it('links "Create an account" to the patient signup route', () => {
+    renderLoginForm()
+
+    expect(screen.getByRole('link', { name: 'Create an account' })).toHaveAttribute('href', '/patient/signup')
   })
 })

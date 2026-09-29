@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { onboardStaff, OnboardStaffApiError, type OnboardStaffResponse, type StaffRole } from './api'
+import { onboardStaff, type OnboardStaffErrorBody, type OnboardStaffResponse, type StaffRole } from './api'
+import { ApiError } from '../../lib/apiClient'
 import { loadStaffSession, storeStaffSession } from '../staff-login/token'
+import { FormField } from '../../components/FormField'
 
 interface FormState {
   name: string
@@ -11,6 +13,24 @@ interface FormState {
   specialization: string
   licenseNumber: string
   experienceYears: string
+}
+
+interface FieldErrors {
+  name?: string
+  email?: string
+  role?: string
+  mobile?: string
+}
+
+// Same pattern backend/src/main/java/com/cms/common/IndianMobileNumberValidator.java enforces
+// server-side (research.md Decision 3) - not a re-derived approximation.
+const INDIAN_MOBILE_PATTERN = /^(?:\+91|0)?[6-9]\d{9}$/
+
+// Only these backend `field` values (OnboardStaffRequest's own top-level record components)
+// have a matching FormField error slot. `doctor`/`doctor.specialization`/etc. do not (research.md
+// Decision 4, FR-006) - those fall back to the top-level banner rather than an invented mapping.
+function fieldErrorKeyFor(field: string): keyof FieldErrors | null {
+  return field === 'name' || field === 'email' || field === 'role' || field === 'mobile' ? field : null
 }
 
 const initialState: FormState = {
@@ -31,6 +51,7 @@ export function OnboardStaffForm({ clinicId }: OnboardStaffFormProps) {
   const [session, setSession] = useState(() => loadStaffSession())
   const [form, setForm] = useState<FormState>(initialState)
   const [formError, setFormError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<OnboardStaffResponse | null>(null)
 
@@ -47,8 +68,27 @@ export function OnboardStaffForm({ clinicId }: OnboardStaffFormProps) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!session) return
-    setSubmitting(true)
     setFormError(null)
+
+    const errors: FieldErrors = {}
+    if (form.name.trim() === '') {
+      errors.name = 'Name is required.'
+    }
+    if (form.email.trim() === '') {
+      errors.email = 'Email is required.'
+    }
+    if (form.role.trim() === '') {
+      errors.role = 'Role is required.'
+    }
+    if (form.mobile.trim() !== '' && !INDIAN_MOBILE_PATTERN.test(form.mobile.trim())) {
+      errors.mobile = 'Mobile number must be a valid Indian number.'
+    }
+    setFieldErrors(errors)
+    if (Object.keys(errors).length > 0) {
+      return
+    }
+
+    setSubmitting(true)
 
     try {
       const response = await onboardStaff(
@@ -71,9 +111,16 @@ export function OnboardStaffForm({ clinicId }: OnboardStaffFormProps) {
       )
       setResult(response)
     } catch (err) {
-      if (err instanceof OnboardStaffApiError) {
-        if (err.body.error === 'UNAUTHORIZED') {
+      if (err instanceof ApiError) {
+        const body = err.body as OnboardStaffErrorBody | undefined
+        const fieldKey =
+          body?.error === 'MISSING_REQUIRED_FIELD' || body?.error === 'INVALID_MOBILE_NUMBER'
+            ? fieldErrorKeyFor(body.field)
+            : null
+        if (body?.error === 'UNAUTHORIZED') {
           handleSessionExpired(err.message)
+        } else if (fieldKey) {
+          setFieldErrors({ [fieldKey]: err.message })
         } else {
           setFormError(err.message)
         }
@@ -175,9 +222,13 @@ export function OnboardStaffForm({ clinicId }: OnboardStaffFormProps) {
     // staff-console-redesign-2026-09-10: a 2-column field grid and a real Cancel action -
     // borrows the layout from a provided design reference (mockup's onboarding.html) rebuilt in
     // this app's own indigo/gray-* design tokens and shared .input class, not a new visual language.
+    // 056-design-copy-quality-pass: dropped the mx-auto max-w-xl this form used to carry -
+    // ClinicShell's content pane already caps width (research.md Decision 2), so this was a
+    // third, redundant centered box nested inside two others - the actual root cause of the
+    // "wasted space" complaint this screen was originally named for.
     <form
       onSubmit={handleSubmit}
-      className="mx-auto max-w-xl space-y-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm sm:p-8"
+      className="space-y-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm sm:p-8"
       aria-label="Onboard staff"
     >
       <div className="border-b border-gray-100 pb-5">
@@ -192,61 +243,56 @@ export function OnboardStaffForm({ clinicId }: OnboardStaffFormProps) {
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor="onboardName" className="block text-sm font-medium text-gray-700">
-            Name
-          </label>
+        {/* No `required` HTML attribute on the inputs below: the pre-submit fieldErrors checks
+            in handleSubmit are what actually surface (native `required` would otherwise block
+            the submit event itself, showing a browser tooltip instead of this form's own
+            inline error - the same fix applied to staff BookSlotForm/WalkInForm). */}
+        <FormField label="Name" htmlFor="onboardName" required error={fieldErrors.name}>
           <input
             id="onboardName"
-            required
             value={form.name}
             onChange={(e) => updateField('name', e.target.value)}
-            className="input mt-1"
+            className="input"
           />
-        </div>
+        </FormField>
 
-        <div>
-          <label htmlFor="onboardEmail" className="block text-sm font-medium text-gray-700">
-            Email
-          </label>
+        <FormField label="Email" htmlFor="onboardEmail" required error={fieldErrors.email}>
           <input
             id="onboardEmail"
             type="email"
-            required
             value={form.email}
             onChange={(e) => updateField('email', e.target.value)}
-            className="input mt-1"
+            className="input"
           />
-        </div>
+        </FormField>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor="onboardMobile" className="block text-sm font-medium text-gray-700">
-            Mobile <span className="font-normal text-gray-400">(optional)</span>
-          </label>
+        <FormField
+          label="Mobile"
+          htmlFor="onboardMobile"
+          hint="10-digit Indian mobile number, e.g. 9876543210"
+          error={fieldErrors.mobile}
+        >
           <input
             id="onboardMobile"
             value={form.mobile}
             onChange={(e) => updateField('mobile', e.target.value)}
-            className="input mt-1"
+            className="input"
           />
-        </div>
+        </FormField>
 
-        <div>
-          <label htmlFor="onboardRole" className="block text-sm font-medium text-gray-700">
-            Role
-          </label>
+        <FormField label="Role" htmlFor="onboardRole" required error={fieldErrors.role}>
           <select
             id="onboardRole"
             value={form.role}
             onChange={(e) => updateField('role', e.target.value as StaffRole)}
-            className="input mt-1"
+            className="input"
           >
             <option value="Operations">Operations</option>
             <option value="Doctor">Doctor</option>
           </select>
-        </div>
+        </FormField>
       </div>
 
       {form.role === 'Doctor' && (

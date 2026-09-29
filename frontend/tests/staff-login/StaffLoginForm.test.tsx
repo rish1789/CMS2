@@ -71,6 +71,27 @@ describe('StaffLoginForm - staff code identifier (T004)', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/invalid/i)
   })
+
+  // 062-rejected-clinic-gating FR-007: a Doctor/Operations member of a rejected clinic sees why
+  // they can't sign in, not a misleading "invalid email or password".
+  it('shows the clinic-not-active message when the staff member clinic has been rejected', async () => {
+    mockedLoginStaff.mockRejectedValueOnce(
+      new LoginStaffApiError({
+        error: 'CLINIC_NOT_ACTIVE',
+        message: 'Your clinic is not currently active. Contact your clinic administrator.',
+      }),
+    )
+    const user = userEvent.setup()
+    render(<StaffLoginForm />)
+
+    await user.type(screen.getByLabelText(/email or staff code/i), 'doctor@example.com')
+    await user.type(screen.getByLabelText(/password/i), 'Str0ng!Pass')
+    await user.click(screen.getByRole('button', { name: /sign in/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Your clinic is not currently active. Contact your clinic administrator.',
+    )
+  })
 })
 
 describe('StaffLoginForm - Super Admin role resolution (040-super-admin-rbac-login)', () => {

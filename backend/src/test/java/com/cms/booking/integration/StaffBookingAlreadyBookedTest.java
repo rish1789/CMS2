@@ -72,10 +72,10 @@ class StaffBookingAlreadyBookedTest extends AbstractStaffBookingIntegrationTest 
                                     callerAccountId,
                                     clinic.getId(),
                                     slot.getId(),
-                                    new com.cms.booking.StaffBookingService.BookSlotInput(
+                                    new com.cms.booking.service.StaffBookingService.BookSlotInput(
                                             patient.getId(), null, null, appointmentType.getId()));
                             return true;
-                        } catch (com.cms.booking.SlotAlreadyBookedException e) {
+                        } catch (com.cms.booking.exception.SlotAlreadyBookedException e) {
                             return false;
                         }
                     })
@@ -97,11 +97,11 @@ class StaffBookingAlreadyBookedTest extends AbstractStaffBookingIntegrationTest 
 
     private java.util.UUID clinicAdminAccountId(com.cms.identity.clinic.Clinic clinic) {
         String unique = java.util.UUID.randomUUID().toString();
-        var admin = accountRepository.save(new com.cms.identity.account.Account(
+        var admin = accountRepository.save(new com.cms.identity.account.domain.Account(
                 "Admin X", "adminx-" + unique + "@example.com",
                 passwordEncoder.encode("Str0ng!Pass"), "CAX-" + unique, null));
-        roleAssignmentRepository.save(new com.cms.identity.account.RoleAssignment(
-                admin, clinic, com.cms.identity.account.RoleAssignment.Role.ClinicAdmin));
+        roleAssignmentRepository.save(new com.cms.identity.account.domain.RoleAssignment(
+                admin, clinic, com.cms.identity.account.domain.RoleAssignment.Role.ClinicAdmin));
         return admin.getId();
     }
 }

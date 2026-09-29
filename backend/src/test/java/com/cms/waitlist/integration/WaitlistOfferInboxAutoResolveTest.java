@@ -2,19 +2,19 @@ package com.cms.waitlist.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.cms.booking.AppointmentType;
-import com.cms.booking.Booking;
+import com.cms.booking.domain.AppointmentType;
+import com.cms.booking.domain.Booking;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfile;
-import com.cms.inbox.InboxItem;
-import com.cms.inbox.InboxItemRepository;
-import com.cms.inbox.InboxItemService;
-import com.cms.inbox.InboxItemStatus;
-import com.cms.patient.account.PatientAccount;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.Slot;
-import com.cms.scheduling.SlotStatus;
-import com.cms.waitlist.WaitlistEntry;
+import com.cms.inbox.domain.InboxItem;
+import com.cms.inbox.repository.InboxItemRepository;
+import com.cms.inbox.service.InboxItemService;
+import com.cms.inbox.domain.InboxItemStatus;
+import com.cms.patient.account.domain.PatientAccount;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.domain.Slot;
+import com.cms.scheduling.domain.SlotStatus;
+import com.cms.waitlist.domain.WaitlistEntry;
 import com.cms.waitlist.dto.ClaimWaitlistRequest;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -42,7 +42,6 @@ class WaitlistOfferInboxAutoResolveTest extends AbstractWaitlistIntegrationTest 
     private Session sessionWithOfferedEntry(Clinic clinic, DoctorProfile doctor, WaitlistEntry[] entryOut) {
         Session session = saveFixedTimeSessionWithSlots(clinic, doctor);
         Slot slot = slotRepository.findBySession_Id(session.getId()).stream()
-                .filter(s -> !s.isBuffer())
                 .filter(s -> s.getStatus() == SlotStatus.OPEN)
                 .findFirst()
                 .orElseThrow();
@@ -150,11 +149,11 @@ class WaitlistOfferInboxAutoResolveTest extends AbstractWaitlistIntegrationTest 
 
     private java.util.UUID clinicAdminAccountId(Clinic clinic) {
         String unique = java.util.UUID.randomUUID().toString();
-        var admin = accountRepository.save(new com.cms.identity.account.Account(
+        var admin = accountRepository.save(new com.cms.identity.account.domain.Account(
                 "Admin " + unique, "admin-" + unique + "@example.com",
                 passwordEncoder.encode("Str0ng!Pass"), "CA-" + unique, null));
         roleAssignmentRepository.save(
-                new com.cms.identity.account.RoleAssignment(admin, clinic, com.cms.identity.account.RoleAssignment.Role.ClinicAdmin));
+                new com.cms.identity.account.domain.RoleAssignment(admin, clinic, com.cms.identity.account.domain.RoleAssignment.Role.ClinicAdmin));
         return admin.getId();
     }
 

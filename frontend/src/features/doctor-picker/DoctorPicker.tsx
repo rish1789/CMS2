@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { listClinicDoctors, type DoctorSummary } from './api'
+import { listClinicDoctors, listDoctorBookingReadiness, type DoctorSummary } from './api'
 import { loadStaffSession } from '../staff-login/token'
-import { ListSkeleton } from '../../components/ListSkeleton'
 import { PaginationControls } from '../../components/PaginationControls'
 import { avatarGradientClass } from '../../components/avatarGradient'
+import { EmptyState } from '../../components/EmptyState'
+import { LoadingState } from '../../components/LoadingState'
 
 const DOCTORS_PAGE_SIZE = 20
 const SEARCH_DEBOUNCE_MS = 300
@@ -21,6 +22,10 @@ const SEARCH_DEBOUNCE_MS = 300
 export function DoctorPicker() {
   const { clinicId } = useParams<{ clinicId: string }>()
   const [doctors, setDoctors] = useState<DoctorSummary[] | null>(null)
+  // real-bug-fix 2026-09-17: a doctor with zero appointment types and no default fee looks fully
+  // staffed here otherwise - fetched separately (its own endpoint, own module) so a failure here
+  // never blocks the doctor list itself from rendering, only the warning badges stay off.
+  const [notBookingReadyIds, setNotBookingReadyIds] = useState<Set<string>>(new Set())
   const [totalCount, setTotalCount] = useState(0)
   const [page, setPage] = useState(0)
   const [searchInput, setSearchInput] = useState('')
@@ -54,6 +59,19 @@ export function DoctorPicker() {
       .catch(() => setError('Failed to load doctors.'))
   }, [clinicId, searchTerm, page])
 
+  useEffect(() => {
+    if (!clinicId) return
+    const session = loadStaffSession()
+    if (!session) return
+    listDoctorBookingReadiness(clinicId, session.token)
+      .then((result) => {
+        setNotBookingReadyIds(new Set(result.filter((r) => !r.bookingReady).map((r) => r.doctorProfileId)))
+      })
+      .catch(() => {
+        // Non-fatal - the doctor list above still renders, only the warning badges stay off.
+      })
+  }, [clinicId])
+
   if (!clinicId) return null
 
   return (
@@ -63,17 +81,21 @@ export function DoctorPicker() {
           <h1 className="text-lg font-semibold text-gray-900">Doctors</h1>
           <p className="mt-0.5 text-sm text-gray-600">Doctors staffed at this clinic.</p>
         </div>
-        <div className="min-w-0">
+        <div className="w-full sm:w-auto">
           <label htmlFor="doctor-search" className="sr-only">
             Search doctors
           </label>
+          {/* 055-responsive-mobile-pass: was `w-72 max-w-full`, which doesn't actually clamp to
+              the wrapped flex row's available width at mobile - caused real page-body horizontal
+              overflow (measured 538px scrollWidth in a 375px viewport). `w-full sm:w-72` fixes
+              it while keeping the exact desktop-width appearance (FR-006). */}
           <input
             id="doctor-search"
             type="search"
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
             placeholder="Search by name, specialization, or staff code"
-            className="w-72 max-w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 sm:w-72"
           />
         </div>
       </div>
@@ -84,12 +106,10 @@ export function DoctorPicker() {
         </p>
       )}
 
-      {doctors === null && !error && <ListSkeleton rows={3} />}
+      {doctors === null && !error && <LoadingState variant="list" rows={3} />}
 
       {doctors && doctors.length === 0 && (
-        <p className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-500 shadow-sm">
-          {searchTerm ? 'No doctors match your search.' : 'No doctors staffed at this clinic yet.'}
-        </p>
+        <EmptyState message={searchTerm ? 'No doctors match your search.' : 'No doctors staffed at this clinic yet.'} />
       )}
 
       {doctors && doctors.length > 0 && (
@@ -125,6 +145,21 @@ export function DoctorPicker() {
                           {doctor.name.charAt(0).toUpperCase()}
                         </span>
                         <span className="font-medium text-gray-900">{doctor.name}</span>
+                        {notBookingReadyIds.has(doctor.doctorProfileId) && (
+                          <span
+                            title="No appointment type or default fee configured yet - patients can't book this doctor until this is set up."
+                            className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800"
+                          >
+                            <svg aria-hidden="true" viewBox="0 0 20 20" className="h-3 w-3 shrink-0" fill="currentColor">
+                              <path
+                                fillRule="evenodd"
+                                clipRule="evenodd"
+                                d="M8.257 3.099c.765-1.36 2.72-1.36 3.486 0l6.28 11.18c.75 1.334-.213 2.987-1.743 2.987H3.72c-1.53 0-2.493-1.653-1.743-2.987l6.28-11.18zM10 7a.75.75 0 01.75.75v3a.75.75 0 01-1.5 0v-3A.75.75 0 0110 7zm0 8a1 1 0 100-2 1 1 0 000 2z"
+                              />
+                            </svg>
+                            Booking setup incomplete
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3">

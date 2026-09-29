@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
-import { createSchedule, editSchedule, ScheduleApiError, type ScheduleMode, type ScheduleResponse } from './api'
+import { createSchedule, editSchedule, type ScheduleApiErrorBody, type ScheduleMode, type ScheduleResponse } from './api'
 import { loadStaffSession, storeStaffSession } from '../staff-login/token'
+import { ApiError } from '../../lib/apiClient'
+import { FormField } from '../../components/FormField'
 
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'] as const
 
@@ -21,6 +23,15 @@ interface FormState {
   endTime: string
   mode: ScheduleMode
   slotIntervalMinutes: string
+  hasBreak: boolean
+  breakStartTime: string
+  breakEndTime: string
+}
+
+interface FieldErrors {
+  daysOfWeek?: string
+  endTime?: string
+  breakEndTime?: string
 }
 
 const initialState: FormState = {
@@ -29,6 +40,9 @@ const initialState: FormState = {
   endTime: '',
   mode: 'FIXED_TIME',
   slotIntervalMinutes: '',
+  hasBreak: false,
+  breakStartTime: '',
+  breakEndTime: '',
 }
 
 // _diagnostics [MEDIUM] - [SCHEDULE_EDIT] - [ORPHANED_COMPONENT]: ScheduleController's tested
@@ -39,22 +53,35 @@ export interface ScheduleFormProps {
   clinicId: string
   doctorProfileId: string
   existingSchedule?: ScheduleResponse
+  // real-bug-fix 2026-09-17: lets DoctorScheduleManager embed this form inline (per-row edit,
+  // or a toggled "add another schedule" panel) instead of the standalone dead-end result screen
+  // below - only used when the caller actually wants that, so the original standalone route
+  // behavior (and its existing tests) is untouched when these are omitted.
+  onSaved?: (schedule: ScheduleResponse) => void
+  onCancel?: () => void
 }
 
-export function ScheduleForm({ clinicId, doctorProfileId, existingSchedule }: ScheduleFormProps) {
+export function ScheduleForm({ clinicId, doctorProfileId, existingSchedule, onSaved, onCancel }: ScheduleFormProps) {
   const [session, setSession] = useState(() => loadStaffSession())
   const [form, setForm] = useState<FormState>(() =>
     existingSchedule
       ? {
           daysOfWeek: existingSchedule.daysOfWeek,
-          startTime: existingSchedule.startTime,
-          endTime: existingSchedule.endTime,
+          // real-bug-fix 2026-09-17: existingSchedule.startTime/endTime come back "HH:MM:SS" -
+          // an <input type="time"> with the default step (60s) needs "HH:MM", not "HH:MM:SS".
+          // Never caught before since existingSchedule had no real caller until now.
+          startTime: formatTime(existingSchedule.startTime),
+          endTime: formatTime(existingSchedule.endTime),
           mode: existingSchedule.mode,
           slotIntervalMinutes: existingSchedule.slotIntervalMinutes?.toString() ?? '',
+          hasBreak: Boolean(existingSchedule.breakStartTime && existingSchedule.breakEndTime),
+          breakStartTime: existingSchedule.breakStartTime ? formatTime(existingSchedule.breakStartTime) : '',
+          breakEndTime: existingSchedule.breakEndTime ? formatTime(existingSchedule.breakEndTime) : '',
         }
       : initialState,
   )
   const [formError, setFormError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<ScheduleResponse | null>(null)
   const isEditing = existingSchedule !== undefined
@@ -81,8 +108,32 @@ export function ScheduleForm({ clinicId, doctorProfileId, existingSchedule }: Sc
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!session) return
-    setSubmitting(true)
     setFormError(null)
+
+    // Mirrors ScheduleService.java's own checks (research.md Decision 3) so the same failure
+    // surfaces inline before a network round-trip, not only after the backend rejects it.
+    const errors: FieldErrors = {}
+    if (form.daysOfWeek.length === 0) {
+      errors.daysOfWeek = 'At least one day of the week is required'
+    }
+    if (form.startTime && form.endTime && form.startTime >= form.endTime) {
+      errors.endTime = 'startTime must be strictly before endTime'
+    }
+    if (form.hasBreak) {
+      if (!form.breakStartTime || !form.breakEndTime) {
+        errors.breakEndTime = 'Both break start and end times are required'
+      } else if (form.breakStartTime >= form.breakEndTime) {
+        errors.breakEndTime = 'breakStartTime must be strictly before breakEndTime'
+      } else if (form.breakStartTime < form.startTime || form.breakEndTime > form.endTime) {
+        errors.breakEndTime = 'The break window must fall within start time and end time'
+      }
+    }
+    setFieldErrors(errors)
+    if (Object.keys(errors).length > 0) {
+      return
+    }
+
+    setSubmitting(true)
 
     try {
       const payload = {
@@ -94,14 +145,21 @@ export function ScheduleForm({ clinicId, doctorProfileId, existingSchedule }: Sc
           form.mode === 'FIXED_TIME' && form.slotIntervalMinutes.trim() !== ''
             ? Number(form.slotIntervalMinutes)
             : undefined,
+        breakStartTime: form.hasBreak && form.breakStartTime !== '' ? form.breakStartTime : undefined,
+        breakEndTime: form.hasBreak && form.breakEndTime !== '' ? form.breakEndTime : undefined,
       }
       const response = existingSchedule
         ? await editSchedule(clinicId, doctorProfileId, existingSchedule.id, payload, session.token)
         : await createSchedule(clinicId, doctorProfileId, payload, session.token)
-      setResult(response)
+      if (onSaved) {
+        onSaved(response)
+      } else {
+        setResult(response)
+      }
     } catch (err) {
-      if (err instanceof ScheduleApiError) {
-        if (err.body.error === 'UNAUTHORIZED') {
+      if (err instanceof ApiError) {
+        const body = err.body as ScheduleApiErrorBody | undefined
+        if (body?.error === 'UNAUTHORIZED') {
           handleSessionExpired(err.message)
         } else {
           setFormError(err.message)
@@ -130,7 +188,11 @@ export function ScheduleForm({ clinicId, doctorProfileId, existingSchedule }: Sc
           {result.mode === 'FIXED_TIME'
             ? `Fixed-Time, ${result.slotIntervalMinutes}-minute slots`
             : 'Queue/Token'}
-          , {formatTime(result.startTime)}–{formatTime(result.endTime)}, {result.daysOfWeek.map(formatDayLabel).join(', ')}.
+          , {formatTime(result.startTime)}–{formatTime(result.endTime)}
+          {result.breakStartTime && result.breakEndTime && (
+            <> (break {formatTime(result.breakStartTime)}–{formatTime(result.breakEndTime)})</>
+          )}
+          , {result.daysOfWeek.map(formatDayLabel).join(', ')}.
         </p>
       </div>
     )
@@ -174,76 +236,118 @@ export function ScheduleForm({ clinicId, doctorProfileId, existingSchedule }: Sc
             )
           })}
         </div>
+        {fieldErrors.daysOfWeek && (
+          <p role="alert" className="mt-2 text-sm text-red-600">
+            {fieldErrors.daysOfWeek}
+          </p>
+        )}
       </fieldset>
 
       <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="startTime" className="block text-sm font-medium text-gray-700">
-            Start time
-          </label>
+        <FormField label="Start time" htmlFor="startTime">
           <input
             id="startTime"
             type="time"
             required
             value={form.startTime}
             onChange={(e) => updateField('startTime', e.target.value)}
-            className="input mt-1"
+            className="input"
           />
-        </div>
-        <div>
-          <label htmlFor="endTime" className="block text-sm font-medium text-gray-700">
-            End time
-          </label>
+        </FormField>
+        <FormField label="End time" htmlFor="endTime" error={fieldErrors.endTime}>
           <input
             id="endTime"
             type="time"
             required
             value={form.endTime}
             onChange={(e) => updateField('endTime', e.target.value)}
-            className="input mt-1"
+            className="input"
           />
-        </div>
+        </FormField>
       </div>
 
-      <div>
-        <label htmlFor="mode" className="block text-sm font-medium text-gray-700">
-          Mode
-        </label>
+      <FormField label="Mode" htmlFor="mode">
         <select
           id="mode"
           value={form.mode}
           onChange={(e) => updateField('mode', e.target.value as ScheduleMode)}
-          className="input mt-1"
+          className="input"
         >
           <option value="FIXED_TIME">Fixed-Time</option>
           <option value="QUEUE">Queue/Token</option>
         </select>
-      </div>
+      </FormField>
 
       {form.mode === 'FIXED_TIME' && (
-        <div>
-          <label htmlFor="slotIntervalMinutes" className="block text-sm font-medium text-gray-700">
-            Slot interval (minutes)
-          </label>
-          <input
-            id="slotIntervalMinutes"
-            type="number"
-            min={1}
-            required
-            value={form.slotIntervalMinutes}
-            onChange={(e) => updateField('slotIntervalMinutes', e.target.value)}
-            className="input mt-1"
-          />
-        </div>
+        <>
+          <FormField label="Slot interval (minutes)" htmlFor="slotIntervalMinutes">
+            <input
+              id="slotIntervalMinutes"
+              type="number"
+              min={1}
+              required
+              value={form.slotIntervalMinutes}
+              onChange={(e) => updateField('slotIntervalMinutes', e.target.value)}
+              className="input"
+            />
+          </FormField>
+
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <input
+                type="checkbox"
+                checked={form.hasBreak}
+                onChange={(e) => updateField('hasBreak', e.target.checked)}
+              />
+              Add a break (e.g. lunch)
+            </label>
+            {form.hasBreak && (
+              <div className="mt-2 grid grid-cols-2 gap-4">
+                <FormField label="Break start" htmlFor="breakStartTime">
+                  <input
+                    id="breakStartTime"
+                    type="time"
+                    required
+                    value={form.breakStartTime}
+                    onChange={(e) => updateField('breakStartTime', e.target.value)}
+                    className="input"
+                  />
+                </FormField>
+                <FormField label="Break end" htmlFor="breakEndTime" error={fieldErrors.breakEndTime}>
+                  <input
+                    id="breakEndTime"
+                    type="time"
+                    required
+                    value={form.breakEndTime}
+                    onChange={(e) => updateField('breakEndTime', e.target.value)}
+                    className="input"
+                  />
+                </FormField>
+              </div>
+            )}
+          </div>
+        </>
       )}
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-150 ease-out hover:bg-indigo-500 hover:shadow-md active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
-      >
-        {submitting ? 'Saving…' : isEditing ? 'Save changes' : 'Save schedule'}
-      </button>
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={submitting}
+          className="flex-1 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-150 ease-out hover:bg-indigo-500 hover:shadow-md active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+        >
+          {submitting ? 'Saving…' : isEditing ? 'Save changes' : 'Save schedule'}
+        </button>
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={submitting}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
     </form>
   )
 }

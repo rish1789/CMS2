@@ -1,7 +1,7 @@
 package com.cms.waitlist.dto;
 
-import com.cms.waitlist.WaitlistEntry;
-import com.cms.waitlist.WaitlistEntryStatus;
+import com.cms.waitlist.domain.WaitlistEntry;
+import com.cms.waitlist.domain.WaitlistEntryStatus;
 import java.time.Instant;
 import java.util.UUID;
 

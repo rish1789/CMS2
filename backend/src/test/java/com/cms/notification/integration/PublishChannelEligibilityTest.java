@@ -2,7 +2,7 @@ package com.cms.notification.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.cms.notification.NotificationEvent;
+import com.cms.notification.domain.NotificationEvent;
 import org.junit.jupiter.api.Test;
 
 /** 011 FR-002/FR-003, spec US1 AC1-AC3: channel eligibility is computed and snapshotted at publish time. */

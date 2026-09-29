@@ -5,16 +5,23 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.booking.Booking;
-import com.cms.clinical.ConsultationNote;
+import com.cms.booking.domain.Booking;
+import com.cms.clinical.domain.ConsultationNote;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfile;
-import com.cms.patient.account.PatientAccount;
-import com.cms.patient.record.Patient;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.Slot;
+import com.cms.patient.account.domain.PatientAccount;
+import com.cms.patient.record.domain.Patient;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.domain.Slot;
 import java.time.Instant;
 import java.util.List;
+import com.cms.scheduling.domain.Schedule;
+import com.cms.scheduling.domain.ScheduleMode;
+import com.cms.scheduling.domain.SlotStatus;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.EnumSet;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 
@@ -62,6 +69,105 @@ class PatientAnonymizationTest extends AbstractPatientAnonymizationIntegrationTe
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + clinicAdminToken(clinic)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.anonymized").value(true));
+    }
+
+    /**
+     * real-bug-fix 2026-09-24 (reproduced live): a pending queue booking must block anonymization
+     * exactly like a fixed-time one. A real queue token's Slot stays OPEN until the patient is seen
+     * (only fixed-time booking flips a Slot to BOOKED), and the precondition query used to require
+     * BOOKED - so a patient waiting in tomorrow's queue could be anonymized mid-booking.
+     */
+    @Test
+    void blocksWhileAPendingQueueBookingExists() throws Exception {
+        Clinic clinic = saveClinic();
+        DoctorProfile doctor = saveDoctorStaffedAt(clinic);
+        Patient patient = savePatient(clinic, null);
+        Schedule queueSchedule = scheduleRepository.save(new Schedule(
+                doctor, clinic, EnumSet.allOf(DayOfWeek.class),
+                LocalTime.of(14, 0), LocalTime.of(16, 0), ScheduleMode.QUEUE, null));
+        sessionGenerationService.generate(LocalDate.now());
+        Session queueSession = sessionRepository.findBySchedule_Id(queueSchedule.getId()).get(0);
+        Slot token = slotRepository.save(new Slot(queueSession, 1));
+        bookSlotForPatient(doctor, token, patient);
+        token.setStatus(SlotStatus.OPEN); // exactly as the real queue-booking flow leaves it
+        slotRepository.save(token);
+
+        mockMvc.perform(post("/api/v1/clinics/{clinicId}/patients/{patientId}/anonymize", clinic.getId(), patient.getId())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + clinicAdminToken(clinic)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("PATIENT_HAS_ACTIVE_FUTURE_BOOKING"));
+        assertThat(patientRepository.findById(patient.getId()).orElseThrow().isAnonymized()).isFalse();
+    }
+
+    /**
+     * real-bug-fix 2026-09-24: nothing ever resolves a queue token whose patient was never marked
+     * seen (the no-show sweep is fixed-time only), so a stale past one must not block anonymization
+     * forever - OPEN counts as pending only for today or later.
+     */
+    @Test
+    void aStalePastQueueBookingDoesNotBlockAnonymization() throws Exception {
+        Clinic clinic = saveClinic();
+        DoctorProfile doctor = saveDoctorStaffedAt(clinic);
+        Patient patient = savePatient(clinic, null);
+        Schedule queueSchedule = scheduleRepository.save(new Schedule(
+                doctor, clinic, EnumSet.allOf(DayOfWeek.class),
+                LocalTime.of(14, 0), LocalTime.of(16, 0), ScheduleMode.QUEUE, null));
+        sessionGenerationService.generate(LocalDate.now().minusDays(3));
+        Session pastSession = sessionRepository.findBySchedule_Id(queueSchedule.getId()).stream()
+                .filter(s -> s.getSessionDate().equals(LocalDate.now().minusDays(3)))
+                .findFirst()
+                .orElseThrow();
+        Slot token = slotRepository.save(new Slot(pastSession, 1));
+        bookSlotForPatient(doctor, token, patient);
+        token.setStatus(SlotStatus.OPEN);
+        slotRepository.save(token);
+
+        mockMvc.perform(post("/api/v1/clinics/{clinicId}/patients/{patientId}/anonymize", clinic.getId(), patient.getId())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + clinicAdminToken(clinic)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.anonymized").value(true));
+    }
+
+    /** 063-front-desk-walk-in (Constitution IV, tasks.md T013): the new optional email is personal data too and is cleared with name and phone. */
+    @Test
+    void anonymizationAlsoClearsTheEmail() throws Exception {
+        Clinic clinic = saveClinic();
+        Patient patient = patientRepository.save(new Patient(clinic, null, "Asha Rao", "9999900077", "asha.rao@example.com"));
+
+        mockMvc.perform(post("/api/v1/clinics/{clinicId}/patients/{patientId}/anonymize", clinic.getId(), patient.getId())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + clinicAdminToken(clinic)))
+                .andExpect(status().isOk());
+
+        assertThat(patientRepository.findById(patient.getId()).orElseThrow().getEmail()).isNull();
+    }
+
+    /**
+     * 063-front-desk-walk-in convergence (T039): a Fixed-Time walk-in who was never seen stays an
+     * untimed BOOKED slot forever - it must block anonymization only while its session is today or
+     * later, never permanently (spec edge case "Walk-ins still waiting at the end of the day").
+     */
+    @Test
+    void aWaitingWalkInBlocksTodayButAStalePastOneDoesNot() throws Exception {
+        Clinic clinic = saveClinic();
+        DoctorProfile doctor = saveDoctorStaffedAt(clinic);
+        Patient stale = savePatient(clinic, null);
+        Patient waitingToday = savePatient(clinic, null);
+        Schedule fixed = scheduleRepository.save(new Schedule(
+                doctor, clinic, EnumSet.allOf(DayOfWeek.class), LocalTime.of(9, 0), LocalTime.of(13, 0), ScheduleMode.FIXED_TIME, 15));
+        sessionGenerationService.generate(LocalDate.now().minusDays(1));
+        List<Session> sessions = sessionRepository.findBySchedule_Id(fixed.getId());
+        Session yesterday = sessions.stream().filter(s -> s.getSessionDate().equals(LocalDate.now().minusDays(1))).findFirst().orElseThrow();
+        Session today = sessions.stream().filter(s -> s.getSessionDate().equals(LocalDate.now())).findFirst().orElseThrow();
+        bookSlotForPatient(doctor, slotRepository.save(new Slot(yesterday, 1)), stale);
+        bookSlotForPatient(doctor, slotRepository.save(new Slot(today, 1)), waitingToday);
+
+        mockMvc.perform(post("/api/v1/clinics/{clinicId}/patients/{patientId}/anonymize", clinic.getId(), stale.getId())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + clinicAdminToken(clinic)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/clinics/{clinicId}/patients/{patientId}/anonymize", clinic.getId(), waitingToday.getId())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + clinicAdminToken(clinic)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("PATIENT_HAS_ACTIVE_FUTURE_BOOKING"));
     }
 
     @Test

@@ -5,13 +5,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfile;
-import com.cms.patient.account.PatientAccount;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.Slot;
-import com.cms.waitlist.WaitlistEntry;
-import com.cms.waitlist.WaitlistEntryNotFoundException;
-import com.cms.waitlist.WaitlistEntryStatus;
-import com.cms.waitlist.WaitlistOfferNotClaimableException;
+import com.cms.patient.account.domain.PatientAccount;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.domain.Slot;
+import com.cms.waitlist.domain.WaitlistEntry;
+import com.cms.waitlist.exception.WaitlistEntryNotFoundException;
+import com.cms.waitlist.domain.WaitlistEntryStatus;
+import com.cms.waitlist.exception.WaitlistOfferNotClaimableException;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 

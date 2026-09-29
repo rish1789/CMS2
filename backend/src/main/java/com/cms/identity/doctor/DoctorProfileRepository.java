@@ -82,12 +82,12 @@ public interface DoctorProfileRepository extends JpaRepository<DoctorProfile, UU
     @Query(
             value = "SELECT dp FROM DoctorProfile dp WHERE EXISTS (SELECT 1 FROM RoleAssignment ra "
                     + "WHERE ra.account = dp.account AND ra.clinic.id = :clinicId "
-                    + "AND ra.role = com.cms.identity.account.RoleAssignment.Role.Doctor AND ra.active = true) "
+                    + "AND ra.role = com.cms.identity.account.domain.RoleAssignment.Role.Doctor AND ra.active = true) "
                     + "AND (:searchPattern IS NULL OR LOWER(dp.account.name) LIKE :searchPattern "
                     + "OR LOWER(dp.account.staffCode) LIKE :searchPattern OR LOWER(dp.specialization) LIKE :searchPattern)",
             countQuery = "SELECT COUNT(dp) FROM DoctorProfile dp WHERE EXISTS (SELECT 1 FROM RoleAssignment ra "
                     + "WHERE ra.account = dp.account AND ra.clinic.id = :clinicId "
-                    + "AND ra.role = com.cms.identity.account.RoleAssignment.Role.Doctor AND ra.active = true) "
+                    + "AND ra.role = com.cms.identity.account.domain.RoleAssignment.Role.Doctor AND ra.active = true) "
                     + "AND (:searchPattern IS NULL OR LOWER(dp.account.name) LIKE :searchPattern "
                     + "OR LOWER(dp.account.staffCode) LIKE :searchPattern OR LOWER(dp.specialization) LIKE :searchPattern)")
     Page<DoctorProfile> findByClinicStaffed(
@@ -106,7 +106,7 @@ public interface DoctorProfileRepository extends JpaRepository<DoctorProfile, UU
      */
     @Query("SELECT DISTINCT dp.specialization FROM DoctorProfile dp WHERE EXISTS (SELECT 1 FROM RoleAssignment ra "
             + "WHERE ra.account = dp.account AND ra.clinic.id = :clinicId "
-            + "AND ra.role = com.cms.identity.account.RoleAssignment.Role.Doctor) ORDER BY dp.specialization ASC")
+            + "AND ra.role = com.cms.identity.account.domain.RoleAssignment.Role.Doctor) ORDER BY dp.specialization ASC")
     List<String> findDistinctSpecializationsByClinic(@Param("clinicId") UUID clinicId);
 
     /** Bulk lookup backing ClinicStaffController's staff-list enrichment (specialization/experience) - avoids one query per row. */

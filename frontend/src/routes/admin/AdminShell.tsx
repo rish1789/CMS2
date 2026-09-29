@@ -1,6 +1,18 @@
 import { useState } from 'react'
 import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { loadSuperAdminSession, storeSuperAdminSession } from '../../features/super-admin/token'
+import { SidebarDrawer } from '../../components/SidebarDrawer'
+import { Sidebar, type SidebarNavItem } from '../../components/Sidebar'
+import { ClinicIcon, DoctorIcon, HomeIcon, SessionIcon } from '../../components/adminIcons'
+
+// 050-sidebar-navigation T006: the persistent admin sidebar's 4 destinations, all verified
+// real routes from App.tsx. No role filtering - AdminShell has exactly one role (Super Admin).
+const ADMIN_NAV_ITEMS: SidebarNavItem[] = [
+  { to: '/super-admin-console', label: 'Admin home', icon: <HomeIcon />, end: true },
+  { to: '/super-admin-console/clinics', label: 'Pending clinic verifications', icon: <ClinicIcon /> },
+  { to: '/super-admin-console/doctors', label: 'Pending doctor verifications', icon: <DoctorIcon /> },
+  { to: '/super-admin-console/sessions/generate', label: 'Trigger session generation', icon: <SessionIcon /> },
+]
 
 // 040-super-admin-rbac-login: Super Admin now authenticates once at the Clinic Portal
 // (/staff/login) and gets a stored bearer session, guarded by RequireSuperAdminSession
@@ -51,9 +63,14 @@ export function AdminShell() {
           </div>
         )}
       </header>
-      <main className="mx-auto max-w-5xl p-6 sm:p-8">
-        <Outlet />
-      </main>
+      <div className="mx-auto flex max-w-6xl gap-6 p-6 sm:p-8">
+        <SidebarDrawer>
+          <Sidebar items={ADMIN_NAV_ITEMS} />
+        </SidebarDrawer>
+        <main className="min-w-0 flex-1">
+          <Outlet />
+        </main>
+      </div>
     </div>
   )
 }

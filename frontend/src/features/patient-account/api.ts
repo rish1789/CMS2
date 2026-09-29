@@ -59,8 +59,12 @@ export interface LoginPatientResponse {
   email: string
 }
 
+// ACCOUNT_NOT_FOUND (no registered account for that email) and INCORRECT_PASSWORD (email is
+// registered, password didn't match) are reported separately - a product decision accepting
+// the resulting user-enumeration tradeoff in exchange for a more specific login error.
 export type LoginPatientErrorBody =
-  | { error: 'INVALID_CREDENTIALS'; message: string }
+  | { error: 'ACCOUNT_NOT_FOUND'; message: string }
+  | { error: 'INCORRECT_PASSWORD'; message: string }
   | { error: 'MISSING_REQUIRED_FIELD'; field: string; message?: string }
 
 export class LoginPatientApiError extends Error {

@@ -6,23 +6,21 @@ export interface CancelSessionButtonProps {
   clinicId: string
   sessionId: string
   /**
-   * Pass `false` when the caller already knows (e.g. from the slot list it just rendered)
-   * that there's nothing booked to cancel - skips the confirm step and the wasted API round
-   * trip entirely, going straight to the same message a SESSION_ALREADY_CANCELLED response
-   * would produce. Omit when the caller doesn't have this information up front.
+   * 065-phase1-stabilization: the session is already whole-cancelled (from the day sheet), so
+   * there is nothing to offer and the button renders nothing - the caller states the cancelled
+   * status itself. A just-finished cancellation still shows its result. An empty session is NOT a
+   * reason to hide the action any more: cancelling it is how staff take it out of service (FR-009).
    */
-  hasActiveBookings?: boolean
+  alreadyCancelled?: boolean
   onCancelled?: (bookingsCancelled: number) => void
 }
 
 type Phase = 'idle' | 'confirming' | 'submitting' | 'done' | 'blocked'
 
-const NOTHING_TO_CANCEL_MESSAGE = 'This session has nothing left to cancel.'
-
 // 042-day-sheet-hardening FR-001/FR-002: a single click must never be sufficient to cancel a
 // whole session - same idle/confirming/submitting shape already used elsewhere in this codebase
 // (staff deactivation, individual booking cancellation) rather than a new interaction pattern.
-export function CancelSessionButton({ clinicId, sessionId, hasActiveBookings, onCancelled }: CancelSessionButtonProps) {
+export function CancelSessionButton({ clinicId, sessionId, alreadyCancelled, onCancelled }: CancelSessionButtonProps) {
   const [session] = useState(() => loadStaffSession())
   const [phase, setPhase] = useState<Phase>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -39,8 +37,8 @@ export function CancelSessionButton({ clinicId, sessionId, hasActiveBookings, on
       setPhase('done')
       onCancelled?.(response.bookingsCancelled)
     } catch (err) {
-      // SESSION_ALREADY_CANCELLED can never succeed on a retry (there's nothing left to
-      // cancel) - re-showing Confirm/Cancel here would just trap the user in a dead loop, so
+      // SESSION_ALREADY_CANCELLED can never succeed on a retry (the session is already
+      // cancelled) - re-showing Confirm/Cancel here would just trap the user in a dead loop, so
       // this one error ends the interaction outright instead of returning to 'confirming'.
       if (err instanceof SessionCancellationApiError && err.body.error === 'SESSION_ALREADY_CANCELLED') {
         setPhase('blocked')
@@ -63,7 +61,9 @@ export function CancelSessionButton({ clinicId, sessionId, hasActiveBookings, on
   if (phase === 'done' && bookingsCancelled !== null) {
     return (
       <p className="text-sm text-green-700">
-        Session cancelled — {bookingsCancelled} booking{bookingsCancelled === 1 ? '' : 's'} cancelled.
+        {bookingsCancelled === 0
+          ? 'Session cancelled. No active bookings needed cancelling.'
+          : `Session cancelled — ${bookingsCancelled} booking${bookingsCancelled === 1 ? '' : 's'} cancelled.`}
       </p>
     )
   }
@@ -76,10 +76,16 @@ export function CancelSessionButton({ clinicId, sessionId, hasActiveBookings, on
     )
   }
 
+  if (alreadyCancelled) {
+    return null
+  }
+
   if (phase === 'confirming' || phase === 'submitting') {
     return (
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-gray-700">Are you sure? Active bookings in this session will be cancelled.</span>
+        <span className="text-sm text-gray-700">
+          Are you sure? This session will stop taking bookings, and any active bookings in it will be cancelled.
+        </span>
         <button
           type="button"
           onClick={handleConfirm}
@@ -114,14 +120,7 @@ export function CancelSessionButton({ clinicId, sessionId, hasActiveBookings, on
   return (
     <button
       type="button"
-      onClick={() => {
-        if (hasActiveBookings === false) {
-          setPhase('blocked')
-          setError(NOTHING_TO_CANCEL_MESSAGE)
-          return
-        }
-        setPhase('confirming')
-      }}
+      onClick={() => setPhase('confirming')}
       className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 text-sm font-medium text-red-700 transition-colors duration-150 hover:bg-red-100"
     >
       <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none">

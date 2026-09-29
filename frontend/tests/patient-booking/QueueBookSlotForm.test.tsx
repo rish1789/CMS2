@@ -47,11 +47,10 @@ describe('QueueBookSlotForm (patient)', () => {
     })
 
     render(
-      <QueueBookSlotForm clinicId={CLINIC_ID} sessionId={SESSION_ID} appointmentTypes={APPOINTMENT_TYPES} />,
+      <QueueBookSlotForm clinicId={CLINIC_ID} sessionId={SESSION_ID} onClose={vi.fn()} appointmentTypes={APPOINTMENT_TYPES} />,
       { wrapper: MemoryRouter },
     )
 
-    await user.type(screen.getByLabelText(/your name/i), 'Jane Doe')
     await user.selectOptions(screen.getByLabelText(/appointment type/i), 'type-1')
     await user.click(screen.getByRole('button', { name: /book into queue/i }))
 
@@ -61,7 +60,7 @@ describe('QueueBookSlotForm (patient)', () => {
     expect(mockedBookQueueSlot).toHaveBeenCalledWith(
       CLINIC_ID,
       SESSION_ID,
-      { patientName: 'Jane Doe', appointmentTypeId: 'type-1' },
+      { patientName: 'Patient', appointmentTypeId: 'type-1' },
       'a.jwt.token',
     )
   })
@@ -71,11 +70,10 @@ describe('QueueBookSlotForm (patient)', () => {
     mockedBookQueueSlot.mockRejectedValueOnce(new QueueBookSlotApiError({ error: 'NO_FEE_CONFIGURED' }))
 
     render(
-      <QueueBookSlotForm clinicId={CLINIC_ID} sessionId={SESSION_ID} appointmentTypes={APPOINTMENT_TYPES} />,
+      <QueueBookSlotForm clinicId={CLINIC_ID} sessionId={SESSION_ID} onClose={vi.fn()} appointmentTypes={APPOINTMENT_TYPES} />,
       { wrapper: MemoryRouter },
     )
 
-    await user.type(screen.getByLabelText(/your name/i), 'Jane Doe')
     await user.selectOptions(screen.getByLabelText(/appointment type/i), 'type-1')
     await user.click(screen.getByRole('button', { name: /book into queue/i }))
 
@@ -83,7 +81,7 @@ describe('QueueBookSlotForm (patient)', () => {
   })
 
   it('shows a message directing back to the session picker when no appointment types are available', () => {
-    render(<QueueBookSlotForm clinicId={CLINIC_ID} sessionId={SESSION_ID} />, { wrapper: MemoryRouter })
+    render(<QueueBookSlotForm clinicId={CLINIC_ID} sessionId={SESSION_ID} onClose={vi.fn()} />, { wrapper: MemoryRouter })
 
     expect(screen.getByText(/pick a session from your clinic's queue list/i)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /browse queue sessions/i })).toHaveAttribute(
@@ -94,12 +92,13 @@ describe('QueueBookSlotForm (patient)', () => {
 
   // patient-booking-visual-polish: doctorName/sessionDate/startTime/endTime ride along from
   // QueueSessionList via router state - when present, the form shows what it's booking instead
-  // of a bare "your name" field with no context.
+  // of a bare field with no context.
   it('shows a summary panel when session detail is passed in', () => {
     render(
       <QueueBookSlotForm
         clinicId={CLINIC_ID}
         sessionId={SESSION_ID}
+        onClose={vi.fn()}
         appointmentTypes={APPOINTMENT_TYPES}
         doctorName="Dr. Asha Rao"
         sessionDate="2026-09-14"
@@ -115,10 +114,24 @@ describe('QueueBookSlotForm (patient)', () => {
 
   it('omits the summary panel when session detail is absent (a direct/refreshed visit)', () => {
     render(
-      <QueueBookSlotForm clinicId={CLINIC_ID} sessionId={SESSION_ID} appointmentTypes={APPOINTMENT_TYPES} />,
+      <QueueBookSlotForm clinicId={CLINIC_ID} sessionId={SESSION_ID} onClose={vi.fn()} appointmentTypes={APPOINTMENT_TYPES} />,
       { wrapper: MemoryRouter },
     )
 
     expect(screen.queryByText(/16:00–18:00/)).not.toBeInTheDocument()
+  })
+
+  it('calls onClose when the close button is clicked', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+
+    render(
+      <QueueBookSlotForm clinicId={CLINIC_ID} sessionId={SESSION_ID} onClose={onClose} appointmentTypes={APPOINTMENT_TYPES} />,
+      { wrapper: MemoryRouter },
+    )
+
+    await user.click(screen.getByRole('button', { name: /close/i }))
+
+    expect(onClose).toHaveBeenCalled()
   })
 })

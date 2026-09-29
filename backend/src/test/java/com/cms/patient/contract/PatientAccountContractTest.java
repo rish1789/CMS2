@@ -7,13 +7,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.patient.account.EmailAlreadyInUseException;
-import com.cms.patient.account.InvalidCredentialsException;
-import com.cms.patient.account.InvalidPasswordException;
-import com.cms.patient.account.JwtService;
-import com.cms.patient.account.PatientAccountService;
-import com.cms.patient.account.PatientAuthenticationEntryPoint;
-import com.cms.patient.account.SecurityConfig;
+import com.cms.patient.account.exception.EmailAlreadyInUseException;
+import com.cms.patient.account.exception.AccountNotFoundException;
+import com.cms.patient.account.exception.IncorrectPasswordException;
+import com.cms.patient.account.exception.InvalidPasswordException;
+import com.cms.patient.account.config.JwtService;
+import com.cms.patient.account.service.PatientAccountService;
+import com.cms.patient.account.config.PatientAuthenticationEntryPoint;
+import com.cms.patient.account.config.SecurityConfig;
 import com.cms.patient.api.PatientAccountController;
 import com.cms.patient.api.PatientExceptionHandler;
 import com.cms.patient.api.dto.LoginResponse;
@@ -162,8 +163,8 @@ class PatientAccountContractTest {
     }
 
     @Test
-    void loginWithWrongCredentialsReturns401() throws Exception {
-        when(patientAccountService.authenticate(any())).thenThrow(new InvalidCredentialsException());
+    void loginWithWrongPasswordReturns401WithIncorrectPasswordError() throws Exception {
+        when(patientAccountService.authenticate(any())).thenThrow(new IncorrectPasswordException());
 
         mockMvc.perform(post("/api/v1/patients/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -172,6 +173,20 @@ class PatientAccountContractTest {
                                 { "email": "owner@example.com", "password": "wrong-password" }
                                 """))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("INVALID_CREDENTIALS"));
+                .andExpect(jsonPath("$.error").value("INCORRECT_PASSWORD"));
+    }
+
+    @Test
+    void loginWithUnknownEmailReturns401WithAccountNotFoundError() throws Exception {
+        when(patientAccountService.authenticate(any())).thenThrow(new AccountNotFoundException());
+
+        mockMvc.perform(post("/api/v1/patients/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                { "email": "nobody@example.com", "password": "Str0ng!Pass" }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("ACCOUNT_NOT_FOUND"));
     }
 }

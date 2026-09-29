@@ -32,7 +32,7 @@ describe('CompleteSlotButton', () => {
 
     render(<CompleteSlotButton clinicId={CLINIC_ID} slotId={SLOT_ID} />)
 
-    await user.click(screen.getByRole('button', { name: /mark completed/i }))
+    await user.click(screen.getByRole('button', { name: /^completed$/i }))
 
     expect(await screen.findByText(/slot marked completed/i)).toBeInTheDocument()
     expect(mockedCompleteSlot).toHaveBeenCalledWith(CLINIC_ID, SLOT_ID, 'a.jwt.token')
@@ -44,7 +44,7 @@ describe('CompleteSlotButton', () => {
 
     render(<CompleteSlotButton clinicId={CLINIC_ID} slotId={SLOT_ID} />)
 
-    await user.click(screen.getByRole('button', { name: /mark completed/i }))
+    await user.click(screen.getByRole('button', { name: /^completed$/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/cannot be marked completed/i)
   })
@@ -55,8 +55,21 @@ describe('CompleteSlotButton', () => {
 
     render(<CompleteSlotButton clinicId={CLINIC_ID} slotId={SLOT_ID} />)
 
-    await user.click(screen.getByRole('button', { name: /mark completed/i }))
+    await user.click(screen.getByRole('button', { name: /^completed$/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/fixed-time sessions/i)
+  })
+
+  // 2026-09-16 real bug found live: a slot scheduled for 15:15 was marked completed at 15:03,
+  // twelve minutes before its scheduled start even arrived - nothing previously stopped this.
+  it('shows the SLOT_NOT_YET_STARTED error message', async () => {
+    const user = userEvent.setup()
+    mockedCompleteSlot.mockRejectedValueOnce(new SlotCompletionApiError({ error: 'SLOT_NOT_YET_STARTED' }))
+
+    render(<CompleteSlotButton clinicId={CLINIC_ID} slotId={SLOT_ID} />)
+
+    await user.click(screen.getByRole('button', { name: /^completed$/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/before its scheduled start time/i)
   })
 })

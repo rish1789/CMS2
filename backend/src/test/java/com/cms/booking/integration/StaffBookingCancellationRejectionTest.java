@@ -5,16 +5,16 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.booking.AppointmentType;
-import com.cms.booking.Booking;
+import com.cms.booking.domain.AppointmentType;
+import com.cms.booking.domain.Booking;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfile;
-import com.cms.patient.record.Patient;
-import com.cms.scheduling.Schedule;
-import com.cms.scheduling.ScheduleMode;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.Slot;
-import com.cms.scheduling.SlotStatus;
+import com.cms.patient.record.domain.Patient;
+import com.cms.scheduling.domain.Schedule;
+import com.cms.scheduling.domain.ScheduleMode;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.domain.Slot;
+import com.cms.scheduling.domain.SlotStatus;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -80,16 +80,17 @@ class StaffBookingCancellationRejectionTest extends AbstractBookingCancellationI
                 .andExpect(jsonPath("$.error").value("BOOKING_NOT_CANCELLABLE"));
     }
 
+    /** 064-queue-send-in-complete (FR-009): staff can now cancel a waiting queue booking (previously rejected as NOT_A_FIXED_TIME_SESSION). */
     @Test
-    void cancellingAQueueModeBookingIsRejected() throws Exception {
+    void cancellingAWaitingQueueBookingNowSucceeds() throws Exception {
         var clinic = saveClinic();
         var doctor = saveDoctorStaffedAt(clinic);
         Booking booking = saveQueueModeBooking(clinic, doctor);
         String token = clinicAdminToken(clinic);
 
-        cancel(clinic.getId().toString(), booking.getId().toString(), token)
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error").value("NOT_A_FIXED_TIME_SESSION"));
+        cancel(clinic.getId().toString(), booking.getId().toString(), token).andExpect(status().isOk());
+        org.assertj.core.api.Assertions.assertThat(slotRepository.findById(booking.getSlot().getId()).orElseThrow().getStatus())
+                .isEqualTo(SlotStatus.OPEN);
     }
 
     private Booking saveQueueModeBooking(Clinic clinic, DoctorProfile doctor) {

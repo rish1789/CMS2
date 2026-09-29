@@ -59,7 +59,7 @@ export function CompleteSlotButton({ clinicId, slotId, onCompleted }: CompleteSl
         disabled={submitting}
         className="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-150 ease-out hover:bg-indigo-500 hover:shadow active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
       >
-        {submitting ? 'Marking completed…' : 'Mark completed'}
+        {submitting ? 'Marking…' : 'Completed'}
       </button>
     </div>
   )

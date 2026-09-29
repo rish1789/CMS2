@@ -19,7 +19,8 @@ import {
 } from './api'
 import { loadSuperAdminSession, storeSuperAdminSession } from '../super-admin/token'
 import { PaginationControls } from '../../components/PaginationControls'
-import { ListSkeleton } from '../../components/ListSkeleton'
+import { EmptyState } from '../../components/EmptyState'
+import { LoadingState } from '../../components/LoadingState'
 import { avatarGradientClass } from '../../components/avatarGradient'
 import { RejectConfirmModal } from '../../components/RejectConfirmModal'
 import { DeleteConfirmModal } from '../../components/DeleteConfirmModal'
@@ -457,13 +458,16 @@ export function PendingDoctorsList() {
           <label htmlFor="doctor-search" className="sr-only">
             Search doctors
           </label>
+          {/* 055-responsive-mobile-pass: was `w-72 max-w-full`, the same real narrow-width
+              overflow bug found and fixed in DoctorPicker.tsx/PendingClinicsList.tsx's
+              identical search inputs. `w-full sm:w-72` fixes it while keeping desktop appearance. */}
           <input
             id="doctor-search"
             type="search"
             value={searchInput}
             onChange={(event) => handleSearchChange(event.target.value)}
             placeholder="Search by name, email, specialization, or license"
-            className="w-72 max-w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 sm:w-72"
           />
         </div>
       </div>
@@ -514,17 +518,20 @@ export function PendingDoctorsList() {
         </div>
       )}
 
-      {loading && <ListSkeleton rows={4} />}
+      {loading && <LoadingState variant="list" rows={4} />}
 
       {!loading && doctors.length === 0 && (
-        <p className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-500 shadow-sm">
-          {searchTerm || reasonFilter ? 'No doctors match your search/filter.' : 'No doctors in this list.'}
-        </p>
+        <EmptyState message={searchTerm || reasonFilter ? 'No doctors match your search/filter.' : 'No doctors in this list.'} />
       )}
 
       {!loading && doctors.length > 0 && (
         <>
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+          {/* 055-responsive-mobile-pass: `contain-layout` fixes a real, verified tablet-width
+              (~768px) bug - this table's own `min-w-[720px]` was leaking past this wrapper's
+              `overflow-x-auto` into the page's own scrollWidth (a known browser quirk with
+              table intrinsic sizing inside flex layouts), causing genuine page-body horizontal
+              scroll - see the identical fix and its explanation in DaySheet.tsx. */}
+          <div className="overflow-x-auto contain-layout rounded-xl border border-gray-200 bg-white shadow-sm">
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">

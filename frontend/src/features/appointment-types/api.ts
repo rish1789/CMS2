@@ -28,6 +28,7 @@ export interface SetDefaultFeeResponse {
 export type AppointmentTypeErrorBody =
   | { error: 'FORBIDDEN'; message?: string }
   | { error: 'DOCTOR_PROFILE_NOT_FOUND'; message?: string }
+  | { error: 'APPOINTMENT_TYPE_NOT_FOUND'; message?: string }
   | { error: 'UNAUTHORIZED'; message?: string }
 
 export class AppointmentTypeApiError extends Error {
@@ -46,6 +47,8 @@ function defaultMessageFor(body: AppointmentTypeErrorBody): string {
       return 'Only this doctor, or a ClinicAdmin at a clinic they are staffed at, can manage appointment types.'
     case 'DOCTOR_PROFILE_NOT_FOUND':
       return 'This doctor could not be found.'
+    case 'APPOINTMENT_TYPE_NOT_FOUND':
+      return 'This appointment type could not be found.'
     case 'UNAUTHORIZED':
       return 'Your session has expired. Please sign in again.'
     default:
@@ -104,6 +107,30 @@ export async function createAppointmentType(
     body: JSON.stringify(request),
   })
   if (!response.ok) await parseError(response, 'DOCTOR_PROFILE_NOT_FOUND')
+  return (await response.json()) as AppointmentTypeResponse
+}
+
+// real-bug-fix 2026-09-17: create/list had no way to correct a mistyped name/fee override
+// afterward - PUT is always safe here even once a Booking already references this
+// AppointmentType, since it only ever changes this row's own name/feeOverride columns.
+export async function renameAppointmentType(
+  doctorProfileId: string,
+  appointmentTypeId: string,
+  request: CreateAppointmentTypeRequest,
+  token: string,
+): Promise<AppointmentTypeResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/v1/doctors/${doctorProfileId}/appointment-types/${appointmentTypeId}`,
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    },
+  )
+  if (!response.ok) await parseError(response, 'APPOINTMENT_TYPE_NOT_FOUND')
   return (await response.json()) as AppointmentTypeResponse
 }
 

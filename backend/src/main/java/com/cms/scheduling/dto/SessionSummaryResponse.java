@@ -1,6 +1,6 @@
 package com.cms.scheduling.dto;
 
-import com.cms.scheduling.Session;
+import com.cms.scheduling.domain.Session;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.UUID;
@@ -16,6 +16,8 @@ import java.util.UUID;
  * <p>staff-console-audit-2026-09-10 P1: startTime/endTime added - the list previously showed
  * only the session's date, never its time range, off Session's own already-loaded fields (zero
  * new queries).
+ *
+ * <p>065-phase1-stabilization (owner decision 3): {@code cancelled} flags a whole-cancelled session.
  */
 public record SessionSummaryResponse(
         UUID sessionId,
@@ -26,9 +28,26 @@ public record SessionSummaryResponse(
         LocalTime endTime,
         String mode,
         int bookedSlotCount,
-        int totalSlotCount) {
+        int totalSlotCount,
+        // 063-front-desk-walk-in (research.md Decision 6): walk-ins waiting in a Fixed-Time session's
+        // walk-in line, and whether anyone is in with the doctor right now (the Doctor free/busy
+        // hint). 064-queue-send-in-complete: for a Queue session, the waiting tokens and whether a
+        // token has been sent in.
+        int walkInsWaiting,
+        boolean inWithDoctor,
+        boolean cancelled) {
 
     public static SessionSummaryResponse from(Session session, Long bookedSlotCount, Long totalSlotCount) {
+        return from(session, bookedSlotCount, totalSlotCount, 0, false, false);
+    }
+
+    public static SessionSummaryResponse from(
+            Session session,
+            Long bookedSlotCount,
+            Long totalSlotCount,
+            long walkInsWaiting,
+            boolean inWithDoctor,
+            boolean cancelled) {
         return new SessionSummaryResponse(
                 session.getId(),
                 session.getDoctorProfile().getId(),
@@ -38,6 +57,9 @@ public record SessionSummaryResponse(
                 session.getEndTime(),
                 session.getMode().name(),
                 bookedSlotCount == null ? 0 : bookedSlotCount.intValue(),
-                totalSlotCount == null ? 0 : totalSlotCount.intValue());
+                totalSlotCount == null ? 0 : totalSlotCount.intValue(),
+                (int) walkInsWaiting,
+                inWithDoctor,
+                cancelled);
     }
 }

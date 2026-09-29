@@ -4,8 +4,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.scheduling.Slot;
-import com.cms.scheduling.SlotStatus;
+import com.cms.scheduling.domain.Slot;
+import com.cms.scheduling.domain.SlotStatus;
 import java.time.LocalTime;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -51,5 +51,43 @@ class SlotCompletionAuthorizationTest extends AbstractSessionDelayIntegrationTes
         String token = clinicAdminToken(clinic);
 
         complete(clinic.getId().toString(), slot.getId().toString(), token).andExpect(status().isOk());
+    }
+
+    /** 057-day-sheet-status-overhaul FR-006: the treating doctor gains access, but only from APPEARED - not BOOKED (see below). */
+    @Test
+    void treatingDoctorCompletesTheirOwnAppearedSlot() throws Exception {
+        var clinic = saveClinic();
+        var doctor = saveDoctorStaffedAt(clinic);
+        Slot slot = saveFixedTimeSlotAt(clinic, doctor, LocalTime.now().minusMinutes(15), SlotStatus.APPEARED);
+        String token = doctorToken(doctor);
+
+        complete(clinic.getId().toString(), slot.getId().toString(), token).andExpect(status().isOk());
+    }
+
+    /** 057-day-sheet-status-overhaul: a doctor cannot complete a still-BOOKED slot - Appeared is the front-desk-owned gate for them. */
+    @Test
+    void treatingDoctorIsRejectedForAStillBookedSlot() throws Exception {
+        var clinic = saveClinic();
+        var doctor = saveDoctorStaffedAt(clinic);
+        Slot slot = saveFixedTimeSlotAt(clinic, doctor, LocalTime.now().minusMinutes(15), SlotStatus.BOOKED);
+        String token = doctorToken(doctor);
+
+        complete(clinic.getId().toString(), slot.getId().toString(), token)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("SLOT_NOT_COMPLETABLE"));
+    }
+
+    /** 057-day-sheet-status-overhaul: no peer-doctor override, mirroring TreatingDoctorAuthorizationService's own precedent for clinical documentation. */
+    @Test
+    void nonTreatingDoctorIsForbiddenEvenWhenTheSlotIsAppeared() throws Exception {
+        var clinic = saveClinic();
+        var treatingDoctor = saveDoctorStaffedAt(clinic);
+        var otherDoctor = saveDoctorStaffedAt(clinic);
+        Slot slot = saveFixedTimeSlotAt(clinic, treatingDoctor, LocalTime.now().minusMinutes(15), SlotStatus.APPEARED);
+        String token = doctorToken(otherDoctor);
+
+        complete(clinic.getId().toString(), slot.getId().toString(), token)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("FORBIDDEN"));
     }
 }

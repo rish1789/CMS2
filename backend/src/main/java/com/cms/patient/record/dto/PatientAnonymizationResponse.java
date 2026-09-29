@@ -1,6 +1,6 @@
 package com.cms.patient.record.dto;
 
-import com.cms.patient.record.Patient;
+import com.cms.patient.record.domain.Patient;
 import java.time.Instant;
 import java.util.UUID;
 

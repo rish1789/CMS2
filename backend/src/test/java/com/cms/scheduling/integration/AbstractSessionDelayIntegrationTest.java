@@ -1,11 +1,11 @@
 package com.cms.scheduling.integration;
 
-import com.cms.identity.account.Account;
-import com.cms.identity.account.RoleAssignment;
+import com.cms.identity.account.domain.Account;
+import com.cms.identity.account.domain.RoleAssignment;
 import com.cms.identity.clinic.Clinic;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.Slot;
-import com.cms.scheduling.SlotStatus;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.domain.Slot;
+import com.cms.scheduling.domain.SlotStatus;
 import java.time.LocalTime;
 
 /**
@@ -29,7 +29,7 @@ public abstract class AbstractSessionDelayIntegrationTest extends AbstractNoShow
 
     /** Adds one more Slot at the given scheduled time into an already-existing Session (e.g. one returned by {@code saveFixedTimeSlotAt}), in the given status. */
     protected Slot addSlotAt(Session session, LocalTime scheduledTime, SlotStatus status) {
-        Slot slot = new Slot(session, scheduledTime, scheduledTime.plusMinutes(15), false);
+        Slot slot = new Slot(session, scheduledTime, scheduledTime.plusMinutes(15));
         slot.setStatus(status);
         return slotRepository.save(slot);
     }

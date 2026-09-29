@@ -4,8 +4,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.booking.Booking;
-import com.cms.scheduling.SlotStatus;
+import com.cms.booking.domain.Booking;
+import com.cms.scheduling.domain.SlotStatus;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -87,8 +87,8 @@ class QueuePositionSuccessTest extends AbstractQueuePositionIntegrationTest {
 
     private Booking bookToken(
             com.cms.identity.clinic.Clinic clinic,
-            com.cms.scheduling.Session session,
-            com.cms.booking.AppointmentType appointmentType,
+            com.cms.scheduling.domain.Session session,
+            com.cms.booking.domain.AppointmentType appointmentType,
             String token)
             throws Exception {
         var patient = saveExistingPatient(clinic);
@@ -96,7 +96,7 @@ class QueuePositionSuccessTest extends AbstractQueuePositionIntegrationTest {
                 accountIdFor(token),
                 clinic.getId(),
                 session.getId(),
-                new com.cms.booking.StaffQueueBookingService.BookSlotInput(
+                new com.cms.booking.service.StaffQueueBookingService.BookSlotInput(
                         patient.getId(), null, null, appointmentType.getId()));
     }
 

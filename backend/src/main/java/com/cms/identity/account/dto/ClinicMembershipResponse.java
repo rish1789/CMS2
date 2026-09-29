@@ -1,6 +1,6 @@
 package com.cms.identity.account.dto;
 
-import com.cms.identity.account.RoleAssignment;
+import com.cms.identity.account.domain.RoleAssignment;
 import java.util.UUID;
 
 /** 041-staff-console-pickers FR-001: one row per active RoleAssignment the caller holds. */

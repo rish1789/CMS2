@@ -3,9 +3,9 @@ package com.cms.notification.integration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.cms.notification.NotificationEvent;
-import com.cms.notification.NotificationEventAlreadyExpiredException;
-import com.cms.notification.NotificationEventStatus;
+import com.cms.notification.domain.NotificationEvent;
+import com.cms.notification.exception.NotificationEventAlreadyExpiredException;
+import com.cms.notification.domain.NotificationEventStatus;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 

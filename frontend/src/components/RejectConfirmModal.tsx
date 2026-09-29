@@ -1,4 +1,7 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react'
+import { useRef, useState } from 'react'
+import { Modal, type ModalHandle } from './Modal'
+import { ModalHeader } from './ModalHeader'
+import { useToast } from './Toast'
 import { REJECTION_REASON_OPTIONS, type RejectionReason } from './rejectionReason'
 
 export interface RejectConfirmModalProps {
@@ -11,26 +14,19 @@ export interface RejectConfirmModalProps {
 }
 
 // super-admin-console-redesign-2026-09-11: shared by the Clinic and Doctor verification queues'
-// single-row and bulk-selection Reject actions - a native <dialog> (showModal()) gives us the
-// same focus-trap/Esc-to-close shape as EmployeeModal (staff deactivation) for free, extended
-// with a list of exactly what's affected and an optional free-text detail alongside the required
-// structured reason.
+// single-row and bulk-selection Reject actions, extended with a list of exactly what's affected
+// and an optional free-text detail alongside the required structured reason.
+// 049-shared-ui-components: migrated onto the shared Modal shell and wired to show a success toast.
 export function RejectConfirmModal({ items, entityNoun, onClose, onSubmit }: RejectConfirmModalProps) {
   const [reason, setReason] = useState<RejectionReason | ''>('')
   const [detail, setDetail] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const dialogRef = useRef<HTMLDialogElement>(null)
+  const modalRef = useRef<ModalHandle>(null)
+  const { showToast } = useToast()
 
-  useEffect(() => {
-    dialogRef.current?.showModal()
-  }, [])
-
-  function handleBackdropClick(event: MouseEvent<HTMLDialogElement>) {
-    if (event.target === dialogRef.current && !submitting) {
-      dialogRef.current?.close()
-    }
-  }
+  const count = items.length
+  const title = count === 1 ? `Reject ${items[0].label}?` : `Reject ${count} ${entityNoun}s?`
 
   async function handleSubmit() {
     if (!reason) return
@@ -38,6 +34,7 @@ export function RejectConfirmModal({ items, entityNoun, onClose, onSubmit }: Rej
     setError(null)
     try {
       await onSubmit(reason, detail.trim())
+      showToast(count === 1 ? `${items[0].label} rejected.` : `${count} ${entityNoun}s rejected.`, 'success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
     } finally {
@@ -45,32 +42,10 @@ export function RejectConfirmModal({ items, entityNoun, onClose, onSubmit }: Rej
     }
   }
 
-  const count = items.length
-  const title = count === 1 ? `Reject ${items[0].label}?` : `Reject ${count} ${entityNoun}s?`
-
   return (
-    <dialog
-      ref={dialogRef}
-      onClose={onClose}
-      onClick={handleBackdropClick}
-      aria-label={title}
-      className="m-auto w-full max-w-md overflow-hidden rounded-xl border-0 bg-white p-0 shadow-xl backdrop:bg-gray-900/50"
-    >
+    <Modal ref={modalRef} onClose={onClose} ariaLabel={title}>
       <div className="max-h-[80vh] space-y-4 overflow-y-auto p-5">
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="text-base font-semibold text-gray-900">{title}</h2>
-          <button
-            type="button"
-            onClick={() => dialogRef.current?.close()}
-            disabled={submitting}
-            aria-label="Close"
-            className="rounded-md p-1 text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-600 disabled:pointer-events-none disabled:opacity-50"
-          >
-            <svg aria-hidden="true" viewBox="0 0 20 20" className="h-5 w-5" fill="currentColor">
-              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-            </svg>
-          </button>
-        </div>
+        <ModalHeader title={title} onCloseClick={() => modalRef.current?.close()} disabled={submitting} />
 
         <p className="text-sm text-gray-600">
           This moves {count === 1 ? 'it' : 'them'} out of the Pending queue into Rejected. It's reversible from the
@@ -128,7 +103,7 @@ export function RejectConfirmModal({ items, entityNoun, onClose, onSubmit }: Rej
         <div className="flex justify-end gap-2 pt-1">
           <button
             type="button"
-            onClick={() => dialogRef.current?.close()}
+            onClick={() => modalRef.current?.close()}
             disabled={submitting}
             className="rounded-lg border border-gray-300 px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none"
           >
@@ -144,6 +119,6 @@ export function RejectConfirmModal({ items, entityNoun, onClose, onSubmit }: Rej
           </button>
         </div>
       </div>
-    </dialog>
+    </Modal>
   )
 }

@@ -108,3 +108,53 @@ export function cancelBookingAsPatient(
 ): Promise<BookingCancellationResponse> {
   return postCancel(`${API_BASE_URL}/api/v1/patients/bookings/${bookingId}/cancel`, token, request)
 }
+
+// 057-day-sheet-status-overhaul: POST /api/v1/clinics/{clinicId}/sessions/{sessionId}/bookings/cancel-batch
+// See specs/057-day-sheet-status-overhaul/contracts/day-sheet-status-flow.md
+export interface BatchCancelResponse {
+  cancelled: string[]
+  failed: { bookingId: string; reason: string }[]
+}
+
+export type BatchCancelErrorBody = { error: 'FORBIDDEN'; message?: string } | { error: 'UNAUTHORIZED'; message?: string }
+
+export class BatchCancelApiError extends Error {
+  readonly body: BatchCancelErrorBody
+
+  constructor(body: BatchCancelErrorBody) {
+    super(body.message ?? 'Only front-desk Operations staff or a ClinicAdmin can cancel slots.')
+    this.name = 'BatchCancelApiError'
+    this.body = body
+  }
+}
+
+export async function cancelBookingsBatch(
+  clinicId: string,
+  sessionId: string,
+  bookingIds: string[],
+  token: string,
+): Promise<BatchCancelResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/v1/clinics/${clinicId}/sessions/${sessionId}/bookings/cancel-batch`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ bookingIds }),
+    },
+  )
+
+  if (!response.ok) {
+    let body: BatchCancelErrorBody
+    try {
+      body = (await response.json()) as BatchCancelErrorBody
+    } catch {
+      body = { error: 'FORBIDDEN' }
+    }
+    throw new BatchCancelApiError(body)
+  }
+
+  return (await response.json()) as BatchCancelResponse
+}

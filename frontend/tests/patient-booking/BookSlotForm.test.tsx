@@ -2,7 +2,9 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BookSlotForm } from '../../src/features/patient-booking/BookSlotForm'
-import { bookSlot, BookSlotApiError, type OpenSlot } from '../../src/features/patient-booking/api'
+import { bookSlot, type OpenSlot } from '../../src/features/patient-booking/api'
+import { storePatientSession } from '../../src/features/patient-account/token'
+import { ApiError } from '../../src/lib/apiClient'
 
 vi.mock('../../src/features/patient-booking/api', async () => {
   const actual = await vi.importActual<typeof import('../../src/features/patient-booking/api')>(
@@ -31,6 +33,11 @@ const SLOT: OpenSlot = {
 describe('BookSlotForm', () => {
   beforeEach(() => {
     mockedBookSlot.mockReset()
+    // patient-booking-modal-conversion: the form no longer asks the already-authenticated
+    // patient for their name - it derives one from their own account email (the same
+    // deriveDisplayNameFromEmail fallback the dashboard greeting already uses), so the session
+    // that would exist for real in the app must exist here too.
+    storePatientSession({ token: 'a.jwt.token', patientAccountId: 'account-1', email: 'jane.doe@example.com' })
   })
 
   it('books the slot and shows the locked fee', async () => {
@@ -45,9 +52,8 @@ describe('BookSlotForm', () => {
       createdAt: '2026-09-03T10:00:00Z',
     })
 
-    render(<BookSlotForm clinicId={CLINIC_ID} slot={SLOT} token="a.jwt.token" />)
+    render(<BookSlotForm clinicId={CLINIC_ID} slot={SLOT} token="a.jwt.token" onClose={vi.fn()} />)
 
-    await user.type(screen.getByLabelText(/your name/i), 'Jane Doe')
     await user.click(screen.getByRole('button', { name: /book slot/i }))
 
     expect(await screen.findByText(/booking confirmed/i)).toBeInTheDocument()
@@ -62,11 +68,12 @@ describe('BookSlotForm', () => {
 
   it('shows the SLOT_ALREADY_BOOKED error message', async () => {
     const user = userEvent.setup()
-    mockedBookSlot.mockRejectedValueOnce(new BookSlotApiError({ error: 'SLOT_ALREADY_BOOKED' }))
+    mockedBookSlot.mockRejectedValueOnce(
+      new ApiError(409, 'This slot is no longer available.', { error: 'SLOT_ALREADY_BOOKED' }),
+    )
 
-    render(<BookSlotForm clinicId={CLINIC_ID} slot={SLOT} token="a.jwt.token" />)
+    render(<BookSlotForm clinicId={CLINIC_ID} slot={SLOT} token="a.jwt.token" onClose={vi.fn()} />)
 
-    await user.type(screen.getByLabelText(/your name/i), 'Jane Doe')
     await user.click(screen.getByRole('button', { name: /book slot/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/no longer available/i)
@@ -74,13 +81,45 @@ describe('BookSlotForm', () => {
 
   it('shows the NO_FEE_CONFIGURED error message', async () => {
     const user = userEvent.setup()
-    mockedBookSlot.mockRejectedValueOnce(new BookSlotApiError({ error: 'NO_FEE_CONFIGURED' }))
+    mockedBookSlot.mockRejectedValueOnce(
+      new ApiError(422, 'No fee is configured for this doctor/appointment type — booking is blocked.', {
+        error: 'NO_FEE_CONFIGURED',
+      }),
+    )
 
-    render(<BookSlotForm clinicId={CLINIC_ID} slot={SLOT} token="a.jwt.token" />)
+    render(<BookSlotForm clinicId={CLINIC_ID} slot={SLOT} token="a.jwt.token" onClose={vi.fn()} />)
 
-    await user.type(screen.getByLabelText(/your name/i), 'Jane Doe')
     await user.click(screen.getByRole('button', { name: /book slot/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/no fee is configured/i)
+  })
+
+  // 046-frontend-api-client T008: proves the actual bug fix, not just the refactor - a
+  // real backend-supplied message must win over the generic per-error-code default. Before
+  // this feature, defaultMessageFor(body) ?? body.message made body.message unreachable dead
+  // code, so this exact scenario (a specific backend message on a known error code) previously
+  // could never surface to the user no matter what the backend actually said.
+  it('shows the backend-specific message when present, not the generic per-error-code default', async () => {
+    const user = userEvent.setup()
+    mockedBookSlot.mockRejectedValueOnce(
+      new ApiError(409, 'This slot was booked by another patient 3 seconds ago.', { error: 'SLOT_ALREADY_BOOKED' }),
+    )
+
+    render(<BookSlotForm clinicId={CLINIC_ID} slot={SLOT} token="a.jwt.token" onClose={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: /book slot/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('This slot was booked by another patient 3 seconds ago.')
+  })
+
+  it('calls onClose when the close button is clicked', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+
+    render(<BookSlotForm clinicId={CLINIC_ID} slot={SLOT} token="a.jwt.token" onClose={onClose} />)
+
+    await user.click(screen.getByRole('button', { name: /close/i }))
+
+    expect(onClose).toHaveBeenCalled()
   })
 })

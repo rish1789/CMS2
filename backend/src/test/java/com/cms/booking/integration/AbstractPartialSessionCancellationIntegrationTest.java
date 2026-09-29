@@ -1,7 +1,7 @@
 package com.cms.booking.integration;
 
-import com.cms.scheduling.Session;
-import com.cms.scheduling.Slot;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.domain.Slot;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.sql.Timestamp;

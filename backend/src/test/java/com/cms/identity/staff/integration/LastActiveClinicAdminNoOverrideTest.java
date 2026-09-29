@@ -3,8 +3,8 @@ package com.cms.identity.staff.integration;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.identity.account.Account;
-import com.cms.identity.account.RoleAssignment;
+import com.cms.identity.account.domain.Account;
+import com.cms.identity.account.domain.RoleAssignment;
 import com.cms.identity.clinic.Clinic;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -12,8 +12,8 @@ import org.springframework.http.HttpHeaders;
 /**
  * T014: "no override for any role, including Super Admin" (FR-004) - proved structurally,
  * not by attempting an override. This endpoint lives under {@code /api/v1/clinics/**},
- * which is JWT-protected (com.cms.identity.account.SecurityConfig, @Order(1)); Super
- * Admin's own chain (com.cms.identity.admin.SuperAdminSecurityConfig, @Order(3)) is
+ * which is JWT-protected (com.cms.identity.account.config.SecurityConfig, @Order(1)); Super
+ * Admin's own chain (com.cms.identity.admin.config.SuperAdminSecurityConfig, @Order(3)) is
  * scoped only to {@code /api/v1/admin/**} and never even matches this request. Super
  * Admin's Basic Auth credentials carry no staff JWT, so presenting them here fails
  * exactly like any other unauthenticated request - there is no bridge between the two

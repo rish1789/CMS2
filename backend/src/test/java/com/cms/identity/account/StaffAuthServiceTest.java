@@ -1,5 +1,19 @@
 package com.cms.identity.account;
 
+import com.cms.identity.account.api.StaffAuthController;
+import com.cms.identity.account.config.StaffJwtService;
+import com.cms.identity.account.domain.Account;
+import com.cms.identity.account.exception.AccountNotFoundException;
+import com.cms.identity.account.exception.IncorrectPasswordException;
+import com.cms.identity.account.domain.RoleAssignment;
+import com.cms.identity.account.exception.StaffClinicNotActiveException;
+import com.cms.identity.account.repository.AccountRepository;
+import com.cms.identity.account.repository.RoleAssignmentRepository;
+import com.cms.identity.clinic.Clinic;
+import java.util.List;
+import com.cms.identity.account.service.StaffAuthService;
+
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -11,7 +25,7 @@ import static org.mockito.Mockito.when;
 
 import com.cms.identity.account.dto.StaffLoginRequest;
 import com.cms.identity.account.dto.StaffLoginResponse;
-import com.cms.identity.admin.SuperAdminAuthenticationService;
+import com.cms.identity.admin.service.SuperAdminAuthenticationService;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -45,9 +59,13 @@ class StaffAuthServiceTest {
     @Mock
     private Account account;
 
+    @Mock
+    private RoleAssignmentRepository roleAssignmentRepository;
+
     private StaffAuthService staffAuthService() {
         return new StaffAuthService(
-                accountRepository, passwordEncoder, staffJwtService, superAdminAuthenticationService);
+                accountRepository, passwordEncoder, staffJwtService, superAdminAuthenticationService,
+                roleAssignmentRepository);
     }
 
     @Test
@@ -100,27 +118,108 @@ class StaffAuthServiceTest {
     }
 
     @Test
-    void wrongPasswordRejectedWithoutIssuingAToken() {
+    void wrongPasswordForAKnownIdentifierThrowsIncorrectPasswordWithoutIssuingAToken() {
         when(superAdminAuthenticationService.authenticate(anyString(), anyString())).thenReturn(Optional.empty());
+        when(superAdminAuthenticationService.identifierMatches("staff@example.com")).thenReturn(false);
         when(accountRepository.findByEmail("staff@example.com")).thenReturn(Optional.of(account));
         when(account.getPasswordHash()).thenReturn("hashed-pw");
         when(passwordEncoder.matches("wrong-password", "hashed-pw")).thenReturn(false);
 
         assertThatThrownBy(
                         () -> staffAuthService().login(new StaffLoginRequest("staff@example.com", "wrong-password")))
-                .isInstanceOf(InvalidCredentialsException.class);
+                .isInstanceOf(IncorrectPasswordException.class);
         verify(staffJwtService, never()).issueToken(any());
     }
 
     @Test
-    void unknownIdentifierRejectedWithSameExceptionAsWrongPassword() {
+    void unknownIdentifierThrowsAccountNotFound() {
         when(superAdminAuthenticationService.authenticate(anyString(), anyString())).thenReturn(Optional.empty());
+        when(superAdminAuthenticationService.identifierMatches("nobody@example.com")).thenReturn(false);
         when(accountRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
         when(accountRepository.findByStaffCode("nobody@example.com")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() ->
                         staffAuthService().login(new StaffLoginRequest("nobody@example.com", "irrelevant")))
-                .isInstanceOf(InvalidCredentialsException.class);
+                .isInstanceOf(AccountNotFoundException.class);
         verifyNoInteractions(passwordEncoder, staffJwtService);
+    }
+
+    @Test
+    void wrongPasswordForTheSuperAdminIdentifierThrowsIncorrectPasswordNotAccountNotFound() {
+        when(superAdminAuthenticationService.authenticate("superadmin", "wrong-password"))
+                .thenReturn(Optional.empty());
+        when(superAdminAuthenticationService.identifierMatches("superadmin")).thenReturn(true);
+
+        assertThatThrownBy(() -> staffAuthService().login(new StaffLoginRequest("superadmin", "wrong-password")))
+                .isInstanceOf(IncorrectPasswordException.class);
+        verifyNoInteractions(accountRepository, passwordEncoder, staffJwtService);
+    }
+
+    // ---- 062-rejected-clinic-gating (FR-007, tasks.md T022): only a ClinicAdmin keeps access to a rejected clinic ----
+
+    private Clinic clinic(boolean rejected) {
+        Clinic clinic = new Clinic("Clinic", "1 Main St", null, null);
+        if (rejected) {
+            clinic.reject(Clinic.RejectionReason.DUPLICATE_REGISTRATION, null, "super-admin");
+        }
+        return clinic;
+    }
+
+    private RoleAssignment role(RoleAssignment.Role role, boolean clinicRejected) {
+        return new RoleAssignment(account, clinic(clinicRejected), role);
+    }
+
+    private void passwordMatchesFor(UUID accountId) {
+        when(superAdminAuthenticationService.authenticate(anyString(), anyString())).thenReturn(Optional.empty());
+        when(accountRepository.findByEmail("staff@example.com")).thenReturn(Optional.of(account));
+        when(account.getPasswordHash()).thenReturn("hashed-pw");
+        when(passwordEncoder.matches("Str0ng!Pass", "hashed-pw")).thenReturn(true);
+        when(account.getId()).thenReturn(accountId);
+        org.mockito.Mockito.lenient().when(account.getEmail()).thenReturn("staff@example.com");
+        org.mockito.Mockito.lenient().when(staffJwtService.issueToken(accountId)).thenReturn("staff-jwt");
+    }
+
+    @Test
+    void aDoctorWhoseOnlyClinicIsRejectedIsRefusedAtSignIn() {
+        UUID accountId = UUID.randomUUID();
+        passwordMatchesFor(accountId);
+        when(roleAssignmentRepository.findByAccount_IdAndActiveTrue(accountId))
+                .thenReturn(List.of(role(RoleAssignment.Role.Doctor, true)));
+
+        assertThatThrownBy(() -> staffAuthService().login(new StaffLoginRequest("staff@example.com", "Str0ng!Pass")))
+                .isInstanceOf(StaffClinicNotActiveException.class);
+        verify(staffJwtService, never()).issueToken(any());
+    }
+
+    @Test
+    void theClinicAdminOfARejectedClinicStillSignsIn() {
+        UUID accountId = UUID.randomUUID();
+        passwordMatchesFor(accountId);
+        when(roleAssignmentRepository.findByAccount_IdAndActiveTrue(accountId))
+                .thenReturn(List.of(role(RoleAssignment.Role.ClinicAdmin, true)));
+
+        assertThat(staffAuthService().login(new StaffLoginRequest("staff@example.com", "Str0ng!Pass")).token())
+                .isEqualTo("staff-jwt");
+    }
+
+    @Test
+    void aDoctorWithAnotherUsableClinicStillSignsIn() {
+        UUID accountId = UUID.randomUUID();
+        passwordMatchesFor(accountId);
+        when(roleAssignmentRepository.findByAccount_IdAndActiveTrue(accountId))
+                .thenReturn(List.of(role(RoleAssignment.Role.Doctor, true), role(RoleAssignment.Role.Doctor, false)));
+
+        assertThat(staffAuthService().login(new StaffLoginRequest("staff@example.com", "Str0ng!Pass")).token())
+                .isEqualTo("staff-jwt");
+    }
+
+    @Test
+    void anAccountWithNoRoleAssignmentsSignsInExactlyAsBefore() {
+        UUID accountId = UUID.randomUUID();
+        passwordMatchesFor(accountId);
+        when(roleAssignmentRepository.findByAccount_IdAndActiveTrue(accountId)).thenReturn(List.of());
+
+        assertThat(staffAuthService().login(new StaffLoginRequest("staff@example.com", "Str0ng!Pass")).token())
+                .isEqualTo("staff-jwt");
     }
 }

@@ -6,7 +6,13 @@ import { StaffLoginForm } from '../../src/features/staff-login/StaffLoginForm'
 import { loginStaff, LoginStaffApiError } from '../../src/features/staff-login/api'
 import { storeStaffSession } from '../../src/features/staff-login/token'
 import { OnboardStaffForm } from '../../src/features/staff-onboarding/OnboardStaffForm'
-import { onboardStaff, OnboardStaffApiError } from '../../src/features/staff-onboarding/api'
+import { onboardStaff } from '../../src/features/staff-onboarding/api'
+import { ApiError } from '../../src/lib/apiClient'
+
+// 065-phase1-stabilization (BUG-006): delay: null keeps every keystroke's events but drops
+// user-event's per-keystroke setTimeout(0) yield, which queues behind other workers under
+// full-suite parallel load (the cause of the intermittent 5 s timeouts in typing-heavy tests).
+const TYPING_OPTIONS = { delay: null }
 
 // staff-console-audit-2026-09-10 P2: OnboardStaffForm now renders a <Link> (the session-expiry
 // "Sign in again" fix), so every render needs a Router in scope.
@@ -52,7 +58,7 @@ describe('StaffLoginForm', () => {
       role: 'STAFF',
     })
     const onSuccess = vi.fn()
-    const user = userEvent.setup()
+    const user = userEvent.setup(TYPING_OPTIONS)
     render(<StaffLoginForm onSuccess={onSuccess} />)
 
     await user.type(screen.getByLabelText(/email/i), 'admin@clinic.example')
@@ -73,7 +79,7 @@ describe('StaffLoginForm', () => {
 
   it('shows an error on invalid credentials', async () => {
     mockedLoginStaff.mockRejectedValueOnce(new LoginStaffApiError({ error: 'UNAUTHORIZED' }))
-    const user = userEvent.setup()
+    const user = userEvent.setup(TYPING_OPTIONS)
     render(<StaffLoginForm />)
 
     await user.type(screen.getByLabelText(/email/i), 'admin@clinic.example')
@@ -105,11 +111,11 @@ describe('OnboardStaffForm', () => {
       role: 'Operations',
       doctorProfileId: null,
     })
-    const user = userEvent.setup()
+    const user = userEvent.setup(TYPING_OPTIONS)
     renderOnboardStaffForm()
 
-    await user.type(screen.getByLabelText(/^name$/i), 'Jane Ops')
-    await user.type(screen.getByLabelText(/^email$/i), 'ops@clinic.example')
+    await user.type(screen.getByLabelText(/^name/i), 'Jane Ops')
+    await user.type(screen.getByLabelText(/^email/i), 'ops@clinic.example')
     await user.click(screen.getByRole('button', { name: /onboard staff/i }))
 
     await waitFor(() => {
@@ -133,11 +139,11 @@ describe('OnboardStaffForm', () => {
       role: 'Doctor',
       doctorProfileId: 'profile-1',
     })
-    const user = userEvent.setup()
+    const user = userEvent.setup(TYPING_OPTIONS)
     renderOnboardStaffForm()
 
-    await user.type(screen.getByLabelText(/^name$/i), 'Dr. Sharma')
-    await user.type(screen.getByLabelText(/^email$/i), 'doc@clinic.example')
+    await user.type(screen.getByLabelText(/^name/i), 'Dr. Sharma')
+    await user.type(screen.getByLabelText(/^email/i), 'doc@clinic.example')
     await user.selectOptions(screen.getByLabelText(/role/i), 'Doctor')
 
     expect(screen.getByLabelText(/specialization/i)).toBeInTheDocument()
@@ -160,16 +166,61 @@ describe('OnboardStaffForm', () => {
     expect(await screen.findByText('DR-4821')).toBeInTheDocument()
   })
 
+  // 054-forms-validation-consistency T016: MISSING_REQUIRED_FIELD naming a field with a real
+  // FormField slot (email) renders at that field, not the top-level banner (FR-005/FR-006).
+  // EMAIL_ALREADY_IN_USE below (a field-agnostic error, no `field` on the body) already proves
+  // the "everything else stays a banner" half of the same rule.
+  it('shows a MISSING_REQUIRED_FIELD error at the email field, not the banner', async () => {
+    storeStaffSession({ token: 'jwt-token', accountId: 'admin-1', email: 'admin@clinic.example' })
+    mockedOnboardStaff.mockRejectedValueOnce(
+      new ApiError(400, 'A required field is missing or invalid', {
+        error: 'MISSING_REQUIRED_FIELD',
+        field: 'email',
+      }),
+    )
+    const user = userEvent.setup(TYPING_OPTIONS)
+    renderOnboardStaffForm()
+
+    await user.type(screen.getByLabelText(/^name/i), 'Jane Ops')
+    await user.type(screen.getByLabelText(/^email/i), 'ops@clinic.example')
+    await user.click(screen.getByRole('button', { name: /onboard staff/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/required field is missing/i)
+  })
+
+  // 054-forms-validation-consistency T016 (SC-003's other half): a server-driven
+  // INVALID_MOBILE_NUMBER (not the client-side regex - mobile is left blank, which the client
+  // check never flags) still maps to the mobile field's FormField slot, not the banner.
+  it('shows a server-driven INVALID_MOBILE_NUMBER error at the mobile field, not the banner', async () => {
+    storeStaffSession({ token: 'jwt-token', accountId: 'admin-1', email: 'admin@clinic.example' })
+    mockedOnboardStaff.mockRejectedValueOnce(
+      new ApiError(400, 'Mobile number does not match the Indian numbering plan', {
+        error: 'INVALID_MOBILE_NUMBER',
+        field: 'mobile',
+      }),
+    )
+    const user = userEvent.setup(TYPING_OPTIONS)
+    renderOnboardStaffForm()
+
+    await user.type(screen.getByLabelText(/^name/i), 'Jane Ops')
+    await user.type(screen.getByLabelText(/^email/i), 'ops@clinic.example')
+    await user.click(screen.getByRole('button', { name: /onboard staff/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/indian numbering plan/i)
+  })
+
   it('surfaces a duplicate-email server error', async () => {
     storeStaffSession({ token: 'jwt-token', accountId: 'admin-1', email: 'admin@clinic.example' })
     mockedOnboardStaff.mockRejectedValueOnce(
-      new OnboardStaffApiError({ error: 'EMAIL_ALREADY_IN_USE' }),
+      new ApiError(409, 'This email is already in use by another staff account.', {
+        error: 'EMAIL_ALREADY_IN_USE',
+      }),
     )
-    const user = userEvent.setup()
+    const user = userEvent.setup(TYPING_OPTIONS)
     renderOnboardStaffForm()
 
-    await user.type(screen.getByLabelText(/^name$/i), 'Jane Ops')
-    await user.type(screen.getByLabelText(/^email$/i), 'ops@clinic.example')
+    await user.type(screen.getByLabelText(/^name/i), 'Jane Ops')
+    await user.type(screen.getByLabelText(/^email/i), 'ops@clinic.example')
     await user.click(screen.getByRole('button', { name: /onboard staff/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/already in use/i)
@@ -177,12 +228,14 @@ describe('OnboardStaffForm', () => {
 
   it('clears the session and prompts re-sign-in on a 401 response', async () => {
     storeStaffSession({ token: 'expired-token', accountId: 'admin-1', email: 'admin@clinic.example' })
-    mockedOnboardStaff.mockRejectedValueOnce(new OnboardStaffApiError({ error: 'UNAUTHORIZED' }))
-    const user = userEvent.setup()
+    mockedOnboardStaff.mockRejectedValueOnce(
+      new ApiError(401, 'Your session has expired. Please sign in again.', { error: 'UNAUTHORIZED' }),
+    )
+    const user = userEvent.setup(TYPING_OPTIONS)
     renderOnboardStaffForm()
 
-    await user.type(screen.getByLabelText(/^name$/i), 'Jane Ops')
-    await user.type(screen.getByLabelText(/^email$/i), 'ops@clinic.example')
+    await user.type(screen.getByLabelText(/^name/i), 'Jane Ops')
+    await user.type(screen.getByLabelText(/^email/i), 'ops@clinic.example')
     await user.click(screen.getByRole('button', { name: /onboard staff/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/sign in again/i)
@@ -212,6 +265,24 @@ describe('OnboardStaffForm', () => {
     expect(options).toEqual(['Operations', 'Doctor'])
   })
 
+  // 054-forms-validation-consistency T014: pre-submit Indian-mobile-format check blocks the
+  // network call entirely (research.md Decision 3) - name/email survive the failed attempt.
+  it('blocks submission and shows an inline error when the mobile number is not a valid Indian number', async () => {
+    storeStaffSession({ token: 'jwt-token', accountId: 'admin-1', email: 'admin@clinic.example' })
+    const user = userEvent.setup(TYPING_OPTIONS)
+    renderOnboardStaffForm()
+
+    await user.type(screen.getByLabelText(/^name/i), 'Jane Ops')
+    await user.type(screen.getByLabelText(/^email/i), 'ops@clinic.example')
+    await user.type(screen.getByLabelText(/mobile/i), '12345')
+    await user.click(screen.getByRole('button', { name: /onboard staff/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/valid indian number/i)
+    expect(mockedOnboardStaff).not.toHaveBeenCalled()
+    expect(screen.getByLabelText(/^name/i)).toHaveValue('Jane Ops')
+    expect(screen.getByLabelText(/^email/i)).toHaveValue('ops@clinic.example')
+  })
+
   it('shows a distinct message (no temporary password) when the doctor already has an account elsewhere', async () => {
     storeStaffSession({ token: 'jwt-token', accountId: 'admin-1', email: 'admin@clinic.example' })
     mockedOnboardStaff.mockResolvedValueOnce({
@@ -223,11 +294,11 @@ describe('OnboardStaffForm', () => {
       doctorProfileId: 'doctor-profile-1',
       existingAccount: true,
     })
-    const user = userEvent.setup()
+    const user = userEvent.setup(TYPING_OPTIONS)
     renderOnboardStaffForm()
 
-    await user.type(screen.getByLabelText(/^name$/i), 'Dr. Existing')
-    await user.type(screen.getByLabelText(/^email$/i), 'existing.doctor@clinic.example')
+    await user.type(screen.getByLabelText(/^name/i), 'Dr. Existing')
+    await user.type(screen.getByLabelText(/^email/i), 'existing.doctor@clinic.example')
     await user.selectOptions(screen.getByLabelText(/role/i), 'Doctor')
     await user.type(screen.getByLabelText(/specialization/i), 'Cardiology')
     await user.type(screen.getByLabelText(/license number/i), 'LIC-1')

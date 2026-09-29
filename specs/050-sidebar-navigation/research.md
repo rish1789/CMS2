@@ -1,0 +1,41 @@
+# Research: Application Shell Sidebar Navigation
+
+## Decision 1: Which layout wrapper each shell's sidebar attaches to
+
+**Decision**: `AdminShell.tsx` gets the sidebar directly (it wraps `AdminDashboard` — the index route — and `AdminSectionShell`'s 3 sub-pages, so every admin destination is always reachable with no prerequisite). `StaffShell.tsx` is left untouched; the sidebar is added to `ClinicShell.tsx` instead.
+
+**Rationale**: Verified by reading the actual route tree (`App.tsx`) and both shell/sub-shell components. `StaffShell` wraps two structurally different things: `/staff` (`StaffDashboard` → `MyClinicsList`, a clinic picker with **no `clinicId` yet**) and `/staff/clinics/:clinicId/*` (nested inside `ClinicShell`, which is where every backlog-listed staff nav item — Day sheet, Doctors, Staff, Find a patient, Onboard staff, Inbox, Join waitlist, Clinic tools home — actually lives, all `:clinicId`-scoped). A sidebar built into `StaffShell` would have nothing to point at on the clinic-picker page. `ClinicShell` already exists specifically for clinic-scoped routes (today just a breadcrumb wrapper) and is the natural, minimal-diff home. This mirrors `AdminSectionShell`'s own documented relationship to `AdminDashboard` ("wraps only the console's sub-pages... not the dashboard home itself, exactly like ClinicShell wraps clinic-scoped routes but not StaffDashboard" — existing code comment), confirming this asymmetry is already an established pattern in this codebase, not a new one invented for this feature.
+
+**Alternatives considered**: Sidebar in `StaffShell` for both `/staff` and clinic-scoped routes, with items conditionally hidden pre-clinic-selection — rejected, it would render an empty/disabled sidebar shell on the picker page for no benefit (Constitution Principle II); a `StaffShell` sidebar carrying only clinic-scoped hrefs that break on `/staff` — rejected outright, would produce dead links.
+
+## Decision 2: A new `Sidebar` component, not a 046 primitive reused as-is
+
+**Decision**: Build `frontend/src/components/Sidebar.tsx` (nav list + active-item highlighting via react-router's built-in `NavLink`, zero new dependency) and a small `SidebarDrawer` wrapper for the responsive collapse (Decision 3). Feed it a per-shell, role-filtered `items: { to: string; label: string; icon: ReactNode }[]` array built in each shell/sub-shell component from data already in scope.
+
+**Rationale**: Confirmed via 046's own `research.md`/`tasks.md` that no nav-list primitive was in that feature's scope (its 9 primitives are Modal/Toast/Button/Input/Select/Card/Badge/EmptyState/LoadingState — no Sidebar/Nav). This is genuinely new capability, not a duplicated pattern to extract. `NavLink`'s built-in `isActive` (via its function-child `className`) is the simplest way to satisfy FR-006 without hand-rolling `useLocation` path-comparison logic.
+
+**Alternatives considered**: Hand-rolled active-state via `useLocation()` + manual path prefix matching — rejected, `NavLink` already does this correctly (including exact-vs-prefix matching) and is already an implicit dependency (react-router-dom is used everywhere in this codebase).
+
+## Decision 3: Responsive collapse — an off-canvas drawer for both shells, not a bottom nav or icon rail
+
+**Decision**: Below the sidebar's breakpoint (matching this project's ~400px responsive standard, using Tailwind's existing `sm:` breakpoint already used identically across `StaffShell.tsx`/`AdminShell.tsx` for the signed-in-identity `<span className="hidden sm:inline">`), the sidebar becomes a hamburger-triggered, off-canvas drawer built as a plain fixed-position panel + backdrop (own conditional-render component, not the 046 `Modal`) that slides in from the left and closes on backdrop click, Escape, or item selection.
+
+**Rationale**: Staff's sidebar has 8 items — too many for a bottom nav (a 4-5-item pattern with no existing precedent anywhere in this codebase) or a legible icon-only rail at this content density. A single drawer pattern for both shells (8 items staff, 4 items admin) avoids building and maintaining two different collapse strategies for what both need to solve identically: "surface the same list, off the main flow, on a narrow viewport." Deliberately not reusing 046's `Modal`: `Modal` is a **centered** `<dialog>` shell (`showModal()`, backdrop click closes it, `m-auto` centering) — an edge-anchored, slide-in drawer is a different interaction shape, the same reasoning 046's own `research.md` used to justify `EmployeeModal` getting a headless shell instead of being forced into `ModalHeader`'s fixed layout rather than inventing a false shared abstraction.
+
+**Alternatives considered**: Icon-only rail at all widths down to mobile — rejected, illegible/too cramped for 8 unlabeled icons on a ~400px screen; bottom navigation — rejected, no existing precedent, and 8 (staff) items don't fit the pattern's usual 4-5 item ceiling; reusing `Modal` for the drawer — rejected per the interaction-shape mismatch above.
+
+## Decision 4: Role-based filtering (FR-007) — verified against real backend role gates, not assumed
+
+**Decision**: `ClinicShell` already fetches `listMyClinics(session.token, ...)` (today only to resolve the breadcrumb's clinic name) and finds the membership matching the current `:clinicId`. Extended to also read that membership's `role: 'ClinicAdmin' | 'Doctor' | 'Operations'` field (`ClinicMembership.role`, confirmed present in `frontend/src/features/staff-clinics/api.ts`) and pass it to `Sidebar` for filtering — **zero new API calls**. Each nav item carries an optional `roles?: StaffRole[]` allowlist; an item with no allowlist is visible to all 3 roles.
+
+**Rationale**: `StoredStaffSession` (the session-storage token payload) carries no role at all (`token`/`accountId`/`email` only, confirmed) — role is inherently per-clinic-membership data, which `ClinicShell` already has in scope. Verified one real, backend-enforced restriction worth encoding: `StaffOnboardingService`/`StaffDeactivationService` both hard-gate on `RoleAssignment.Role.ClinicAdmin` ("only an active ClinicAdmin for THIS specific clinic may onboard/deactivate staff" — verified via the actual service code, not assumed). "Onboard staff" is therefore ClinicAdmin-only in the sidebar. The "Staff" roster item itself stays visible to all roles (viewing the roster is not gated — only the deactivate action inside it is, which `EmployeeModal` already enforces server-side regardless of what the sidebar shows). No other item has a confirmed backend role restriction, so the remaining 6 staff items and all 4 admin items ship with no `roles` allowlist (visible to all) rather than inventing unverified restrictions (Constitution Principle II — no speculative gating).
+
+**Alternatives considered**: A new "what can this role do" lookup table maintained independently of the backend's actual gates — rejected as a duplication risk (the two would drift); gating every item defensively "just in case" — rejected, not backed by any verified backend restriction, and FR-010 explicitly requires backend enforcement stay authoritative regardless.
+
+## Decision 5: Existing dashboard tile grids stay, unchanged in content
+
+**Decision**: `ClinicToolsDashboard.tsx` and `AdminDashboard.tsx` are not touched by this feature (FR-011/Edge Cases) — they keep their current tile grids as-is, now simply reachable both via the new sidebar's "Clinic tools home"/"Admin home" entry and as the shell's own index route (same as today).
+
+**Rationale**: The backlog brief's own acceptance criteria requires the plan state whether tile grids are removed or kept, "since removing all navigation redundancy on day one could regress a currently-working flow." Keeping them as-is is the lowest-risk option and defers any dashboard redesign to 048 (staff dashboard) — which the backlog wave's own build order already assigns this exact job to, avoiding rework.
+
+**Alternatives considered**: Simplifying the tile grids now that the sidebar covers the same destinations — rejected, that's explicitly 048's scope (`ClinicToolsDashboard.tsx` redesign), doing it here would be duplicated, throwaway work per this wave's own sequencing (046's `research.md` Decision 5 already made the identical call to defer `ClinicToolsDashboard` to 048).

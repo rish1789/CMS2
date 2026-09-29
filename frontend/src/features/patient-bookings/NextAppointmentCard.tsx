@@ -58,37 +58,39 @@ export function NextAppointmentCard() {
   }, [session])
 
   if (!session || next === undefined) {
-    return (
-      <div aria-hidden="true" className="h-24 animate-pulse rounded-lg border border-gray-200 bg-white shadow-sm" />
-    )
+    return <div aria-hidden="true" className="h-[92px] animate-pulse rounded-2xl bg-gray-100" />
   }
 
   if (next === null) return null
 
   return (
-    <Link
-      to={`/patient/bookings/${next.id}`}
-      className="flex items-center gap-4 rounded-lg border border-indigo-200 bg-indigo-50 p-4 shadow-sm transition-all duration-150 ease-out hover:border-indigo-300 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
-    >
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-indigo-600 shadow-xs">
-        <BookingIcon />
-      </span>
-      <div className="min-w-0 flex-1">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-indigo-900">
-          Your next appointment
-          <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-xs font-semibold text-white">
+    // 056-design-copy-quality-pass (2026-09-16 dashboard rebuild): restyled to match
+    // design/patient-dashboard-reference.html's bold teal "next visit" strip - the
+    // above conditional logic (fetch, find-soonest-upcoming, render-nothing-if-none) is
+    // unchanged, already exactly what that reference's spec calls for.
+    <div className="mb-10 flex flex-wrap items-center justify-between gap-5 rounded-2xl bg-indigo-600 p-6 text-white">
+      <div className="flex items-center gap-4">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15">
+          <BookingIcon />
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm text-indigo-100">Your next visit</p>
+          <p className="truncate text-base font-semibold">
+            {next.doctorName} · {next.clinicName}
+          </p>
+          <p className="text-sm text-indigo-100 tabular-nums">
             {describeRelativeDate(next.sessionDate)}
-          </span>
-        </h2>
-        <p className="mt-0.5 truncate text-sm text-indigo-700 tabular-nums">
-          {next.doctorName} · {next.clinicName}
-          {next.mode === 'FIXED_TIME' && next.startTime ? ` · ${formatTime(next.startTime)}` : ''}
-          {next.mode === 'QUEUE' && next.tokenNumber !== null ? ` · Token ${next.tokenNumber}` : ''}
-        </p>
+            {next.mode === 'FIXED_TIME' && next.startTime ? `, ${formatTime(next.startTime)}` : ''}
+            {next.mode === 'QUEUE' && next.tokenNumber !== null ? `, Token ${next.tokenNumber}` : ''}
+          </p>
+        </div>
       </div>
-      <span aria-hidden="true" className="shrink-0 text-indigo-600">
-        →
-      </span>
-    </Link>
+      <Link
+        to={`/patient/bookings/${next.id}`}
+        className="shrink-0 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-indigo-700 transition-opacity duration-150 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-indigo-600"
+      >
+        View details
+      </Link>
+    </div>
   )
 }

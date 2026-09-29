@@ -8,11 +8,11 @@ import com.cms.identity.staff.integration.AbstractStaffIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
-/** T002: wrong password with a valid staff code -> 401, same shape as the email-based failure (FR-003, FR-004). */
+/** T002: wrong password with a valid staff code -> 401 INCORRECT_PASSWORD (FR-003; see StaffAuthService for the distinct-error-message decision). */
 class StaffCodeLoginWrongPasswordTest extends AbstractStaffIntegrationTest {
 
     @Test
-    void wrongPasswordWithValidStaffCodeRejectedWithSameShapeAsEmailFailure() throws Exception {
+    void wrongPasswordWithValidStaffCodeReturnsIncorrectPassword() throws Exception {
         saveAccount("wrong.pass.code@sunrise-clinic.example", "Str0ng!Pass", "OP-9003");
 
         mockMvc.perform(post("/api/v1/staff/login")
@@ -22,6 +22,6 @@ class StaffCodeLoginWrongPasswordTest extends AbstractStaffIntegrationTest {
                                 { "identifier": "OP-9003", "password": "Incorrect1!" }
                                 """))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("INVALID_CREDENTIALS"));
+                .andExpect(jsonPath("$.error").value("INCORRECT_PASSWORD"));
     }
 }

@@ -8,11 +8,11 @@ import com.cms.identity.staff.integration.AbstractStaffIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
-/** T003: unrecognized staff code -> 401, same shape as unknown email (FR-004). */
+/** T003: unrecognized staff code -> 401 ACCOUNT_NOT_FOUND, same shape as an unknown email (see StaffAuthService for the distinct-error-message decision). */
 class StaffCodeLoginUnknownCodeTest extends AbstractStaffIntegrationTest {
 
     @Test
-    void unknownStaffCodeRejectedWithSameShapeAsUnknownEmail() throws Exception {
+    void unknownStaffCodeReturnsAccountNotFound() throws Exception {
         mockMvc.perform(post("/api/v1/staff/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(
@@ -20,11 +20,11 @@ class StaffCodeLoginUnknownCodeTest extends AbstractStaffIntegrationTest {
                                 { "identifier": "DR-0000", "password": "Incorrect1!" }
                                 """))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("INVALID_CREDENTIALS"));
+                .andExpect(jsonPath("$.error").value("ACCOUNT_NOT_FOUND"));
     }
 
     @Test
-    void identifierThatMatchesNeitherEmailNorStaffCodeFormatRejectedSameShape() throws Exception {
+    void identifierThatMatchesNeitherEmailNorStaffCodeFormatReturnsAccountNotFound() throws Exception {
         mockMvc.perform(post("/api/v1/staff/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(
@@ -32,6 +32,6 @@ class StaffCodeLoginUnknownCodeTest extends AbstractStaffIntegrationTest {
                                 { "identifier": "not-a-real-identifier", "password": "Incorrect1!" }
                                 """))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("INVALID_CREDENTIALS"));
+                .andExpect(jsonPath("$.error").value("ACCOUNT_NOT_FOUND"));
     }
 }

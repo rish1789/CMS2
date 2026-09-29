@@ -2,13 +2,13 @@ package com.cms.inbox.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.cms.booking.AppointmentType;
+import com.cms.booking.domain.AppointmentType;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfile;
-import com.cms.inbox.AlreadyClaimedException;
-import com.cms.inbox.InboxItem;
-import com.cms.inbox.InboxItemService;
-import com.cms.scheduling.Session;
+import com.cms.inbox.exception.AlreadyClaimedException;
+import com.cms.inbox.domain.InboxItem;
+import com.cms.inbox.service.InboxItemService;
+import com.cms.scheduling.domain.Session;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;

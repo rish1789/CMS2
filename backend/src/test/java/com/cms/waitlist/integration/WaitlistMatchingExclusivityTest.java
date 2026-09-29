@@ -2,13 +2,13 @@ package com.cms.waitlist.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.cms.booking.Booking;
+import com.cms.booking.domain.Booking;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfile;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.Slot;
-import com.cms.waitlist.WaitlistEntry;
-import com.cms.waitlist.WaitlistEntryStatus;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.domain.Slot;
+import com.cms.waitlist.domain.WaitlistEntry;
+import com.cms.waitlist.domain.WaitlistEntryStatus;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -28,7 +28,7 @@ class WaitlistMatchingExclusivityTest extends AbstractWaitlistIntegrationTest {
     void noShowReleaseNeverBumpsTheWaitlist() {
         Clinic clinic = saveClinic();
         DoctorProfile doctor = saveDoctorStaffedAt(clinic, "Cardiology");
-        Session session = saveFixedTimeSessionWithSlots(clinic, doctor);
+        Session session = savePastFixedTimeSessionWithSlots(clinic, doctor);
         List<Slot> slots = slotRepository.findBySession_Id(session.getId());
         bookSlot(clinic, doctor, slots.get(0), savePatientAccount());
 
@@ -51,7 +51,7 @@ class WaitlistMatchingExclusivityTest extends AbstractWaitlistIntegrationTest {
 
         WaitlistEntry entry = saveWaitlistEntry(clinic, savePatientAccount(), doctor, null, Instant.now());
 
-        sessionCancellationService.cancelSession(session);
+        sessionCancellationService.cancelSession(session, doctor.getAccount().getId());
 
         assertThat(waitlistEntryRepository.findById(entry.getId()).orElseThrow().getStatus())
                 .isEqualTo(WaitlistEntryStatus.WAITING);
@@ -67,7 +67,8 @@ class WaitlistMatchingExclusivityTest extends AbstractWaitlistIntegrationTest {
 
         WaitlistEntry entry = saveWaitlistEntry(clinic, savePatientAccount(), doctor, null, Instant.now());
 
-        sessionPartialCancellationService.cancelFromCutoff(session, booking.getSlot().getStartTime(), null);
+        sessionPartialCancellationService.cancelFromCutoff(
+                session, booking.getSlot().getStartTime(), null, doctor.getAccount().getId());
 
         assertThat(waitlistEntryRepository.findById(entry.getId()).orElseThrow().getStatus())
                 .isEqualTo(WaitlistEntryStatus.WAITING);

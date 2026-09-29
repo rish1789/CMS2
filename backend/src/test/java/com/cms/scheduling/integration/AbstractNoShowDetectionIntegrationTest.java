@@ -1,19 +1,19 @@
 package com.cms.scheduling.integration;
 
-import com.cms.booking.AppointmentType;
-import com.cms.booking.AppointmentTypeRepository;
-import com.cms.booking.Booking;
-import com.cms.booking.BookingRepository;
+import com.cms.booking.domain.AppointmentType;
+import com.cms.booking.repository.AppointmentTypeRepository;
+import com.cms.booking.domain.Booking;
+import com.cms.booking.repository.BookingRepository;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfile;
-import com.cms.patient.record.Patient;
-import com.cms.patient.record.PatientRepository;
-import com.cms.scheduling.NoShowDetectionService;
-import com.cms.scheduling.Schedule;
-import com.cms.scheduling.ScheduleMode;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.Slot;
-import com.cms.scheduling.SlotStatus;
+import com.cms.patient.record.domain.Patient;
+import com.cms.patient.record.repository.PatientRepository;
+import com.cms.scheduling.service.NoShowDetectionService;
+import com.cms.scheduling.domain.Schedule;
+import com.cms.scheduling.domain.ScheduleMode;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.domain.Slot;
+import com.cms.scheduling.domain.SlotStatus;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -54,7 +54,7 @@ public abstract class AbstractNoShowDetectionIntegrationTest extends AbstractSlo
         Session session = new Session(
                 schedule, clinic, doctor, LocalDate.now(), ScheduleMode.FIXED_TIME, scheduledTime, scheduledTime.plusMinutes(15), 15);
         session = sessionRepository.save(session);
-        Slot slot = new Slot(session, scheduledTime, scheduledTime.plusMinutes(15), false);
+        Slot slot = new Slot(session, scheduledTime, scheduledTime.plusMinutes(15));
         slot.setStatus(status);
         return slotRepository.save(slot);
     }

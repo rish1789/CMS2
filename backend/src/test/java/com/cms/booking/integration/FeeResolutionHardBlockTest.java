@@ -2,8 +2,8 @@ package com.cms.booking.integration;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.cms.booking.AppointmentType;
-import com.cms.booking.NoFeeConfiguredException;
+import com.cms.booking.domain.AppointmentType;
+import com.cms.booking.exception.NoFeeConfiguredException;
 import com.cms.identity.doctor.DoctorProfile;
 import org.junit.jupiter.api.Test;
 

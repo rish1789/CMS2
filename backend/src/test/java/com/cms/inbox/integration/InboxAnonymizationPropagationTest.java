@@ -4,13 +4,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.booking.AppointmentType;
-import com.cms.booking.Booking;
+import com.cms.booking.domain.AppointmentType;
+import com.cms.booking.domain.Booking;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfile;
-import com.cms.patient.record.PatientAnonymizationService;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.SlotStatus;
+import com.cms.patient.record.service.PatientAnonymizationService;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.domain.SlotStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;

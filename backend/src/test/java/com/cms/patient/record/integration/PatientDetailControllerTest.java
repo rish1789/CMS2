@@ -5,7 +5,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.cms.identity.clinic.Clinic;
-import com.cms.patient.record.Patient;
+import com.cms.patient.record.domain.Patient;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;

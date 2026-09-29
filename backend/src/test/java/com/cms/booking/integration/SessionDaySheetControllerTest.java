@@ -1,21 +1,26 @@
 package com.cms.booking.integration;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.booking.AppointmentType;
-import com.cms.booking.StaffBookingService;
-import com.cms.identity.account.Account;
-import com.cms.identity.account.RoleAssignment;
+import com.cms.booking.domain.AppointmentType;
+import com.cms.booking.service.StaffBookingService;
+import com.cms.identity.account.domain.Account;
+import com.cms.identity.account.domain.RoleAssignment;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfile;
-import com.cms.patient.record.Patient;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.Slot;
+import com.cms.patient.record.domain.Patient;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.domain.Slot;
+import com.cms.scheduling.domain.SlotStatus;
+import com.jayway.jsonpath.JsonPath;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
+import org.springframework.test.web.servlet.MvcResult;
 
 /** 041-staff-console-pickers T011/US2: the day sheet's per-session slot+booking detail. */
 class SessionDaySheetControllerTest extends AbstractStaffBookingIntegrationTest {
@@ -61,6 +66,87 @@ class SessionDaySheetControllerTest extends AbstractStaffBookingIntegrationTest 
                 .andExpect(jsonPath(
                         "$.slots[?(@.status=='OPEN')][0].booking")
                         .doesNotExist());
+    }
+
+    /**
+     * day-sheet-slot-ordering-fix: repro for the ordering bug - a slot whose status is
+     * changed well after initial generation (the 023 no-show sweep's own shape: fetch, mutate,
+     * save one candidate at a time, outside any batch that would preserve original row order)
+     * must still come back chronologically. This doesn't rely on the no-show sweep's real grace
+     * -period timing, which the test can't fast-forward - flipping status via the repository
+     * directly is exactly the same kind of out-of-band UPDATE.
+     */
+    @Test
+    void keepsSlotsInStartTimeOrderAfterAnOutOfBandStatusChange() throws Exception {
+        Clinic clinic = saveClinic();
+        DoctorProfile doctor = saveDoctorStaffedAt(clinic);
+        Session session = saveFixedTimeSessionWithSlots(clinic, doctor);
+        List<Slot> slotsInGenerationOrder = slotRepository.findBySession_Id(session.getId());
+        Slot middleSlot = slotsInGenerationOrder.get(slotsInGenerationOrder.size() / 2);
+        Patient patient = saveExistingPatient(clinic);
+        AppointmentType appointmentType = saveAppointmentTypeWithNoOverride(doctor);
+        UUID adminAccountId = saveClinicAdminAccountId(clinic);
+
+        staffBookingService.bookSlot(
+                adminAccountId,
+                clinic.getId(),
+                middleSlot.getId(),
+                new StaffBookingService.BookSlotInput(patient.getId(), null, null, appointmentType.getId()));
+
+        Slot bookedSlot = slotRepository.findById(middleSlot.getId()).orElseThrow();
+        bookedSlot.setStatus(SlotStatus.NO_SHOW);
+        slotRepository.save(bookedSlot);
+
+        MvcResult result = mockMvc.perform(get(
+                        "/api/v1/clinics/{clinicId}/sessions/{sessionId}/day-sheet",
+                        clinic.getId(),
+                        session.getId())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + staffJwtService.issueToken(adminAccountId)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        List<String> startTimesInResponseOrder =
+                JsonPath.read(result.getResponse().getContentAsString(), "$.slots[*].startTime");
+        List<String> chronological = startTimesInResponseOrder.stream().sorted().toList();
+        assertThat(startTimesInResponseOrder).containsExactlyElementsOf(chronological);
+    }
+
+    /**
+     * day-sheet-slot-ordering-fix: a second, narrower repro - a single ordinary booking (no
+     * no-show/status mutation afterward) is itself an UPDATE on the Slot row (OPEN -&gt;
+     * BOOKED, {@link StaffBookingService}), so it hits the exact same "unordered scan"
+     * root cause as {@link #keepsSlotsInStartTimeOrderAfterAnOutOfBandStatusChange}, not just
+     * background-job-driven transitions.
+     */
+    @Test
+    void keepsSlotsInStartTimeOrderAfterAPlainFreshBooking() throws Exception {
+        Clinic clinic = saveClinic();
+        DoctorProfile doctor = saveDoctorStaffedAt(clinic);
+        Session session = saveFixedTimeSessionWithSlots(clinic, doctor);
+        List<Slot> slotsInGenerationOrder = slotRepository.findBySession_Id(session.getId());
+        Slot middleSlot = slotsInGenerationOrder.get(slotsInGenerationOrder.size() / 2);
+        Patient patient = saveExistingPatient(clinic);
+        AppointmentType appointmentType = saveAppointmentTypeWithNoOverride(doctor);
+        UUID adminAccountId = saveClinicAdminAccountId(clinic);
+
+        staffBookingService.bookSlot(
+                adminAccountId,
+                clinic.getId(),
+                middleSlot.getId(),
+                new StaffBookingService.BookSlotInput(patient.getId(), null, null, appointmentType.getId()));
+
+        MvcResult result = mockMvc.perform(get(
+                        "/api/v1/clinics/{clinicId}/sessions/{sessionId}/day-sheet",
+                        clinic.getId(),
+                        session.getId())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + staffJwtService.issueToken(adminAccountId)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        List<String> startTimesInResponseOrder =
+                JsonPath.read(result.getResponse().getContentAsString(), "$.slots[*].startTime");
+        List<String> chronological = startTimesInResponseOrder.stream().sorted().toList();
+        assertThat(startTimesInResponseOrder).containsExactlyElementsOf(chronological);
     }
 
     @Test

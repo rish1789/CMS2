@@ -1,11 +1,12 @@
 package com.cms.booking.dto;
 
-import com.cms.booking.Booking;
-import com.cms.booking.BookingStatus;
-import com.cms.booking.PaymentStatus;
-import com.cms.scheduling.ScheduleMode;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.Slot;
+import com.cms.booking.domain.Booking;
+import com.cms.booking.domain.BookingCancellationReason;
+import com.cms.booking.domain.BookingStatus;
+import com.cms.booking.domain.PaymentStatus;
+import com.cms.scheduling.domain.ScheduleMode;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.domain.Slot;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -31,7 +32,9 @@ public record PatientBookingSummaryResponse(
         BookingStatus status,
         PaymentStatus paymentStatus,
         BigDecimal lockedFee,
-        Instant createdAt) {
+        Instant createdAt,
+        /** 062-rejected-clinic-gating (FR-010): lets the patient console explain a CLINIC_REJECTED cancellation. Null unless a reason was recorded. */
+        BookingCancellationReason cancellationReason) {
 
     public static PatientBookingSummaryResponse of(Booking booking) {
         Slot slot = booking.getSlot();
@@ -50,6 +53,7 @@ public record PatientBookingSummaryResponse(
                 booking.getStatus(),
                 booking.getPaymentStatus(),
                 booking.getLockedFee(),
-                booking.getCreatedAt());
+                booking.getCreatedAt(),
+                booking.getCancellationReason());
     }
 }

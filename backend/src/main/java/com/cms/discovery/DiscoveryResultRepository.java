@@ -1,9 +1,9 @@
 package com.cms.discovery;
 
-import com.cms.identity.account.RoleAssignment;
+import com.cms.identity.account.domain.RoleAssignment;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -33,12 +33,18 @@ public interface DiscoveryResultRepository extends JpaRepository<RoleAssignment,
      * {@code bytea}. Comparing the already-lowercased Java value directly against {@code
      * LOWER(column)} - never wrapping the parameter itself in {@code LOWER()} - avoids the
      * ambiguity entirely (the column side gives Postgres a concrete type to infer against).
-     * Sort is supplied via {@code Sort} rather than hand-written per-field JPQL - Spring Data
-     * appends {@code ORDER BY} using the exact alias paths ({@code a.name}, {@code c.name},
-     * {@code dp.experienceYears}, {@code dp.specialization}) given by {@link
-     * DiscoverySearchService#resolveSort}, verified live against the real dev Postgres instance
-     * (unlike the admin queues' own more conservative same-entity-only sort, this cross-join
-     * case was actually exercised, not left unverified).
+     * Sort is supplied via {@code Sort} (wrapped in the {@code Pageable} parameter) rather than
+     * hand-written per-field JPQL - Spring Data appends {@code ORDER BY} using the exact alias
+     * paths ({@code a.name}, {@code c.name}, {@code dp.experienceYears}, {@code
+     * dp.specialization}) given by {@link DiscoverySearchService#resolveSort}, verified live
+     * against the real dev Postgres instance (unlike the admin queues' own more conservative
+     * same-entity-only sort, this cross-join case was actually exercised, not left unverified).
+     *
+     * <p>047-backend-hardening FR-001: {@code Pageable} (not a bare {@code Sort}) so Spring Data
+     * applies LIMIT/OFFSET automatically for this {@code @Query} method - the public,
+     * unauthenticated endpoint this backs can never again return an unbounded result set,
+     * regardless of caller-supplied query parameters (capped in {@link
+     * DiscoverySearchService#search}).
      */
     @Query(
             """
@@ -49,7 +55,7 @@ public interface DiscoveryResultRepository extends JpaRepository<RoleAssignment,
             JOIN ra.clinic c
             JOIN DoctorProfile dp ON dp.account = a
             WHERE ra.active = true
-              AND ra.role = com.cms.identity.account.RoleAssignment.Role.Doctor
+              AND ra.role = com.cms.identity.account.domain.RoleAssignment.Role.Doctor
               AND c.verified = true
               AND dp.licenseVerified = true
               AND dp.visible = true
@@ -67,7 +73,7 @@ public interface DiscoveryResultRepository extends JpaRepository<RoleAssignment,
             @Param("city") String city,
             @Param("specialization") String specialization,
             @Param("minExperienceYears") Integer minExperienceYears,
-            Sort sort);
+            Pageable pageable);
 
     /** patient-search-advanced-filtering: drives the City filter dropdown - only cities that actually have at least one eligible doctor right now, so picking one never dead-ends into an empty result. */
     @Query(
@@ -78,7 +84,7 @@ public interface DiscoveryResultRepository extends JpaRepository<RoleAssignment,
             JOIN ra.clinic c
             JOIN DoctorProfile dp ON dp.account = a
             WHERE ra.active = true
-              AND ra.role = com.cms.identity.account.RoleAssignment.Role.Doctor
+              AND ra.role = com.cms.identity.account.domain.RoleAssignment.Role.Doctor
               AND c.verified = true
               AND dp.licenseVerified = true
               AND dp.visible = true
@@ -96,7 +102,7 @@ public interface DiscoveryResultRepository extends JpaRepository<RoleAssignment,
             JOIN ra.clinic c
             JOIN DoctorProfile dp ON dp.account = a
             WHERE ra.active = true
-              AND ra.role = com.cms.identity.account.RoleAssignment.Role.Doctor
+              AND ra.role = com.cms.identity.account.domain.RoleAssignment.Role.Doctor
               AND c.verified = true
               AND dp.licenseVerified = true
               AND dp.visible = true

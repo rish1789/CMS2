@@ -2,8 +2,8 @@ package com.cms.patient.record.integration;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.cms.patient.record.PatientAccountNotFoundException;
-import com.cms.patient.record.PatientLinkingService;
+import com.cms.patient.record.exception.PatientAccountNotFoundException;
+import com.cms.patient.record.service.PatientLinkingService;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

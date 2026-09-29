@@ -4,7 +4,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.booking.Booking;
+import com.cms.booking.domain.Booking;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -36,11 +36,11 @@ class QueuePositionPatientAccessTest extends AbstractQueuePositionIntegrationTes
         // First token ahead (a walk-in, unowned) stays active.
         staffQueueBookingService.bookSlot(
                 staffAccountId, clinic.getId(), session.getId(),
-                new com.cms.booking.StaffQueueBookingService.BookSlotInput(null, "Walk-in Ahead", null, appointmentType.getId()));
+                new com.cms.booking.service.StaffQueueBookingService.BookSlotInput(null, "Walk-in Ahead", null, appointmentType.getId()));
 
         Booking patientBooking = patientQueueBookingService.bookSlot(
                 patientAccount.getId(), clinic.getId(), session.getId(),
-                new com.cms.booking.PatientQueueBookingService.BookSlotInput("Patient Name", appointmentType.getId()));
+                new com.cms.booking.service.PatientQueueBookingService.BookSlotInput("Patient Name", appointmentType.getId()));
 
         String patientToken = patientToken(patientAccount);
 
@@ -69,7 +69,7 @@ class QueuePositionPatientAccessTest extends AbstractQueuePositionIntegrationTes
 
         Booking booking = patientQueueBookingService.bookSlot(
                 ownerAccount.getId(), clinic.getId(), session.getId(),
-                new com.cms.booking.PatientQueueBookingService.BookSlotInput("Owner", appointmentType.getId()));
+                new com.cms.booking.service.PatientQueueBookingService.BookSlotInput("Owner", appointmentType.getId()));
 
         patientQueuePosition(booking.getId().toString(), patientToken(unrelatedAccount))
                 .andExpect(status().isNotFound())

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { cancelFromCutoff, PartialCancellationApiError } from './api'
+import { cancelFromCutoff } from './api'
+import { ApiError } from '../../lib/apiClient'
 import { loadStaffSession } from '../staff-login/token'
 
 export interface CancelFromCutoffFormProps {
@@ -54,7 +55,7 @@ export function CancelFromCutoffForm({ clinicId, sessionId, onCancelled }: Cance
       onCancelled?.(response.bookingsCancelled)
     } catch (err) {
       setPhase('confirming')
-      if (err instanceof PartialCancellationApiError) {
+      if (err instanceof ApiError) {
         setError(err.message)
       } else {
         setError('Something went wrong. Please try again.')

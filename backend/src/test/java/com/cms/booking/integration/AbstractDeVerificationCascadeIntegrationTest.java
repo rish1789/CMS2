@@ -1,9 +1,9 @@
 package com.cms.booking.integration;
 
-import com.cms.identity.admin.ClinicVerificationService;
-import com.cms.identity.admin.DoctorVerificationService;
-import com.cms.waitlist.WaitlistEntry;
-import com.cms.waitlist.WaitlistEntryRepository;
+import com.cms.identity.admin.service.ClinicVerificationService;
+import com.cms.identity.admin.service.DoctorVerificationService;
+import com.cms.waitlist.domain.WaitlistEntry;
+import com.cms.waitlist.repository.WaitlistEntryRepository;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import org.junit.jupiter.api.AfterEach;
@@ -52,7 +52,7 @@ public abstract class AbstractDeVerificationCascadeIntegrationTest extends Abstr
     protected WaitlistEntry saveWaitingEntry(
             com.cms.identity.clinic.Clinic clinic,
             com.cms.identity.doctor.DoctorProfile doctor,
-            com.cms.patient.account.PatientAccount patientAccount) {
+            com.cms.patient.account.domain.PatientAccount patientAccount) {
         return waitlistEntryRepository.save(new WaitlistEntry(clinic, patientAccount, doctor, null));
     }
 }

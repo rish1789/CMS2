@@ -1,4 +1,7 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react'
+import { useRef, useState } from 'react'
+import { Modal, type ModalHandle } from './Modal'
+import { ModalHeader } from './ModalHeader'
+import { useToast } from './Toast'
 
 export interface DeleteConfirmModalProps {
   /** One row for a single-item delete, several for a bulk delete - the modal's copy and confirm phrase adapt to the count. */
@@ -12,24 +15,15 @@ export interface DeleteConfirmModalProps {
 // super-admin-console-redesign-2026-09-11: permanent delete is irreversible (unlike Reject,
 // which just moves a record to a bin) - one step more friction than RejectConfirmModal's
 // reason-dropdown: the admin must type the exact name (single item) or the word DELETE (bulk)
-// before the button enables. Uses a native <dialog> (showModal()) shared with
-// EmployeeModal/RejectConfirmModal - the browser handles focus trapping and Esc-to-close, so no
-// hand-rolled Tab-cycling is needed.
+// before the button enables.
+// 049-shared-ui-components: migrated onto the shared Modal shell (native <dialog>, unchanged
+// focus-trap/Esc-to-close/backdrop-click behavior) and wired to show a success toast.
 export function DeleteConfirmModal({ items, entityNoun, onClose, onSubmit }: DeleteConfirmModalProps) {
   const [confirmText, setConfirmText] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const dialogRef = useRef<HTMLDialogElement>(null)
-
-  useEffect(() => {
-    dialogRef.current?.showModal()
-  }, [])
-
-  function handleBackdropClick(event: MouseEvent<HTMLDialogElement>) {
-    if (event.target === dialogRef.current && !submitting) {
-      dialogRef.current?.close()
-    }
-  }
+  const modalRef = useRef<ModalHandle>(null)
+  const { showToast } = useToast()
 
   const count = items.length
   const requiredText = count === 1 ? items[0].label : 'DELETE'
@@ -42,6 +36,7 @@ export function DeleteConfirmModal({ items, entityNoun, onClose, onSubmit }: Del
     setError(null)
     try {
       await onSubmit()
+      showToast(count === 1 ? `${items[0].label} deleted.` : `${count} ${entityNoun}s deleted.`, 'success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
     } finally {
@@ -50,28 +45,9 @@ export function DeleteConfirmModal({ items, entityNoun, onClose, onSubmit }: Del
   }
 
   return (
-    <dialog
-      ref={dialogRef}
-      onClose={onClose}
-      onClick={handleBackdropClick}
-      aria-label={title}
-      className="m-auto w-full max-w-md overflow-hidden rounded-xl border-0 bg-white p-0 shadow-xl backdrop:bg-gray-900/50"
-    >
+    <Modal ref={modalRef} onClose={onClose} ariaLabel={title}>
       <div className="max-h-[80vh] space-y-4 overflow-y-auto p-5">
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="text-base font-semibold text-gray-900">{title}</h2>
-          <button
-            type="button"
-            onClick={() => dialogRef.current?.close()}
-            disabled={submitting}
-            aria-label="Close"
-            className="rounded-md p-1 text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-600 disabled:pointer-events-none disabled:opacity-50"
-          >
-            <svg aria-hidden="true" viewBox="0 0 20 20" className="h-5 w-5" fill="currentColor">
-              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-            </svg>
-          </button>
-        </div>
+        <ModalHeader title={title} onCloseClick={() => modalRef.current?.close()} disabled={submitting} />
 
         <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
           This cannot be undone. {count === 1 ? 'The record' : `All ${count} records`} will be permanently removed.
@@ -109,7 +85,7 @@ export function DeleteConfirmModal({ items, entityNoun, onClose, onSubmit }: Del
         <div className="flex justify-end gap-2 pt-1">
           <button
             type="button"
-            onClick={() => dialogRef.current?.close()}
+            onClick={() => modalRef.current?.close()}
             disabled={submitting}
             className="rounded-lg border border-gray-300 px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none"
           >
@@ -125,6 +101,6 @@ export function DeleteConfirmModal({ items, entityNoun, onClose, onSubmit }: Del
           </button>
         </div>
       </div>
-    </dialog>
+    </Modal>
   )
 }

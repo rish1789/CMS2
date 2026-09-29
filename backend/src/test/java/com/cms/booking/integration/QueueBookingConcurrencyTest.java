@@ -2,7 +2,7 @@ package com.cms.booking.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.cms.booking.StaffQueueBookingService;
+import com.cms.booking.service.StaffQueueBookingService;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -62,11 +62,11 @@ class QueueBookingConcurrencyTest extends AbstractQueueBookingIntegrationTest {
 
     private java.util.UUID clinicAdminAccountId(com.cms.identity.clinic.Clinic clinic) {
         String unique = java.util.UUID.randomUUID().toString();
-        var admin = accountRepository.save(new com.cms.identity.account.Account(
+        var admin = accountRepository.save(new com.cms.identity.account.domain.Account(
                 "Admin X", "adminx-" + unique + "@example.com",
                 passwordEncoder.encode("Str0ng!Pass"), "CAX-" + unique, null));
-        roleAssignmentRepository.save(new com.cms.identity.account.RoleAssignment(
-                admin, clinic, com.cms.identity.account.RoleAssignment.Role.ClinicAdmin));
+        roleAssignmentRepository.save(new com.cms.identity.account.domain.RoleAssignment(
+                admin, clinic, com.cms.identity.account.domain.RoleAssignment.Role.ClinicAdmin));
         return admin.getId();
     }
 }

@@ -2,7 +2,8 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BookingContextHeader } from '../../src/features/booking-detail/BookingContextHeader'
-import { getBookingDetail, BookingDetailApiError, type BookingDetail } from '../../src/features/booking-detail/api'
+import { getBookingDetail, type BookingDetail } from '../../src/features/booking-detail/api'
+import { ApiError } from '../../src/lib/apiClient'
 import { storeStaffSession } from '../../src/features/staff-login/token'
 
 vi.mock('../../src/features/booking-detail/api', async () => {
@@ -55,7 +56,7 @@ describe('BookingContextHeader', () => {
   })
 
   it('renders nothing (no redundant error banner) when the lookup fails', async () => {
-    mockedGetBookingDetail.mockRejectedValueOnce(new BookingDetailApiError(404))
+    mockedGetBookingDetail.mockRejectedValueOnce(new ApiError(404, 'Not found', undefined))
     const { container } = render(
       <MemoryRouter>
         <BookingContextHeader clinicId={CLINIC_ID} bookingId={BOOKING_ID} />

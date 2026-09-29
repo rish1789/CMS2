@@ -140,6 +140,40 @@ export async function unverifyClinic(clinicId: string, token: string): Promise<V
   return (await response.json()) as VerifyClinicResponse
 }
 
+export interface ResetAdminPasswordResult {
+  accountId: string
+  email: string
+  temporaryPassword: string
+}
+
+// real-bug-fix 2026-09-16: this system has no self-service "forgot password" flow anywhere -
+// when a clinic's own admin login stops working, this is the only recovery path. Mirrors
+// OnboardStaffForm's own "shown once, cannot be retrieved again" contract exactly.
+export async function resetClinicAdminPassword(clinicId: string, token: string): Promise<ResetAdminPasswordResult> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/admin/clinics/${clinicId}/reset-admin-password`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  await throwIfNotOk(response)
+  return (await response.json()) as ResetAdminPasswordResult
+}
+
+// real-bug-fix 2026-09-17: resetClinicAdminPassword above only ever generates a random password -
+// this lets Super Admin set a specific chosen one instead, same "shown once" contract.
+export async function setClinicAdminPassword(
+  clinicId: string,
+  newPassword: string,
+  token: string,
+): Promise<ResetAdminPasswordResult> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/admin/clinics/${clinicId}/set-admin-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ newPassword }),
+  })
+  await throwIfNotOk(response)
+  return (await response.json()) as ResetAdminPasswordResult
+}
+
 export async function rejectClinic(
   clinicId: string,
   reasonCode: RejectionReason,

@@ -2,7 +2,7 @@ package com.cms.notification.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.cms.notification.NotificationEvent;
+import com.cms.notification.domain.NotificationEvent;
 import org.junit.jupiter.api.Test;
 
 /** 011 FR-004: no mobile on file makes SMS ineligible regardless of the smsOptIn flag. */

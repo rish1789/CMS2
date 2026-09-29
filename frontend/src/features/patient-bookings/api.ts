@@ -21,6 +21,8 @@ export interface PatientBookingSummary {
   paymentStatus: PaymentStatus
   lockedFee: number
   createdAt: string
+  // 062-rejected-clinic-gating: why a CANCELLED booking was cancelled; null when no reason was recorded.
+  cancellationReason: string | null
 }
 
 export interface PatientBookingListResult {

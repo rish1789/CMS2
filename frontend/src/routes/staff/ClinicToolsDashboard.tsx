@@ -2,19 +2,119 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { loadStaffSession } from '../../features/staff-login/token'
-import { listSessions } from '../../features/day-sheet/api'
+import { getTodayStats, listSessions, type SessionSummary, type TodaySessionStats } from '../../features/day-sheet/api'
 import { listInboxItems } from '../../features/inbox/api'
 import { getWaitlistCount } from '../../features/waitlist/api'
 import { IconBadge } from '../../components/adminIcons'
+import { Badge } from '../../components/Badge'
+import { Card } from '../../components/Card'
+import { EmptyState } from '../../components/EmptyState'
+import { LoadingState } from '../../components/LoadingState'
 import {
   ClockIcon,
   DaySheetIcon,
   InboxIcon,
   SearchIcon,
+  ShieldIcon,
   StethoscopeIcon,
   TeamIcon,
   UserPlusIcon,
 } from '../../components/staffIcons'
+
+// 051-staff-dashboard-enhancement US1: a condensed glance, not the full Day Sheet - capped
+// rather than paginated (research.md).
+const MAX_SESSIONS_SHOWN = 10
+
+// Local, deliberately not exported from DaySheet.tsx - a 3-line pure formatter isn't worth
+// coupling two unrelated route components over (tasks.md T002).
+function formatSessionTimeRange(startTime: string | null | undefined, endTime: string | null | undefined): string {
+  if (!startTime || !endTime) return ''
+  return `${startTime.slice(0, 5)}–${endTime.slice(0, 5)}`
+}
+
+// 051-staff-dashboard-enhancement T011 (contracts/today-session-stats.md): both counts real,
+// server-computed - never fabricated or client-estimated (FR-004).
+function TodayStatsTile({ stats }: { stats: TodaySessionStats | null }) {
+  return (
+    <div className="flex gap-3">
+      <div className="flex-1 rounded-lg border border-gray-200 bg-white p-4">
+        <p className="text-xs font-semibold tracking-wide text-gray-500 uppercase">Completed today</p>
+        {stats === null ? (
+          <span aria-hidden="true" className="mt-1 block h-7 w-10 animate-pulse rounded bg-gray-100" />
+        ) : (
+          <p className="mt-1 text-2xl font-semibold text-gray-900">{stats.completedCount}</p>
+        )}
+      </div>
+      <div className="flex-1 rounded-lg border border-gray-200 bg-white p-4">
+        <p className="text-xs font-semibold tracking-wide text-gray-500 uppercase">No-shows today</p>
+        {stats === null ? (
+          <span aria-hidden="true" className="mt-1 block h-7 w-10 animate-pulse rounded bg-gray-100" />
+        ) : (
+          <p className="mt-1 text-2xl font-semibold text-gray-900">{stats.noShowCount}</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function TodaySessionsSection({
+  clinicId,
+  sessions,
+  totalCount,
+}: {
+  clinicId: string
+  sessions: SessionSummary[] | null
+  totalCount: number | null
+}) {
+  if (sessions === null) {
+    return (
+      <div className="space-y-2">
+        <h2 className="text-xs font-semibold tracking-wide text-gray-500 uppercase">Today's sessions</h2>
+        <LoadingState variant="list" rows={2} />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      <h2 className="text-xs font-semibold tracking-wide text-gray-500 uppercase">Today's sessions</h2>
+      {sessions.length === 0 ? (
+        <EmptyState message="No sessions scheduled today." />
+      ) : (
+        <div className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
+          {sessions.map((sessionItem) => (
+            <Link
+              key={sessionItem.sessionId}
+              to={`/staff/clinics/${clinicId}/day-sheet/${sessionItem.sessionId}`}
+              className="flex items-center justify-between gap-3 p-3 text-sm transition-colors duration-150 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="font-medium text-gray-900">{sessionItem.doctorName}</span>
+                <span className="text-gray-500">
+                  {formatSessionTimeRange(sessionItem.startTime, sessionItem.endTime)}
+                </span>
+                <Badge color={sessionItem.mode === 'FIXED_TIME' ? 'indigo' : 'gray'}>
+                  {sessionItem.mode === 'FIXED_TIME' ? 'Fixed-time' : 'Queue'}
+                </Badge>
+              </div>
+              <span className="shrink-0 text-gray-500">
+                {sessionItem.bookedSlotCount}/{sessionItem.totalSlotCount} booked
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
+      {totalCount !== null && totalCount > sessions.length && (
+        <Link
+          to={`/staff/clinics/${clinicId}/day-sheet`}
+          className="block text-sm font-medium text-indigo-600 transition-colors duration-150 hover:text-indigo-700"
+        >
+          +{totalCount - sessions.length} more in Day Sheet
+        </Link>
+      )}
+    </div>
+  )
+}
 
 // 041-staff-console-pickers: replaces most of the prior "type a raw ID, click Go" launcher
 // grid with links into real browse/pick views. Only two tools that never had a typed-ID field
@@ -69,6 +169,12 @@ const LINKS: QuickLink[] = [
     path: (clinicId) => `/staff/clinics/${clinicId}/waitlist/join`,
     icon: <ClockIcon />,
   },
+  {
+    title: 'Booking protection',
+    description: 'Review flagged suspicious booking activity and manage this clinic’s appointment limit.',
+    path: (clinicId) => `/staff/clinics/${clinicId}/protection`,
+    icon: <ShieldIcon />,
+  },
 ]
 
 function todayIsoDate(): string {
@@ -78,16 +184,16 @@ function todayIsoDate(): string {
   return `${now.getFullYear()}-${month}-${day}`
 }
 
+// 051-staff-dashboard-enhancement T013 (046 restyle): visual only - same null-while-loading /
+// resolved-count behavior as before, now rendered via the shared Badge component.
 function CountBadge({ count, singular, plural }: { count: number | null; singular: string; plural: string }) {
   if (count === null) {
-    return (
-      <span aria-hidden="true" className="h-4 w-16 animate-pulse rounded-full bg-gray-100" />
-    )
+    return <span aria-hidden="true" className="h-4 w-16 animate-pulse rounded-full bg-gray-100" />
   }
   return (
-    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+    <Badge color="gray">
       {count} {count === 1 ? singular : plural}
-    </span>
+    </Badge>
   )
 }
 
@@ -99,8 +205,10 @@ function CountBadge({ count, singular, plural }: { count: number | null; singula
 export function ClinicToolsDashboard() {
   const { clinicId } = useParams<{ clinicId: string }>()
   const [todaySessionCount, setTodaySessionCount] = useState<number | null>(null)
+  const [todaySessions, setTodaySessions] = useState<SessionSummary[] | null>(null)
   const [unclaimedInboxCount, setUnclaimedInboxCount] = useState<number | null>(null)
   const [waitingCount, setWaitingCount] = useState<number | null>(null)
+  const [todayStats, setTodayStats] = useState<TodaySessionStats | null>(null)
 
   useEffect(() => {
     if (!clinicId) return
@@ -108,8 +216,11 @@ export function ClinicToolsDashboard() {
     if (!session) return
     const today = todayIsoDate()
 
-    listSessions(clinicId, session.token, { from: today, to: today, page: 0, size: 1 })
-      .then((result) => setTodaySessionCount(result.totalCount))
+    listSessions(clinicId, session.token, { from: today, to: today, page: 0, size: MAX_SESSIONS_SHOWN })
+      .then((result) => {
+        setTodaySessionCount(result.totalCount)
+        setTodaySessions(result.sessions)
+      })
       .catch(() => {})
 
     listInboxItems(clinicId, session.token)
@@ -118,6 +229,10 @@ export function ClinicToolsDashboard() {
 
     getWaitlistCount(clinicId, session.token)
       .then((result) => setWaitingCount(result.waitingCount))
+      .catch(() => {})
+
+    getTodayStats(clinicId, session.token)
+      .then((result) => setTodayStats(result))
       .catch(() => {})
   }, [clinicId])
 
@@ -150,26 +265,30 @@ export function ClinicToolsDashboard() {
         </span>
       </Link>
 
+      <TodaySessionsSection clinicId={clinicId} sessions={todaySessions} totalCount={todaySessionCount} />
+
+      <TodayStatsTile stats={todayStats} />
+
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {LINKS.map((link) => (
           <Link
             key={link.title}
             to={link.path(clinicId)}
-            // staff-console-audit-2026-09-10 P3: was hover:shadow-sm on a card already shadow-sm
-            // - a visual no-op. hover:shadow-md actually changes on hover.
-            className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-all duration-150 ease-out hover:border-indigo-300 hover:shadow-md active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+            className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
           >
-            <div className="flex items-start justify-between gap-2">
-              <IconBadge>{link.icon}</IconBadge>
-              {link.title === 'Day sheet' && <CountBadge count={todaySessionCount} singular="session today" plural="sessions today" />}
-              {link.title === 'Join a patient to the waitlist' && (
-                <CountBadge count={waitingCount} singular="waiting" plural="waiting" />
-              )}
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-gray-900">{link.title}</h3>
-              <p className="mt-1 text-sm text-gray-600">{link.description}</p>
-            </div>
+            <Card className="flex flex-col gap-3 hover:border-indigo-300">
+              <div className="flex items-start justify-between gap-2">
+                <IconBadge>{link.icon}</IconBadge>
+                {link.title === 'Day sheet' && <CountBadge count={todaySessionCount} singular="session today" plural="sessions today" />}
+                {link.title === 'Join a patient to the waitlist' && (
+                  <CountBadge count={waitingCount} singular="waiting" plural="waiting" />
+                )}
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">{link.title}</h3>
+                <p className="mt-1 text-sm text-gray-600">{link.description}</p>
+              </div>
+            </Card>
           </Link>
         ))}
       </div>

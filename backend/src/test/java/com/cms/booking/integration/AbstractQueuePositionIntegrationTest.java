@@ -1,7 +1,7 @@
 package com.cms.booking.integration;
 
-import com.cms.booking.Booking;
-import com.cms.scheduling.SlotStatus;
+import com.cms.booking.domain.Booking;
+import com.cms.scheduling.domain.SlotStatus;
 
 /**
  * 027: extends 022's queue-booking fixture directly (this codebase's own established
@@ -12,7 +12,7 @@ import com.cms.scheduling.SlotStatus;
  */
 public abstract class AbstractQueuePositionIntegrationTest extends AbstractQueueBookingIntegrationTest {
 
-    /** Marks a Booking's own Slot directly - no Queue-mode "complete"/no-show action exists yet in this backlog to trigger it through (Assumptions). */
+    /** Marks a Booking's own Slot directly (a fixture shortcut; 064 added real Queue send-in/complete endpoints, exercised in QueuePositionShrinksTest). */
     protected void setSlotStatus(Booking booking, SlotStatus status) {
         var slot = booking.getSlot();
         slot.setStatus(status);

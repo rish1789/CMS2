@@ -150,3 +150,45 @@ export function InboxIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+export function ShieldIcon({ className }: IconProps) {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+    >
+      <path d="M12 3.5l7 3v5c0 4.5-3 7.5-7 8.5-4-1-7-4-7-8.5v-5z" />
+      <path d="M9.5 12l1.75 1.75L14.5 10" />
+    </svg>
+  )
+}
+
+// 063-front-desk-walk-in: a person arriving through a door - the front-desk Walk-in screen.
+export function WalkInIcon({ className }: IconProps) {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+    >
+      <path d="M14 4h4.5a1.5 1.5 0 0 1 1.5 1.5v13a1.5 1.5 0 0 1-1.5 1.5H14" />
+      <circle cx="9" cy="6.5" r="2" />
+      <path d="M9 9.5v5l-2.5 5M9 14.5l2.5 5M6 12l3-2.5 3 2.5" />
+    </svg>
+  )
+}

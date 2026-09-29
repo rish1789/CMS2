@@ -6,15 +6,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.identity.account.InvalidCredentialsException;
-import com.cms.identity.account.SecurityConfig;
-import com.cms.identity.account.StaffAuthController;
-import com.cms.identity.account.StaffAuthService;
-import com.cms.identity.account.StaffAuthenticationEntryPoint;
-import com.cms.identity.account.StaffJwtService;
+import com.cms.identity.account.exception.AccountNotFoundException;
+import com.cms.identity.account.exception.IncorrectPasswordException;
+import com.cms.identity.account.exception.StaffClinicNotActiveException;
+import com.cms.identity.account.config.SecurityConfig;
+import com.cms.identity.account.api.StaffAuthController;
+import com.cms.identity.account.service.StaffAuthService;
+import com.cms.identity.account.config.StaffAuthenticationEntryPoint;
+import com.cms.identity.account.config.StaffJwtService;
 import com.cms.identity.account.dto.StaffLoginResponse;
 import com.cms.identity.api.GlobalExceptionHandler;
-import com.cms.identity.staff.StaffExceptionHandler;
+import com.cms.identity.staff.exception.StaffExceptionHandler;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +30,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * Web-layer ("contract") test for POST /api/v1/staff/login - real Spring Security filter chain,
  * real bean validation, with {@link StaffAuthService} (the extracted business logic - see
  * StaffAuthServiceTest for its own exhaustive branch coverage) mocked, so this runs without a
- * database. Covers the 200 success path and both flavors of 4xx failure this endpoint produces.
+ * database. Covers the 200 success path and every flavor of 4xx failure this endpoint produces.
  */
 @WebMvcTest(controllers = StaffAuthController.class)
 @Import({StaffExceptionHandler.class, GlobalExceptionHandler.class, SecurityConfig.class})
@@ -67,8 +69,8 @@ class StaffAuthControllerTest {
     }
 
     @Test
-    void wrongCredentialsReturn401WithSharedErrorShape() throws Exception {
-        when(staffAuthService.login(any())).thenThrow(new InvalidCredentialsException());
+    void wrongPasswordReturns401WithIncorrectPasswordError() throws Exception {
+        when(staffAuthService.login(any())).thenThrow(new IncorrectPasswordException());
 
         mockMvc.perform(post("/api/v1/staff/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -77,7 +79,21 @@ class StaffAuthControllerTest {
                                 { "identifier": "staff@example.com", "password": "wrong-password" }
                                 """))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("INVALID_CREDENTIALS"));
+                .andExpect(jsonPath("$.error").value("INCORRECT_PASSWORD"));
+    }
+
+    @Test
+    void unknownIdentifierReturns401WithAccountNotFoundError() throws Exception {
+        when(staffAuthService.login(any())).thenThrow(new AccountNotFoundException());
+
+        mockMvc.perform(post("/api/v1/staff/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                """
+                                { "identifier": "nobody@example.com", "password": "Str0ng!Pass" }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("ACCOUNT_NOT_FOUND"));
     }
 
     @Test
@@ -90,5 +106,19 @@ class StaffAuthControllerTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("MISSING_REQUIRED_FIELD"));
+    }
+
+    // 062-rejected-clinic-gating (FR-007, contract section 3, tasks.md T024)
+    @Test
+    void aStaffMemberWhoseOnlyClinicIsRejectedGets403ClinicNotActive() throws Exception {
+        when(staffAuthService.login(any())).thenThrow(new StaffClinicNotActiveException());
+
+        mockMvc.perform(post("/api/v1/staff/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"identifier\":\"doctor@example.com\",\"password\":\"Str0ng!Pass\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("CLINIC_NOT_ACTIVE"))
+                .andExpect(jsonPath("$.message")
+                        .value("Your clinic is not currently active. Contact your clinic administrator."));
     }
 }

@@ -35,7 +35,7 @@ class RegisterClinicHappyPathTest extends AbstractIntegrationTest {
         org.junit.jupiter.api.Assertions.assertFalse(clinic.isVerified());
         org.junit.jupiter.api.Assertions.assertTrue(account.isActive());
         org.junit.jupiter.api.Assertions.assertEquals(
-                com.cms.identity.account.RoleAssignment.Role.ClinicAdmin, roleAssignment.getRole());
+                com.cms.identity.account.domain.RoleAssignment.Role.ClinicAdmin, roleAssignment.getRole());
         org.junit.jupiter.api.Assertions.assertEquals(
                 account.getId(), roleAssignment.getAccount().getId());
         org.junit.jupiter.api.Assertions.assertEquals(

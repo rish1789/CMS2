@@ -1,10 +1,10 @@
 package com.cms.notification.integration;
 
-import com.cms.notification.NotificationEventRepository;
-import com.cms.notification.NotificationEventService;
-import com.cms.notification.NotificationSender;
-import com.cms.patient.account.PatientAccount;
-import com.cms.patient.account.PatientAccountRepository;
+import com.cms.notification.repository.NotificationEventRepository;
+import com.cms.notification.service.NotificationEventService;
+import com.cms.notification.service.NotificationSender;
+import com.cms.patient.account.domain.PatientAccount;
+import com.cms.patient.account.repository.PatientAccountRepository;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.AfterEach;

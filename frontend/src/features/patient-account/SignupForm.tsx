@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { signupPatient, SignupPatientApiError, type SignupPatientResponse } from './api'
+import { FormField } from '../../components/FormField'
 
 interface FormState {
   email: string
@@ -106,7 +107,7 @@ export function SignupForm() {
         </p>
       )}
 
-      <Field label="Email" htmlFor="signupEmail" required error={fieldErrors.email}>
+      <FormField label="Email" htmlFor="signupEmail" required error={fieldErrors.email}>
         <input
           id="signupEmail"
           type="email"
@@ -115,9 +116,9 @@ export function SignupForm() {
           onChange={(e) => updateField('email', e.target.value)}
           className="input"
         />
-      </Field>
+      </FormField>
 
-      <Field label="Password" htmlFor="signupPassword" required error={fieldErrors.password}>
+      <FormField label="Password" htmlFor="signupPassword" required error={fieldErrors.password}>
         <input
           id="signupPassword"
           type="password"
@@ -133,9 +134,9 @@ export function SignupForm() {
             ))}
           </ul>
         )}
-      </Field>
+      </FormField>
 
-      <Field
+      <FormField
         label="Mobile (optional)"
         htmlFor="signupMobile"
         error={fieldErrors.mobile}
@@ -147,7 +148,7 @@ export function SignupForm() {
           onChange={(e) => updateField('mobile', e.target.value)}
           className="input"
         />
-      </Field>
+      </FormField>
 
       <button
         type="submit"
@@ -157,32 +158,5 @@ export function SignupForm() {
         {submitting ? 'Creating account…' : 'Create account'}
       </button>
     </form>
-  )
-}
-
-interface FieldProps {
-  label: string
-  htmlFor: string
-  required?: boolean
-  error?: string
-  hint?: string
-  children: React.ReactNode
-}
-
-function Field({ label, htmlFor, required, error, hint, children }: FieldProps) {
-  return (
-    <div>
-      <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700">
-        {label}
-        {required && <span aria-hidden="true"> *</span>}
-      </label>
-      <div className="mt-1">{children}</div>
-      {hint && !error && <p className="mt-1 text-sm text-gray-500">{hint}</p>}
-      {error && (
-        <p role="alert" className="mt-1 text-sm text-red-600">
-          {error}
-        </p>
-      )}
-    </div>
   )
 }

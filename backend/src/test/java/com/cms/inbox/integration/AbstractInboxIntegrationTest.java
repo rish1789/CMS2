@@ -1,37 +1,37 @@
 package com.cms.inbox.integration;
 
-import com.cms.booking.AppointmentType;
-import com.cms.booking.AppointmentTypeRepository;
-import com.cms.booking.Booking;
-import com.cms.booking.BookingRepository;
-import com.cms.booking.DeVerificationCascadeService;
-import com.cms.booking.WalkInInsertionService;
-import com.cms.identity.account.Account;
-import com.cms.identity.account.AccountRepository;
-import com.cms.identity.account.RoleAssignment;
-import com.cms.identity.account.RoleAssignmentRepository;
-import com.cms.identity.account.StaffJwtService;
+import com.cms.booking.domain.AppointmentType;
+import com.cms.booking.repository.AppointmentTypeRepository;
+import com.cms.booking.domain.Booking;
+import com.cms.booking.repository.BookingRepository;
+import com.cms.booking.service.DeVerificationCascadeService;
+import com.cms.booking.service.FrontDeskWalkInService;
+import com.cms.identity.account.domain.Account;
+import com.cms.identity.account.repository.AccountRepository;
+import com.cms.identity.account.domain.RoleAssignment;
+import com.cms.identity.account.repository.RoleAssignmentRepository;
+import com.cms.identity.account.config.StaffJwtService;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.clinic.ClinicRepository;
 import com.cms.identity.doctor.DoctorProfile;
 import com.cms.identity.doctor.DoctorProfileRepository;
-import com.cms.inbox.InboxItem;
-import com.cms.inbox.InboxItemRepository;
-import com.cms.patient.account.PatientAccount;
-import com.cms.patient.account.PatientAccountRepository;
-import com.cms.patient.record.PatientRepository;
-import com.cms.scheduling.Schedule;
-import com.cms.scheduling.ScheduleMode;
-import com.cms.scheduling.ScheduleRepository;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.SessionGenerationService;
-import com.cms.scheduling.SessionRepository;
-import com.cms.scheduling.Slot;
-import com.cms.scheduling.SlotRepository;
-import com.cms.scheduling.SlotStatus;
-import com.cms.waitlist.WaitlistEntry;
-import com.cms.waitlist.WaitlistEntryRepository;
-import com.cms.waitlist.WaitlistMatchingService;
+import com.cms.inbox.domain.InboxItem;
+import com.cms.inbox.repository.InboxItemRepository;
+import com.cms.patient.account.domain.PatientAccount;
+import com.cms.patient.account.repository.PatientAccountRepository;
+import com.cms.patient.record.repository.PatientRepository;
+import com.cms.scheduling.domain.Schedule;
+import com.cms.scheduling.domain.ScheduleMode;
+import com.cms.scheduling.repository.ScheduleRepository;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.service.SessionGenerationService;
+import com.cms.scheduling.repository.SessionRepository;
+import com.cms.scheduling.domain.Slot;
+import com.cms.scheduling.repository.SlotRepository;
+import com.cms.scheduling.domain.SlotStatus;
+import com.cms.waitlist.domain.WaitlistEntry;
+import com.cms.waitlist.repository.WaitlistEntryRepository;
+import com.cms.waitlist.service.WaitlistMatchingService;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -113,7 +113,7 @@ public abstract class AbstractInboxIntegrationTest {
     protected BookingRepository bookingRepository;
 
     @Autowired
-    protected WalkInInsertionService walkInInsertionService;
+    protected FrontDeskWalkInService frontDeskWalkInService;
 
     @Autowired
     protected WaitlistEntryRepository waitlistEntryRepository;
@@ -172,7 +172,7 @@ public abstract class AbstractInboxIntegrationTest {
     protected void linkDoctorToClinic(DoctorProfile profile, Clinic clinic, boolean active) {
         RoleAssignment roleAssignment = new RoleAssignment(profile.getAccount(), clinic, RoleAssignment.Role.Doctor);
         if (!active) {
-            roleAssignment.deactivate(com.cms.identity.account.RoleAssignment.DeactivationReason.RESIGNED);
+            roleAssignment.deactivate(com.cms.identity.account.domain.RoleAssignment.DeactivationReason.RESIGNED);
         }
         roleAssignmentRepository.save(roleAssignment);
     }
@@ -219,39 +219,65 @@ public abstract class AbstractInboxIntegrationTest {
                 new PatientAccount("patient" + counter + "@example.com", passwordEncoder.encode("Str0ng!Pass"), null));
     }
 
-    /** A Fixed-Time Schedule (every day, 9-13, 15-min) generated into a Session with Slots, for a doctor staffed at the given clinic. */
+    /**
+     * A Fixed-Time Schedule (every day, 9-13, 15-min) generated into a Session with Slots, for a
+     * doctor staffed at the given clinic.
+     *
+     * <p>065-phase1-stabilization: dated tomorrow, explicitly - a today-dated 09:00 slot is elapsed
+     * (unbookable, never offered) for most of the day, which made these fixtures depend on the time
+     * the suite runs.
+     */
     protected Session saveFixedTimeSessionWithSlots(Clinic clinic, DoctorProfile doctor) {
         Schedule schedule = scheduleRepository.save(new Schedule(
                 doctor, clinic, EnumSet.allOf(DayOfWeek.class),
                 LocalTime.of(9, 0), LocalTime.of(13, 0), ScheduleMode.FIXED_TIME, 15));
-        sessionGenerationService.generate(LocalDate.now());
-        return sessionRepository.findBySchedule_Id(schedule.getId()).get(0);
+        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        sessionGenerationService.generate(tomorrow);
+        return sessionOn(schedule, tomorrow);
+    }
+
+    private Session sessionOn(Schedule schedule, LocalDate date) {
+        return sessionRepository.findBySchedule_Id(schedule.getId()).stream()
+                .filter(s -> s.getSessionDate().equals(date))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("No session generated on " + date));
     }
 
     protected List<Slot> slotsOf(Session session) {
         return slotRepository.findBySession_Id(session.getId());
     }
 
-    protected Slot aRegularOpenSlotOf(Session session) {
+    protected Slot anOpenSlotOf(Session session) {
         return slotsOf(session).stream()
-                .filter(s -> !s.isBuffer())
                 .filter(s -> s.getStatus() == SlotStatus.OPEN)
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException("No OPEN regular Slot in this Session"));
+                .orElseThrow(() -> new IllegalStateException("No OPEN Slot in this Session"));
     }
 
     protected AppointmentType saveAppointmentType(DoctorProfile doctor) {
         return appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
     }
 
-    /** Drives the real 025 production path: staff inserts a walk-in, which (as of 038) also creates a WALK_IN InboxItem. */
+    /**
+     * Drives the real production walk-in path, which (as of 038) also creates a WALK_IN InboxItem.
+     * 063-front-desk-walk-in: the front-desk registration replaced 025's slot insertion (retired).
+     */
     protected Booking insertWalkIn(UUID callerAccountId, Clinic clinic, Session session, AppointmentType appointmentType) {
-        return walkInInsertionService.insertWalkIn(
-                callerAccountId,
-                clinic.getId(),
-                session.getId(),
-                new WalkInInsertionService.WalkInInsertionInput(
-                        null, "Walk-in Patient " + UUID.randomUUID(), "98" + (100000000 + (counter++)), appointmentType.getId(), null));
+        return frontDeskWalkInService
+                .register(
+                        callerAccountId,
+                        clinic.getId(),
+                        new FrontDeskWalkInService.RegisterInput(
+                                session.getId(),
+                                null,
+                                "Walk-in Patient " + UUID.randomUUID(),
+                                "98" + (100000000 + (counter++)),
+                                null,
+                                appointmentType.getId(),
+                                "GENERAL_CHECKUP",
+                                null,
+                                false))
+                .booking();
     }
 
     protected WaitlistEntry saveWaitingEntry(Clinic clinic, PatientAccount patientAccount, DoctorProfile doctor, Instant joinedAt) {
@@ -271,6 +297,6 @@ public abstract class AbstractInboxIntegrationTest {
 
     protected List<InboxItem> outstandingItemsOf(Clinic clinic) {
         return inboxItemRepository.findByClinic_IdAndStatusNotOrderByCreatedAtAsc(
-                clinic.getId(), com.cms.inbox.InboxItemStatus.RESOLVED);
+                clinic.getId(), com.cms.inbox.domain.InboxItemStatus.RESOLVED);
     }
 }

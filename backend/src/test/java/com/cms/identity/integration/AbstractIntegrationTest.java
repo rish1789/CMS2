@@ -11,8 +11,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import com.cms.identity.account.AccountRepository;
-import com.cms.identity.account.RoleAssignmentRepository;
+import com.cms.identity.account.repository.AccountRepository;
+import com.cms.identity.account.repository.RoleAssignmentRepository;
 import com.cms.identity.clinic.ClinicRepository;
 
 @SpringBootTest

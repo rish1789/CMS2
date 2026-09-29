@@ -7,9 +7,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.identity.account.SecurityConfig;
-import com.cms.identity.account.StaffAuthenticationEntryPoint;
-import com.cms.identity.account.StaffJwtService;
+import com.cms.identity.account.config.SecurityConfig;
+import com.cms.identity.account.config.StaffAuthenticationEntryPoint;
+import com.cms.identity.account.config.StaffJwtService;
 import com.cms.identity.api.ClinicRegistrationController;
 import com.cms.identity.api.GlobalExceptionHandler;
 import com.cms.identity.api.dto.RegisterClinicResponse;

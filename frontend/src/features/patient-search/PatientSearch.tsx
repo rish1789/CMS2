@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { searchPatients, type PatientSearchResult } from './api'
+import { TodayPatientsTable } from './TodayPatientsTable'
 import { loadStaffSession } from '../staff-login/token'
 import { ListSkeleton } from '../../components/ListSkeleton'
 import { PaginationControls } from '../../components/PaginationControls'
@@ -51,6 +52,8 @@ export function PatientSearch() {
         <p className="mt-0.5 text-sm text-gray-600">Search this clinic's patients by name or phone number.</p>
       </div>
 
+      <TodayPatientsTable clinicId={clinicId} />
+
       <form onSubmit={handleSubmit} className="flex max-w-md gap-2">
         <input
           aria-label="Search by name or phone"
@@ -93,17 +96,23 @@ export function PatientSearch() {
           {/* staff-console-audit-2026-09-10 P1: the whole card used to be a single Link straight
               to the irreversible anonymize flow - clicking a patient's name to look them up (the
               most natural act here) landed on the destructive path. Only the explicit
-              "Anonymize" action is a link now; the patient's info itself is plain, inert text. */}
+              "Anonymize" action is a link now.
+              052-patient-clinical-hub: the patient's name/phone is a link again, but now into
+              the safe, read-only hub - not the destructive anonymize path the 2026-09-10 audit
+              deliberately removed it from. "Anonymize" stays its own, separately-styled link. */}
           <ul className="grid gap-3 sm:grid-cols-2">
             {results.map((patient) => (
               <li
                 key={patient.patientId}
                 className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
               >
-                <div className="min-w-0">
+                <Link
+                  to={`/staff/clinics/${clinicId}/patients/${patient.patientId}`}
+                  className="min-w-0 rounded-md transition-colors duration-150 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                >
                   <p className="truncate font-medium text-gray-900">{patient.name}</p>
                   {patient.phone && <p className="text-sm text-gray-600">{patient.phone}</p>}
-                </div>
+                </Link>
                 <Link
                   to={`/staff/clinics/${clinicId}/patients/${patient.patientId}/anonymize`}
                   className="inline-flex h-9 shrink-0 items-center rounded-lg border border-red-300 bg-white px-3 text-sm font-medium text-red-700 transition-colors duration-150 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"

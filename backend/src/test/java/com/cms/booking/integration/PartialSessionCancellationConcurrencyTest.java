@@ -2,13 +2,13 @@ package com.cms.booking.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.cms.booking.Booking;
-import com.cms.booking.BookingCancellationService;
-import com.cms.booking.BookingNotCancellableException;
-import com.cms.booking.BookingStatus;
-import com.cms.booking.SessionPartialCancellationService;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.Slot;
+import com.cms.booking.domain.Booking;
+import com.cms.booking.service.BookingCancellationService;
+import com.cms.booking.exception.BookingNotCancellableException;
+import com.cms.booking.domain.BookingStatus;
+import com.cms.booking.service.SessionPartialCancellationService;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.domain.Slot;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -49,7 +49,9 @@ class PartialSessionCancellationConcurrencyTest extends AbstractPartialSessionCa
             };
             Callable<Boolean> partialCancel = () -> {
                 Session freshSession = sessionRepository.findById(session.getId()).orElseThrow();
-                return sessionPartialCancellationService.cancelFromCutoff(freshSession, LocalTime.of(10, 0), null) == 1;
+                return sessionPartialCancellationService.cancelFromCutoff(
+                                freshSession, LocalTime.of(10, 0), null, doctor.getAccount().getId())
+                        == 1;
             };
 
             List<Future<Boolean>> futures = executor.invokeAll(List.of(individualCancel, partialCancel));

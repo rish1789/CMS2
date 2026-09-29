@@ -7,13 +7,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.identity.account.SecurityConfig;
-import com.cms.identity.account.StaffAuthenticationEntryPoint;
-import com.cms.identity.account.StaffJwtService;
+import com.cms.identity.account.config.SecurityConfig;
+import com.cms.identity.account.config.StaffAuthenticationEntryPoint;
+import com.cms.identity.account.config.StaffJwtService;
 import com.cms.identity.api.GlobalExceptionHandler;
-import com.cms.identity.staff.StaffExceptionHandler;
-import com.cms.identity.staff.StaffOnboardingController;
-import com.cms.identity.staff.StaffOnboardingService;
+import com.cms.identity.staff.exception.StaffExceptionHandler;
+import com.cms.identity.staff.api.StaffOnboardingController;
+import com.cms.identity.staff.service.StaffOnboardingService;
 import com.cms.identity.staff.dto.OnboardStaffResponse;
 import java.util.UUID;
 import org.hamcrest.Matchers;

@@ -63,13 +63,13 @@ class ListSchedulesTest extends AbstractScheduleIntegrationTest {
     void listReturnsAScheduleFreshFromTheDatabaseWithDaysOfWeekPopulated() throws Exception {
         var clinic = saveClinic();
         var doctor = saveDoctorStaffedAt(clinic);
-        scheduleRepository.save(new com.cms.scheduling.Schedule(
+        scheduleRepository.save(new com.cms.scheduling.domain.Schedule(
                 doctor,
                 clinic,
                 java.util.Set.of(java.time.DayOfWeek.MONDAY, java.time.DayOfWeek.WEDNESDAY, java.time.DayOfWeek.FRIDAY),
                 java.time.LocalTime.of(9, 0),
                 java.time.LocalTime.of(13, 0),
-                com.cms.scheduling.ScheduleMode.FIXED_TIME,
+                com.cms.scheduling.domain.ScheduleMode.FIXED_TIME,
                 15));
         String token = clinicAdminToken(clinic);
 

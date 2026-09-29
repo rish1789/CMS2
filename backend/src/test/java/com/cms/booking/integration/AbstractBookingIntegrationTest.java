@@ -1,14 +1,14 @@
 package com.cms.booking.integration;
 
-import com.cms.booking.AppointmentTypeRepository;
-import com.cms.booking.AppointmentTypeService;
-import com.cms.booking.DoctorDefaultFeeRepository;
-import com.cms.booking.FeeResolutionService;
-import com.cms.identity.account.Account;
-import com.cms.identity.account.AccountRepository;
-import com.cms.identity.account.RoleAssignment;
-import com.cms.identity.account.RoleAssignmentRepository;
-import com.cms.identity.account.StaffJwtService;
+import com.cms.booking.repository.AppointmentTypeRepository;
+import com.cms.booking.service.AppointmentTypeService;
+import com.cms.booking.repository.DoctorDefaultFeeRepository;
+import com.cms.booking.service.FeeResolutionService;
+import com.cms.identity.account.domain.Account;
+import com.cms.identity.account.repository.AccountRepository;
+import com.cms.identity.account.domain.RoleAssignment;
+import com.cms.identity.account.repository.RoleAssignmentRepository;
+import com.cms.identity.account.config.StaffJwtService;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.clinic.ClinicRepository;
 import com.cms.identity.doctor.DoctorProfile;
@@ -107,7 +107,7 @@ public abstract class AbstractBookingIntegrationTest {
     protected RoleAssignment linkDoctorToClinic(DoctorProfile profile, Clinic clinic, boolean active) {
         RoleAssignment roleAssignment = new RoleAssignment(profile.getAccount(), clinic, RoleAssignment.Role.Doctor);
         if (!active) {
-            roleAssignment.deactivate(com.cms.identity.account.RoleAssignment.DeactivationReason.RESIGNED);
+            roleAssignment.deactivate(com.cms.identity.account.domain.RoleAssignment.DeactivationReason.RESIGNED);
         }
         return roleAssignmentRepository.save(roleAssignment);
     }

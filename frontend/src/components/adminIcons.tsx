@@ -92,6 +92,29 @@ export function ArrowIcon({ className }: IconProps) {
   )
 }
 
+// 050-sidebar-navigation: "home"/dashboard destination for both the Staff and Admin
+// sidebars - no existing icon covered this concept (ClinicIcon is already used for "Clinic
+// verification" in the same Admin sidebar, so reusing it for "Admin home" would duplicate
+// visually within one list).
+export function HomeIcon({ className }: IconProps) {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+    >
+      <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z" />
+    </svg>
+  )
+}
+
 export function CheckIcon({ className }: IconProps) {
   return (
     <svg

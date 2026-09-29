@@ -1,6 +1,6 @@
 package com.cms.clinical.dto;
 
-import com.cms.clinical.ConsultationNote;
+import com.cms.clinical.domain.ConsultationNote;
 import java.time.Instant;
 import java.util.UUID;
 

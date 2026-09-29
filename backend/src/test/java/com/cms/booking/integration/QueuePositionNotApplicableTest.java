@@ -4,9 +4,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.booking.Booking;
-import com.cms.identity.account.RoleAssignment;
-import com.cms.scheduling.SlotStatus;
+import com.cms.booking.domain.Booking;
+import com.cms.identity.account.domain.RoleAssignment;
+import com.cms.scheduling.domain.SlotStatus;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -28,7 +28,7 @@ class QueuePositionNotApplicableTest extends AbstractQueuePositionIntegrationTes
         var slot = slotRepository.findBySession_Id(session.getId()).get(0);
         var patient = saveExistingPatient(clinic);
         var appointmentType = saveAppointmentTypeWithOverride(doctor, new BigDecimal("300.00"));
-        var counterAdmin = accountRepository.save(new com.cms.identity.account.Account(
+        var counterAdmin = accountRepository.save(new com.cms.identity.account.domain.Account(
                 "Admin FT", "adminft-" + java.util.UUID.randomUUID() + "@example.com",
                 passwordEncoder.encode("Str0ng!Pass"), "CAFT-" + java.util.UUID.randomUUID(), null));
         roleAssignmentRepository.save(new RoleAssignment(counterAdmin, clinic, RoleAssignment.Role.ClinicAdmin));
@@ -55,7 +55,7 @@ class QueuePositionNotApplicableTest extends AbstractQueuePositionIntegrationTes
 
         Booking booking = staffQueueBookingService.bookSlot(
                 callerAccountId, clinic.getId(), session.getId(),
-                new com.cms.booking.StaffQueueBookingService.BookSlotInput(patient.getId(), null, null, appointmentType.getId()));
+                new com.cms.booking.service.StaffQueueBookingService.BookSlotInput(patient.getId(), null, null, appointmentType.getId()));
         setSlotStatus(booking, SlotStatus.COMPLETED);
 
         queuePosition(clinic.getId().toString(), booking.getId().toString(), token)
@@ -76,7 +76,7 @@ class QueuePositionNotApplicableTest extends AbstractQueuePositionIntegrationTes
 
         Booking booking = staffQueueBookingService.bookSlot(
                 callerAccountId, clinic.getId(), session.getId(),
-                new com.cms.booking.StaffQueueBookingService.BookSlotInput(patient.getId(), null, null, appointmentType.getId()));
+                new com.cms.booking.service.StaffQueueBookingService.BookSlotInput(patient.getId(), null, null, appointmentType.getId()));
         setSlotStatus(booking, SlotStatus.NO_SHOW);
 
         queuePosition(clinic.getId().toString(), booking.getId().toString(), token)

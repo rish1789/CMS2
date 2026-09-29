@@ -1,7 +1,7 @@
 package com.cms.scheduling.dto;
 
-import com.cms.scheduling.Schedule;
-import com.cms.scheduling.ScheduleMode;
+import com.cms.scheduling.domain.Schedule;
+import com.cms.scheduling.domain.ScheduleMode;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.util.Set;
@@ -15,7 +15,9 @@ public record ScheduleResponse(
         LocalTime startTime,
         LocalTime endTime,
         ScheduleMode mode,
-        Integer slotIntervalMinutes) {
+        Integer slotIntervalMinutes,
+        LocalTime breakStartTime,
+        LocalTime breakEndTime) {
 
     public static ScheduleResponse of(Schedule schedule) {
         return new ScheduleResponse(
@@ -26,6 +28,8 @@ public record ScheduleResponse(
                 schedule.getStartTime(),
                 schedule.getEndTime(),
                 schedule.getMode(),
-                schedule.getSlotIntervalMinutes());
+                schedule.getSlotIntervalMinutes(),
+                schedule.getBreakStartTime(),
+                schedule.getBreakEndTime());
     }
 }

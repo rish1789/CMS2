@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DaySheet } from '../../src/features/day-sheet/DaySheet'
 import { listSessions, type SessionSummary } from '../../src/features/day-sheet/api'
+import { listClinicDoctors } from '../../src/features/doctor-picker/api'
 import { storeStaffSession } from '../../src/features/staff-login/token'
 
 vi.mock('../../src/features/day-sheet/api', async () => {
@@ -13,7 +14,15 @@ vi.mock('../../src/features/day-sheet/api', async () => {
   return { ...actual, listSessions: vi.fn() }
 })
 
+vi.mock('../../src/features/doctor-picker/api', async () => {
+  const actual = await vi.importActual<typeof import('../../src/features/doctor-picker/api')>(
+    '../../src/features/doctor-picker/api',
+  )
+  return { ...actual, listClinicDoctors: vi.fn() }
+})
+
 const mockedListSessions = vi.mocked(listSessions)
+const mockedListClinicDoctors = vi.mocked(listClinicDoctors)
 
 function renderWithSession() {
   storeStaffSession({ token: 'staff-jwt', accountId: 'account-1', email: 'dr.sharma@clinic.example' })
@@ -60,10 +69,25 @@ const SESSION_B: SessionSummary = {
 const DOCTOR_1 = { doctorProfileId: 'doctor-1', name: 'Dr. Priya Nair', staffCode: 'DR-1001' }
 const DOCTOR_2 = { doctorProfileId: 'doctor-2', name: 'Dr. Arjun Rao', staffCode: 'DR-1002' }
 
+function installAllDoctors(doctors: Array<{ doctorProfileId: string; name: string; staffCode: string }>) {
+  mockedListClinicDoctors.mockResolvedValue({
+    doctors: doctors.map((d) => ({ ...d, specialization: 'General Medicine' })),
+    page: 0,
+    pageSize: 100,
+    totalCount: doctors.length,
+  })
+}
+
 describe('DaySheet (041-staff-console-pickers T012/US2, 042-day-sheet-hardening US2)', () => {
   beforeEach(() => {
     sessionStorage.clear()
     mockedListSessions.mockReset()
+    mockedListClinicDoctors.mockReset()
+    // real-bug-fix 2026-09-17: the search bar's own doctor list is now a separate fetch
+    // (listClinicDoctors) - default to empty so every existing test keeps working without
+    // having to opt in, and tests that specifically exercise the search bar call
+    // installAllDoctors() to populate it.
+    mockedListClinicDoctors.mockResolvedValue({ doctors: [], page: 0, pageSize: 100, totalCount: 0 })
   })
 
   it('renders a single-doctor page as a merged tab header, no repeated Doctor column, and navigates on click', async () => {
@@ -133,6 +157,23 @@ describe('DaySheet (041-staff-console-pickers T012/US2, 042-day-sheet-hardening 
     expect(screen.getByText('14:00–18:00')).toBeInTheDocument()
   })
 
+  // 065-phase1-stabilization (owner decision 3): a whole-cancelled session is flagged in the list.
+  it('flags a cancelled session in the list', async () => {
+    mockedListSessions.mockResolvedValueOnce({
+      sessions: [{ ...SESSION_A, cancelled: true }, { ...SESSION_B, cancelled: false }],
+      doctors: [DOCTOR_1, DOCTOR_2],
+      page: 0,
+      pageSize: 20,
+      totalCount: 2,
+    })
+    renderWithSession()
+
+    const cancelledRow = (await findOpenLink('Dr. Priya Nair')).closest('tr') as HTMLElement
+    expect(within(cancelledRow).getByText('Cancelled')).toBeInTheDocument()
+    const otherRow = (await findOpenLink('Dr. Arjun Rao')).closest('tr') as HTMLElement
+    expect(within(otherRow).queryByText('Cancelled')).not.toBeInTheDocument()
+  })
+
   // staff-console-audit-2026-09-10 P1: today's row is marked, so it isn't visually identical to
   // one two weeks out - uses a fixed system time rather than relying on whatever date the test
   // happens to run on.
@@ -200,7 +241,8 @@ describe('DaySheet (041-staff-console-pickers T012/US2, 042-day-sheet-hardening 
     expect(await screen.findByText(/no sessions scheduled/i)).toBeInTheDocument()
   })
 
-  it('offers a type-to-filter doctor search sourced from the response doctors field and re-fetches on an exact match', async () => {
+  it('offers a type-to-filter doctor search sourced from the clinic-wide doctor list and re-fetches on an exact match', async () => {
+    installAllDoctors([DOCTOR_1, DOCTOR_2])
     mockedListSessions.mockResolvedValueOnce({
       sessions: [SESSION_A, SESSION_B],
       doctors: [DOCTOR_1, DOCTOR_2],
@@ -239,6 +281,7 @@ describe('DaySheet (041-staff-console-pickers T012/US2, 042-day-sheet-hardening 
   })
 
   it('resolves an exact match by Staff ID (staffCode) as well as by name', async () => {
+    installAllDoctors([DOCTOR_1, DOCTOR_2])
     mockedListSessions.mockResolvedValueOnce({
       sessions: [SESSION_A, SESSION_B],
       doctors: [DOCTOR_1, DOCTOR_2],
@@ -270,6 +313,7 @@ describe('DaySheet (041-staff-console-pickers T012/US2, 042-day-sheet-hardening 
   })
 
   it('clearing the doctor search resets to All doctors', async () => {
+    installAllDoctors([DOCTOR_1, DOCTOR_2])
     mockedListSessions.mockResolvedValueOnce({
       sessions: [SESSION_A],
       doctors: [DOCTOR_1],
@@ -340,5 +384,85 @@ describe('DaySheet (041-staff-console-pickers T012/US2, 042-day-sheet-hardening 
     expect(await findOpenLink('Dr. Arjun Rao')).toBeInTheDocument()
     expect(screen.queryByText('Dr. Priya Nair')).not.toBeInTheDocument()
     expect(mockedListSessions).toHaveBeenLastCalledWith('clinic-1', 'staff-jwt', expect.objectContaining({ page: 1 }))
+  })
+
+  // real-bug-fix 2026-09-17: the actual regression this fix addresses - a doctor with a real,
+  // valid schedule but zero generated Sessions yet (session generation is nightly/manual-trigger
+  // only) used to be completely invisible in this search bar, since it used to be sourced from
+  // listSessions' own response - which only ever lists doctors who already have a Session in the
+  // window. A doctor now shows up here purely because they're staffed at the clinic, independent
+  // of whether any Session has been generated for them.
+  it('lists a staffed doctor in the search bar even when they have zero sessions in the window', async () => {
+    const noSessionsYetDoctor = { doctorProfileId: 'doctor-3', name: 'Dr. New Hire', staffCode: 'DR-3003' }
+    installAllDoctors([DOCTOR_1, noSessionsYetDoctor])
+    mockedListSessions.mockResolvedValueOnce({
+      sessions: [SESSION_A],
+      doctors: [DOCTOR_1], // listSessions' own doctors field never mentions the new hire
+      page: 0,
+      pageSize: 20,
+      totalCount: 1,
+    })
+    renderWithSession()
+    await findOpenLink('Dr. Priya Nair')
+
+    const filter = screen.getByLabelText(/filter by doctor/i)
+    const datalist = filter.closest('div')?.querySelector('datalist')
+    const optionValues = Array.from(datalist?.querySelectorAll('option') ?? []).map((option) =>
+      option.getAttribute('value'),
+    )
+    expect(optionValues).toContain('Dr. New Hire — DR-3003')
+  })
+
+  // real-bug-fix 2026-09-17: "more power" for the search bar - a doctor outside the initial
+  // clinic-wide fetch (a large roster, or one onboarded moments ago) is still findable by typing,
+  // via a debounced server-side search that merges results in rather than replacing the list.
+  it('searches the server for a doctor not in the initially-loaded list as the user types', async () => {
+    installAllDoctors([DOCTOR_1])
+    mockedListSessions.mockResolvedValueOnce({
+      sessions: [SESSION_A],
+      doctors: [DOCTOR_1],
+      page: 0,
+      pageSize: 20,
+      totalCount: 1,
+    })
+    renderWithSession()
+    await findOpenLink('Dr. Priya Nair')
+
+    const lateHire = { doctorProfileId: 'doctor-9', name: 'Dr. Late Hire', staffCode: 'DR-9009' }
+    mockedListClinicDoctors.mockResolvedValueOnce({
+      doctors: [{ ...lateHire, specialization: 'Cardiology' }],
+      page: 0,
+      pageSize: 100,
+      totalCount: 1,
+    })
+    mockedListSessions.mockResolvedValueOnce({
+      sessions: [],
+      doctors: [],
+      page: 0,
+      pageSize: 20,
+      totalCount: 0,
+    })
+
+    const filter = screen.getByLabelText(/filter by doctor/i)
+    await userEvent.type(filter, 'Late Hire')
+
+    await waitFor(() => {
+      expect(mockedListClinicDoctors).toHaveBeenCalledWith(
+        'clinic-1',
+        'staff-jwt',
+        expect.objectContaining({ q: 'Late Hire' }),
+      )
+    })
+
+    // The server hit's own name is now a resolvable exact match, without losing Dr. Priya Nair.
+    await userEvent.clear(filter)
+    await userEvent.type(filter, 'Dr. Late Hire')
+    await waitFor(() => {
+      expect(mockedListSessions).toHaveBeenLastCalledWith(
+        'clinic-1',
+        'staff-jwt',
+        expect.objectContaining({ doctorProfileId: 'doctor-9' }),
+      )
+    })
   })
 })

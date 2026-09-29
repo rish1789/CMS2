@@ -23,15 +23,15 @@ class PatientSlotBookingDateLogicTest extends AbstractPatientBookingIntegrationT
         var clinic = saveClinic();
         var doctor = saveDoctorStaffedAt(clinic);
         var pastSlot = savePastDatedOpenFixedTimeSlot(clinic, doctor);
-        var todaySession = saveFixedTimeSessionWithSlots(clinic, doctor);
-        var todaySlot = anOpenSlotOf(todaySession);
+        var upcomingSession = saveFixedTimeSessionWithSlots(clinic, doctor);
+        var upcomingSlot = anOpenSlotOf(upcomingSession);
         var patientAccount = savePatientAccount();
 
         mockMvc.perform(get("/api/v1/patients/clinics/{clinicId}/slots", clinic.getId())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + patientToken(patientAccount)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.slots[?(@.slotId=='" + pastSlot.getId() + "')]").doesNotExist())
-                .andExpect(jsonPath("$.slots[?(@.slotId=='" + todaySlot.getId() + "')]").exists());
+                .andExpect(jsonPath("$.slots[?(@.slotId=='" + upcomingSlot.getId() + "')]").exists());
     }
 
     @Test

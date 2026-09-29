@@ -5,6 +5,11 @@ import { PrescriptionForm } from '../../src/features/prescriptions/PrescriptionF
 import { createPrescription, listPrescriptions, PrescriptionApiError } from '../../src/features/prescriptions/api'
 import { storeStaffSession } from '../../src/features/staff-login/token'
 
+// 065-phase1-stabilization (BUG-006): delay: null keeps every keystroke's events but drops
+// user-event's per-keystroke setTimeout(0) yield, which queues behind other workers under
+// full-suite parallel load (the cause of the intermittent 5 s timeouts in typing-heavy tests).
+const TYPING_OPTIONS = { delay: null }
+
 vi.mock('../../src/features/prescriptions/api', async () => {
   const actual = await vi.importActual<typeof import('../../src/features/prescriptions/api')>(
     '../../src/features/prescriptions/api',
@@ -37,7 +42,7 @@ describe('PrescriptionForm', () => {
   })
 
   it('creates a prescription with one item and lists it afterward', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup(TYPING_OPTIONS)
     mockedList.mockResolvedValueOnce([])
     mockedCreate.mockResolvedValueOnce({
       id: 'prescription-1',
@@ -93,7 +98,7 @@ describe('PrescriptionForm', () => {
   })
 
   it('adds a second item row when "Add another item" is clicked', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup(TYPING_OPTIONS)
     mockedList.mockResolvedValueOnce([])
 
     render(<PrescriptionForm clinicId={CLINIC_ID} bookingId={BOOKING_ID} />)
@@ -105,7 +110,7 @@ describe('PrescriptionForm', () => {
   })
 
   it('shows the PRESCRIPTION_ITEM_REQUIRED error message', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup(TYPING_OPTIONS)
     mockedList.mockResolvedValueOnce([])
     mockedCreate.mockRejectedValueOnce(new PrescriptionApiError({ error: 'PRESCRIPTION_ITEM_REQUIRED' }))
 
@@ -129,6 +134,19 @@ describe('PrescriptionForm', () => {
     render(<PrescriptionForm clinicId={CLINIC_ID} bookingId={BOOKING_ID} />)
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/could not be found/i)
+    expect(screen.queryByRole('group', { name: 'Item 1' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /save prescription/i })).not.toBeInTheDocument()
+  })
+
+  // real-bug-fix 2026-09-17: same reasoning as the booking-not-found case above - a caller who
+  // isn't the treating doctor used to see this message as a banner above a form that was still
+  // live and submittable, inviting a doomed resubmit of the same denied request.
+  it('blocks the form entirely when the caller is not the treating doctor', async () => {
+    mockedList.mockRejectedValueOnce(new PrescriptionApiError({ error: 'FORBIDDEN' }))
+
+    render(<PrescriptionForm clinicId={CLINIC_ID} bookingId={BOOKING_ID} />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/only the treating doctor/i)
     expect(screen.queryByRole('group', { name: 'Item 1' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /save prescription/i })).not.toBeInTheDocument()
   })

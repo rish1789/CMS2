@@ -4,6 +4,9 @@ bin/
 .gradle/
 *.log
 
+# OWASP Dependency-Check NVD database cache (see build.gradle dependencyCheck.data.directory)
+.dependency-check-data/
+
 # IDE
 .idea
 *.iml

@@ -34,6 +34,10 @@ export function ExternalRecordReferenceForm({ clinicId, bookingId }: ExternalRec
   // entirely instead of showing a banner above a form that's still live and submittable for a
   // booking that doesn't exist.
   const [bookingNotFound, setBookingNotFound] = useState(false)
+  // real-bug-fix 2026-09-17: same reasoning as bookingNotFound above - a FORBIDDEN response
+  // (anyone but the treating doctor) used to fall through to the generic `error` banner while
+  // the whole form stayed live and submittable underneath it.
+  const [accessDeniedMessage, setAccessDeniedMessage] = useState<string | null>(null)
 
   useEffect(() => {
     if (!session) {
@@ -49,6 +53,10 @@ export function ExternalRecordReferenceForm({ clinicId, bookingId }: ExternalRec
         if (cancelled) return
         if (err instanceof ExternalRecordReferenceApiError && err.body.error === 'BOOKING_NOT_FOUND') {
           setBookingNotFound(true)
+          return
+        }
+        if (err instanceof ExternalRecordReferenceApiError && err.body.error === 'FORBIDDEN') {
+          setAccessDeniedMessage(err.message)
           return
         }
         setError(err instanceof Error ? err.message : 'Failed to load references.')
@@ -102,6 +110,14 @@ export function ExternalRecordReferenceForm({ clinicId, bookingId }: ExternalRec
     return (
       <p role="alert" className="mx-auto max-w-md rounded-md bg-red-50 p-3 text-sm text-red-700">
         This booking could not be found.
+      </p>
+    )
+  }
+
+  if (accessDeniedMessage) {
+    return (
+      <p role="alert" className="mx-auto max-w-md rounded-md bg-red-50 p-3 text-sm text-red-700">
+        {accessDeniedMessage}
       </p>
     )
   }

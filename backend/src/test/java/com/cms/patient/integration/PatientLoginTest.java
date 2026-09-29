@@ -8,8 +8,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
 /**
- * T008: correct credentials succeed with a token; wrong password and unknown email both
- * return the identically-shaped 401 INVALID_CREDENTIALS (FR-007, no information leak).
+ * T008: correct credentials succeed with a token; wrong password and unknown email now return
+ * distinct 401 error codes (see PatientAccountService.authenticate's decision note).
  */
 class PatientLoginTest extends AbstractPatientIntegrationTest {
 
@@ -31,7 +31,7 @@ class PatientLoginTest extends AbstractPatientIntegrationTest {
     }
 
     @Test
-    void wrongPasswordRejectedWithoutRevealingEmailIsRegistered() throws Exception {
+    void wrongPasswordForARegisteredEmailReturnsIncorrectPassword() throws Exception {
         mockMvc.perform(post("/api/v1/patients/signup")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(validSignupJson("login-wrongpw@example.com")));
@@ -43,11 +43,11 @@ class PatientLoginTest extends AbstractPatientIntegrationTest {
                                 { "email": "login-wrongpw@example.com", "password": "WrongPassword!1" }
                                 """))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("INVALID_CREDENTIALS"));
+                .andExpect(jsonPath("$.error").value("INCORRECT_PASSWORD"));
     }
 
     @Test
-    void unknownEmailRejectedWithIdenticalErrorShapeAsWrongPassword() throws Exception {
+    void unknownEmailReturnsAccountNotFound() throws Exception {
         mockMvc.perform(post("/api/v1/patients/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(
@@ -55,6 +55,6 @@ class PatientLoginTest extends AbstractPatientIntegrationTest {
                                 { "email": "never-registered@example.com", "password": "Str0ng!Pass" }
                                 """))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("INVALID_CREDENTIALS"));
+                .andExpect(jsonPath("$.error").value("ACCOUNT_NOT_FOUND"));
     }
 }

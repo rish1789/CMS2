@@ -1,7 +1,7 @@
 package com.cms.clinical.integration;
 
-import com.cms.clinical.ExternalRecordReferenceRepository;
-import com.cms.clinical.ExternalRecordReferenceService;
+import com.cms.clinical.repository.ExternalRecordReferenceRepository;
+import com.cms.clinical.service.ExternalRecordReferenceService;
 import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
 

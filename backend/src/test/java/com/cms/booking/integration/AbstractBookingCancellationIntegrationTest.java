@@ -1,32 +1,32 @@
 package com.cms.booking.integration;
 
-import com.cms.booking.AppointmentType;
-import com.cms.booking.AppointmentTypeRepository;
-import com.cms.booking.Booking;
-import com.cms.booking.BookingRepository;
-import com.cms.booking.DoctorDefaultFeeRepository;
-import com.cms.identity.account.Account;
-import com.cms.identity.account.AccountRepository;
-import com.cms.identity.account.RoleAssignment;
-import com.cms.identity.account.RoleAssignmentRepository;
-import com.cms.identity.account.StaffJwtService;
+import com.cms.booking.domain.AppointmentType;
+import com.cms.booking.repository.AppointmentTypeRepository;
+import com.cms.booking.domain.Booking;
+import com.cms.booking.repository.BookingRepository;
+import com.cms.booking.repository.DoctorDefaultFeeRepository;
+import com.cms.identity.account.domain.Account;
+import com.cms.identity.account.repository.AccountRepository;
+import com.cms.identity.account.domain.RoleAssignment;
+import com.cms.identity.account.repository.RoleAssignmentRepository;
+import com.cms.identity.account.config.StaffJwtService;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.clinic.ClinicRepository;
 import com.cms.identity.doctor.DoctorProfile;
 import com.cms.identity.doctor.DoctorProfileRepository;
-import com.cms.patient.account.JwtService;
-import com.cms.patient.account.PatientAccount;
-import com.cms.patient.account.PatientAccountRepository;
-import com.cms.patient.record.Patient;
-import com.cms.patient.record.PatientRepository;
-import com.cms.scheduling.Schedule;
-import com.cms.scheduling.ScheduleMode;
-import com.cms.scheduling.ScheduleRepository;
-import com.cms.scheduling.Session;
-import com.cms.scheduling.SessionRepository;
-import com.cms.scheduling.Slot;
-import com.cms.scheduling.SlotRepository;
-import com.cms.scheduling.SlotStatus;
+import com.cms.patient.account.config.JwtService;
+import com.cms.patient.account.domain.PatientAccount;
+import com.cms.patient.account.repository.PatientAccountRepository;
+import com.cms.patient.record.domain.Patient;
+import com.cms.patient.record.repository.PatientRepository;
+import com.cms.scheduling.domain.Schedule;
+import com.cms.scheduling.domain.ScheduleMode;
+import com.cms.scheduling.repository.ScheduleRepository;
+import com.cms.scheduling.domain.Session;
+import com.cms.scheduling.repository.SessionRepository;
+import com.cms.scheduling.domain.Slot;
+import com.cms.scheduling.repository.SlotRepository;
+import com.cms.scheduling.domain.SlotStatus;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -156,7 +156,7 @@ public abstract class AbstractBookingCancellationIntegrationTest {
     protected void linkDoctorToClinic(DoctorProfile profile, Clinic clinic, boolean active) {
         RoleAssignment roleAssignment = new RoleAssignment(profile.getAccount(), clinic, RoleAssignment.Role.Doctor);
         if (!active) {
-            roleAssignment.deactivate(com.cms.identity.account.RoleAssignment.DeactivationReason.RESIGNED);
+            roleAssignment.deactivate(com.cms.identity.account.domain.RoleAssignment.DeactivationReason.RESIGNED);
         }
         roleAssignmentRepository.save(roleAssignment);
     }
@@ -184,6 +184,16 @@ public abstract class AbstractBookingCancellationIntegrationTest {
         return clinicAdminToken(saveClinic());
     }
 
+    /** 057-day-sheet-status-overhaul: no fixture here needed an Operations-role token before this feature's batch-cancel authorization tests. */
+    protected String operationsToken(Clinic clinic) {
+        counter++;
+        Account ops = accountRepository.save(new Account(
+                "Ops " + counter, "ops" + counter + "@example.com",
+                passwordEncoder.encode("Str0ng!Pass"), "OP-" + counter, null));
+        roleAssignmentRepository.save(new RoleAssignment(ops, clinic, RoleAssignment.Role.Operations));
+        return staffJwtService.issueToken(ops.getId());
+    }
+
     protected PatientAccount savePatientAccount() {
         counter++;
         return patientAccountRepository.save(
@@ -201,7 +211,7 @@ public abstract class AbstractBookingCancellationIntegrationTest {
                 LocalTime.of(0, 0), LocalTime.of(23, 59), ScheduleMode.FIXED_TIME, 15));
         Session session = sessionRepository.save(new Session(
                 schedule, clinic, doctor, LocalDate.now(), ScheduleMode.FIXED_TIME, scheduledTime, scheduledTime.plusMinutes(15), 15));
-        return slotRepository.save(new Slot(session, scheduledTime, scheduledTime.plusMinutes(15), false));
+        return slotRepository.save(new Slot(session, scheduledTime, scheduledTime.plusMinutes(15)));
     }
 
     /** A confirmed (BOOKED Slot, ACTIVE Booking) Fixed-Time appointment at the given scheduled time relative to now - for cutoff testing. */

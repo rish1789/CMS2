@@ -1,6 +1,8 @@
 package com.cms.discovery;
 
 import java.util.List;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
@@ -14,6 +16,13 @@ import org.springframework.stereotype.Service;
 public class DiscoverySearchService {
 
     private static final String DEFAULT_SORT_FIELD = "doctorName";
+
+    // 047-backend-hardening FR-001: a public, unauthenticated endpoint must never be able to
+    // pull an unbounded result set regardless of what a caller requests - DEFAULT_PAGE_SIZE
+    // applies when no size is given, MAX_PAGE_SIZE silently clamps anything larger rather than
+    // rejecting the request (this is a safety cap, not a validated API contract change).
+    public static final int DEFAULT_PAGE_SIZE = 20;
+    public static final int MAX_PAGE_SIZE = 50;
 
     private final DiscoveryResultRepository repository;
 
@@ -30,12 +39,25 @@ public class DiscoverySearchService {
      * search page, and a stray/stale sort param should never break someone's search.
      */
     public List<DiscoveryResult> search(
-            String q, String city, String specialization, Integer minExperienceYears, String sortField, String sortDirection) {
+            String q,
+            String city,
+            String specialization,
+            Integer minExperienceYears,
+            String sortField,
+            String sortDirection,
+            Integer page,
+            Integer size) {
         String searchPattern = normalizeToLikePattern(q);
         String normalizedCity = normalizeToLowercase(city);
         String normalizedSpecialization = normalizeToLowercase(specialization);
-        return repository.search(
-                searchPattern, normalizedCity, normalizedSpecialization, minExperienceYears, resolveSort(sortField, sortDirection));
+        Pageable pageable = resolvePageable(page, size, resolveSort(sortField, sortDirection));
+        return repository.search(searchPattern, normalizedCity, normalizedSpecialization, minExperienceYears, pageable);
+    }
+
+    private Pageable resolvePageable(Integer page, Integer size, Sort sort) {
+        int resolvedPage = (page == null || page < 0) ? 0 : page;
+        int resolvedSize = (size == null || size < 1) ? DEFAULT_PAGE_SIZE : Math.min(size, MAX_PAGE_SIZE);
+        return PageRequest.of(resolvedPage, resolvedSize, sort);
     }
 
     public List<String> listCities() {

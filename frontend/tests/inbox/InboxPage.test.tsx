@@ -32,7 +32,7 @@ const walkInItem = {
   claimedByAccountId: null,
   claimedByName: null,
   createdAt: '2026-09-05T10:00:00Z',
-  summary: { bookingId: 'b-1', patientName: 'Jane Doe', slotStartTime: '10:15' },
+  summary: { bookingId: 'b-1', patientName: 'Jane Doe', doctorName: 'Dr. Amit Shah', slotStartTime: '10:15' },
 }
 
 describe('InboxPage', () => {

@@ -2,7 +2,8 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BookSlotForm } from '../../src/features/staff-booking/BookSlotForm'
-import { bookSlot, BookSlotApiError } from '../../src/features/staff-booking/api'
+import { bookSlot } from '../../src/features/staff-booking/api'
+import { ApiError } from '../../src/lib/apiClient'
 import { listAppointmentTypes } from '../../src/features/appointment-types/api'
 import { searchPatients } from '../../src/features/patient-search/api'
 import { storeStaffSession } from '../../src/features/staff-login/token'
@@ -80,6 +81,8 @@ describe('BookSlotForm', () => {
       id: 'booking-1',
       slotId: SLOT_ID,
       patientId: 'patient-1',
+      patientName: 'Asha Rao',
+      doctorName: 'Dr. Kavita Iyer',
       appointmentTypeId: 'type-1',
       lockedFee: 300,
       paymentStatus: 'PENDING',
@@ -104,7 +107,9 @@ describe('BookSlotForm', () => {
 
   it('shows the SLOT_ALREADY_BOOKED error message', async () => {
     const user = userEvent.setup()
-    mockedBookSlot.mockRejectedValueOnce(new BookSlotApiError({ error: 'SLOT_ALREADY_BOOKED' }))
+    mockedBookSlot.mockRejectedValueOnce(
+      new ApiError(409, 'This slot is already booked.', { error: 'SLOT_ALREADY_BOOKED' }),
+    )
 
     render(<BookSlotForm clinicId={CLINIC_ID} slotId={SLOT_ID} doctorProfileId={DOCTOR_PROFILE_ID} />)
 
@@ -121,6 +126,8 @@ describe('BookSlotForm', () => {
       id: 'booking-2',
       slotId: SLOT_ID,
       patientId: 'patient-2',
+      patientName: 'Walk-in Patient',
+      doctorName: 'Dr. Kavita Iyer',
       appointmentTypeId: 'type-1',
       lockedFee: 500,
       paymentStatus: 'PENDING',
@@ -153,5 +160,20 @@ describe('BookSlotForm', () => {
 
     expect(await screen.findByText(/no appointment types configured yet/i)).toBeInTheDocument()
     expect(screen.queryByLabelText(/appointment type/i)).not.toBeInTheDocument()
+  })
+
+  // 054-forms-validation-consistency T014: pre-submit required-field check blocks the network
+  // call entirely (research.md Decision 3) - the picked patient survives the failed attempt.
+  it('blocks submission and shows an inline error when no appointment type is selected', async () => {
+    const user = userEvent.setup()
+
+    render(<BookSlotForm clinicId={CLINIC_ID} slotId={SLOT_ID} doctorProfileId={DOCTOR_PROFILE_ID} />)
+
+    await pickExistingPatient(user)
+    await user.click(screen.getByRole('button', { name: /book slot/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/please select an appointment type/i)
+    expect(mockedBookSlot).not.toHaveBeenCalled()
+    expect(screen.getByText('Asha Rao')).toBeInTheDocument()
   })
 })

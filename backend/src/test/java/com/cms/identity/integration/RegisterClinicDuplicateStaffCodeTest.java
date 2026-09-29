@@ -3,7 +3,7 @@ package com.cms.identity.integration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.cms.identity.account.Account;
+import com.cms.identity.account.domain.Account;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;

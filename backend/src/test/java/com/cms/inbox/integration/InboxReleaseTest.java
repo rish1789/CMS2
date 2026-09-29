@@ -4,11 +4,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.booking.AppointmentType;
+import com.cms.booking.domain.AppointmentType;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfile;
-import com.cms.inbox.InboxItem;
-import com.cms.scheduling.Session;
+import com.cms.inbox.domain.InboxItem;
+import com.cms.scheduling.domain.Session;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;

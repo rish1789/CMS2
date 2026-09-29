@@ -28,6 +28,7 @@ export type QueueBookSlotErrorBody =
   | { error: 'PATIENT_NOT_FOUND'; message?: string }
   | { error: 'APPOINTMENT_TYPE_NOT_FOUND'; message?: string }
   | { error: 'NO_FEE_CONFIGURED'; message?: string }
+  | { error: 'CLINIC_NOT_ACCEPTING_APPOINTMENTS'; message?: string }
   | { error: 'INVALID_MOBILE_NUMBER'; message?: string }
   | { error: 'TOKEN_ISSUANCE_FAILED'; message?: string }
   | { error: 'UNAUTHORIZED'; message?: string }
@@ -62,6 +63,8 @@ function defaultMessageFor(body: QueueBookSlotErrorBody): string {
       return 'Could not issue a queue token right now — please try again shortly.'
     case 'UNAUTHORIZED':
       return 'Your session has expired. Please sign in again.'
+    case 'CLINIC_NOT_ACCEPTING_APPOINTMENTS':
+      return 'This clinic is not accepting appointments.'
     default:
       return 'Something went wrong. Please try again.'
   }

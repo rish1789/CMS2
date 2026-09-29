@@ -3,8 +3,8 @@ package com.cms.scheduling.integration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.cms.scheduling.NotAQueueSessionException;
-import com.cms.scheduling.SessionNotFoundException;
+import com.cms.scheduling.exception.NotAQueueSessionException;
+import com.cms.scheduling.exception.SessionNotFoundException;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

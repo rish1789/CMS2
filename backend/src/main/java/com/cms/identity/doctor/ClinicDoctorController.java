@@ -1,7 +1,7 @@
 package com.cms.identity.doctor;
 
-import com.cms.identity.account.RoleAssignmentRepository;
-import com.cms.identity.account.SecurityConfig;
+import com.cms.identity.account.repository.RoleAssignmentRepository;
+import com.cms.identity.account.config.SecurityConfig;
 import com.cms.identity.doctor.dto.DoctorListResponse;
 import com.cms.identity.doctor.dto.DoctorSummaryResponse;
 import java.util.UUID;

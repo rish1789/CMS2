@@ -2,8 +2,9 @@
 // See specs/031-waitlist-matching-longest-waiting/contracts/waitlist-join.md
 // and POST /api/v1/patients/waitlist-entries/{entryId}/claim|decline
 // See specs/032-self-service-waitlist-claim/contracts/waitlist-claim.md
+// 046-frontend-api-client: migrated onto the shared apiClient (see its own ApiError export).
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
+import { apiRequest } from '../../lib/apiClient'
 
 export interface WaitlistEntryResponse {
   id: string
@@ -41,18 +42,9 @@ export type WaitlistJoinErrorBody =
   | { error: 'UNAUTHORIZED'; message?: string }
   | { error: 'FORBIDDEN'; message?: string }
 
-export class WaitlistJoinApiError extends Error {
-  readonly body: WaitlistJoinErrorBody
-
-  constructor(body: WaitlistJoinErrorBody) {
-    super(defaultMessageFor(body) ?? body.message)
-    this.name = 'WaitlistJoinApiError'
-    this.body = body
-  }
-}
-
-function defaultMessageFor(body: WaitlistJoinErrorBody): string {
-  switch (body.error) {
+function defaultMessageFor(body: unknown): string {
+  const error = (body as WaitlistJoinErrorBody | undefined)?.error
+  switch (error) {
     case 'CLINIC_NOT_FOUND':
       return 'This clinic could not be found.'
     case 'DOCTOR_NOT_STAFFED_AT_CLINIC':
@@ -77,39 +69,20 @@ export async function joinWaitlist(
   request: JoinWaitlistRequest,
   token: string,
 ): Promise<WaitlistEntryResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/patients/clinics/${clinicId}/waitlist`, {
+  return apiRequest<WaitlistEntryResponse>(`/api/v1/patients/clinics/${clinicId}/waitlist`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(request),
+    token,
+    body: request,
+    fallbackMessage: defaultMessageFor,
   })
-
-  if (!response.ok) {
-    let body: WaitlistJoinErrorBody
-    try {
-      body = (await response.json()) as WaitlistJoinErrorBody
-    } catch {
-      body = { error: 'CLINIC_NOT_FOUND' }
-    }
-    throw new WaitlistJoinApiError(body)
-  }
-
-  return (await response.json()) as WaitlistEntryResponse
 }
 
 // _diagnostics [HIGH] - [WAITLIST_CLAIM] - [WORKFLOW_GAP]
 export async function listMyWaitlistEntries(token: string): Promise<WaitlistEntryResponse[]> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/patients/waitlist-entries`, {
-    headers: { Authorization: `Bearer ${token}` },
+  return apiRequest<WaitlistEntryResponse[]>('/api/v1/patients/waitlist-entries', {
+    token,
+    fallbackMessage: 'Your session has expired. Please sign in again.',
   })
-
-  if (!response.ok) {
-    throw new WaitlistJoinApiError({ error: 'UNAUTHORIZED' })
-  }
-
-  return (await response.json()) as WaitlistEntryResponse[]
 }
 
 // _diagnostics [HIGH] - [WAITLIST_JOIN staff] - [MISSING_STAFF_UI]
@@ -118,26 +91,12 @@ export async function staffJoinWaitlist(
   request: StaffJoinWaitlistRequest,
   token: string,
 ): Promise<WaitlistEntryResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/clinics/${clinicId}/waitlist`, {
+  return apiRequest<WaitlistEntryResponse>(`/api/v1/clinics/${clinicId}/waitlist`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(request),
+    token,
+    body: request,
+    fallbackMessage: defaultMessageFor,
   })
-
-  if (!response.ok) {
-    let body: WaitlistJoinErrorBody
-    try {
-      body = (await response.json()) as WaitlistJoinErrorBody
-    } catch {
-      body = { error: 'CLINIC_NOT_FOUND' }
-    }
-    throw new WaitlistJoinApiError(body)
-  }
-
-  return (await response.json()) as WaitlistEntryResponse
 }
 
 export interface ClaimWaitlistRequest {
@@ -157,6 +116,7 @@ export interface WaitlistClaimResponse {
 }
 
 export type WaitlistClaimErrorBody =
+  | { error: 'CLINIC_NOT_ACCEPTING_APPOINTMENTS'; message?: string }
   | { error: 'WAITLIST_ENTRY_NOT_FOUND'; message?: string }
   | { error: 'WAITLIST_OFFER_NOT_CLAIMABLE'; message?: string }
   | { error: 'APPOINTMENT_TYPE_NOT_FOUND'; message?: string }
@@ -164,18 +124,9 @@ export type WaitlistClaimErrorBody =
   | { error: 'SLOT_ALREADY_BOOKED'; message?: string }
   | { error: 'UNAUTHORIZED'; message?: string }
 
-export class WaitlistClaimApiError extends Error {
-  readonly body: WaitlistClaimErrorBody
-
-  constructor(body: WaitlistClaimErrorBody) {
-    super(defaultClaimMessageFor(body) ?? body.message)
-    this.name = 'WaitlistClaimApiError'
-    this.body = body
-  }
-}
-
-function defaultClaimMessageFor(body: WaitlistClaimErrorBody): string {
-  switch (body.error) {
+function defaultClaimMessageFor(body: unknown): string {
+  const error = (body as WaitlistClaimErrorBody | undefined)?.error
+  switch (error) {
     case 'WAITLIST_ENTRY_NOT_FOUND':
       return 'This waitlist offer could not be found.'
     case 'WAITLIST_OFFER_NOT_CLAIMABLE':
@@ -188,6 +139,8 @@ function defaultClaimMessageFor(body: WaitlistClaimErrorBody): string {
       return 'This slot was just booked by someone else.'
     case 'UNAUTHORIZED':
       return 'Your session has expired. Please sign in again.'
+    case 'CLINIC_NOT_ACCEPTING_APPOINTMENTS':
+      return 'This clinic is not accepting appointments.'
     default:
       return 'Something went wrong. Please try again.'
   }
@@ -198,26 +151,12 @@ export async function claimOffer(
   request: ClaimWaitlistRequest,
   token: string,
 ): Promise<WaitlistClaimResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/patients/waitlist-entries/${entryId}/claim`, {
+  return apiRequest<WaitlistClaimResponse>(`/api/v1/patients/waitlist-entries/${entryId}/claim`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(request),
+    token,
+    body: request,
+    fallbackMessage: defaultClaimMessageFor,
   })
-
-  if (!response.ok) {
-    let body: WaitlistClaimErrorBody
-    try {
-      body = (await response.json()) as WaitlistClaimErrorBody
-    } catch {
-      body = { error: 'WAITLIST_ENTRY_NOT_FOUND' }
-    }
-    throw new WaitlistClaimApiError(body)
-  }
-
-  return (await response.json()) as WaitlistClaimResponse
 }
 
 export interface WaitlistCountResponse {
@@ -226,32 +165,16 @@ export interface WaitlistCountResponse {
 
 // dashboard-live-data-2026-09-10: the clinic tools dashboard's "waitlist backlog" tile.
 export async function getWaitlistCount(clinicId: string, token: string): Promise<WaitlistCountResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/clinics/${clinicId}/waitlist/count`, {
-    headers: { Authorization: `Bearer ${token}` },
+  return apiRequest<WaitlistCountResponse>(`/api/v1/clinics/${clinicId}/waitlist/count`, {
+    token,
+    fallbackMessage: 'Only front-desk Operations staff or a ClinicAdmin can view the waitlist count.',
   })
-  if (!response.ok) {
-    throw new WaitlistJoinApiError({ error: 'FORBIDDEN' })
-  }
-  return (await response.json()) as WaitlistCountResponse
 }
 
 export async function declineOffer(entryId: string, token: string): Promise<WaitlistEntryResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/patients/waitlist-entries/${entryId}/decline`, {
+  return apiRequest<WaitlistEntryResponse>(`/api/v1/patients/waitlist-entries/${entryId}/decline`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    token,
+    fallbackMessage: defaultClaimMessageFor,
   })
-
-  if (!response.ok) {
-    let body: WaitlistClaimErrorBody
-    try {
-      body = (await response.json()) as WaitlistClaimErrorBody
-    } catch {
-      body = { error: 'WAITLIST_ENTRY_NOT_FOUND' }
-    }
-    throw new WaitlistClaimApiError(body)
-  }
-
-  return (await response.json()) as WaitlistEntryResponse
 }

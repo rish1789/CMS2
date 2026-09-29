@@ -4,8 +4,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cms.identity.account.Account;
-import com.cms.identity.account.StaffJwtService;
+import com.cms.identity.account.domain.Account;
+import com.cms.identity.account.config.StaffJwtService;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,7 +26,7 @@ class AdminAuthorizationTest extends AbstractAdminIntegrationTest {
     private StaffJwtService staffJwtService;
 
     @Autowired
-    private com.cms.patient.account.JwtService patientJwtService;
+    private com.cms.patient.account.config.JwtService patientJwtService;
 
     @Test
     void listRejectsRequestWithNoCredentials() throws Exception {

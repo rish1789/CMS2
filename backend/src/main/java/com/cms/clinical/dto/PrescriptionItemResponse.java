@@ -1,6 +1,6 @@
 package com.cms.clinical.dto;
 
-import com.cms.clinical.PrescriptionItem;
+import com.cms.clinical.domain.PrescriptionItem;
 import java.util.UUID;
 
 public record PrescriptionItemResponse(
