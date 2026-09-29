@@ -27,12 +27,15 @@
 
 ## Phase 2: Foundational (blocking for US2, US3, US4)
 
-- [ ] T002 Write `backend/src/main/resources/db/migration/V41__session_cancellation.sql`. It creates the table, constraints and indexes exactly as in data-model.md.
-- [ ] T003 [P] Create entity `B/scheduling/domain/SessionCancellationRecord.java`:
+- [x] T002 Write `backend/src/main/resources/db/migration/V41__session_cancellation.sql`. It creates the table, constraints and indexes exactly as in data-model.md.
+  - Done. Confirmed 2026-09-29: the file matches data-model.md (table, `ck_session_cancellation_range`, `uq_session_cancellation_whole`, `idx_session_cancellation_session`, NO ACTION FK, `cancelled_by_account_id`). Flyway applied it on a fresh database.
+- [x] T003 [P] Create entity `B/scheduling/domain/SessionCancellationRecord.java`:
   - fields `id`, `session`, `fromTime`, `toTime`, `cancelledAt`
   - factory methods `whole(Session)` and `range(Session, LocalTime from, LocalTime to)`
   - `covers(LocalTime probe)`
-- [ ] T004 [P] Create `B/scheduling/repository/SessionCancellationRecordRepository.java` with `findBySession_Id(UUID)` and `existsBySession_IdAndFromTimeIsNull(UUID)`.
+  - Done under a different name: `B/scheduling/domain/SessionCancellation.java`. Factories are `whole(Session, UUID accountId, Instant)` and `range(Session, from, to, UUID accountId, Instant)` (owner decision 7 adds the account). `covers` is a private helper in `SessionAvailabilityService`, not an entity method.
+- [x] T004 [P] Create `B/scheduling/repository/SessionCancellationRecordRepository.java` with `findBySession_Id(UUID)` and `existsBySession_IdAndFromTimeIsNull(UUID)`.
+  - Done under a different name: `B/scheduling/repository/SessionCancellationRepository.java`. It has both methods, plus `existsBySession_Id`, `countBySession_Id` (deletion guard) and `findWholeCancelledSessionIdsIn` (day-sheet list).
 - [x] T005 Write failing unit test `BT/scheduling/service/SessionAvailabilityServiceTest.java` against a fixed `Clock`. Cases:
   - past date → PAST_DATE
   - today, start before now → ELAPSED
@@ -124,11 +127,12 @@
 
 **Independent test**: T026 passes.
 
-- [ ] T025 [P] [US2] [US3] [US4] Write integration test `BT/booking/integration/SessionAvailabilityIntegrationTest.java` (Testcontainers):
+- [x] T025 [P] [US2] [US3] [US4] Write integration test `BT/booking/integration/SessionAvailabilityIntegrationTest.java` (Testcontainers):
   - listing excludes whole-cancelled, range-covered and elapsed slots
   - booking on a cancelled session → 409 `SESSION_NOT_ACCEPTING_BOOKINGS`
   - a double whole-cancellation leaves exactly one record
   - the V41 CHECK rejects `to_time <= from_time`
+  - Done: written and compiles, 9 cases. Executed 2026-09-29 in a cloud sandbox with Docker: 9/9 pass.
 - [x] T026 [US4] Add failing cases to `BookingPathsAvailabilityTest`:
   - patient fixed-time ELAPSED and PAST_DATE → `SlotDateInThePastException`
   - staff fixed-time ELAPSED and PAST_DATE → `SlotDateInThePastException`
@@ -158,8 +162,13 @@
 ## Phase 9: Polish & verification
 
 - [ ] T035 Backend: `spotlessCheck` on the changed files, compile, and the full `test -x spotlessApply --continue`. Compare against the T001 baseline.
-- [ ] T036 Frontend: `tsc -b`, `npm run lint` (no new warnings), full test run.
-- [ ] T037 Restart the local backend: V41 applies and Hibernate `validate` plus JPQL parsing succeed. Run the quickstart §3 curl smoke tests.
+- [x] T036 Frontend: `tsc -b`, `npm run lint` (no new warnings), full test run.
+  - Done 2026-09-29 after `npm ci`: `tsc -b` clean; lint 0 errors and 24 warnings (the existing baseline); Vitest 78 files, 441/441 pass.
+- [x] T037 Restart the local backend: V41 applies and Hibernate `validate` plus JPQL parsing succeed. Run the quickstart §3 curl smoke tests.
+  - Done 2026-09-29 on port 8081 against a fresh local PostgreSQL 16 (cloud sandbox, not the owner's machine). Flyway validated and applied 41 migrations up to V41; `ddl-auto: validate` passed; the app started with no WARN or ERROR lines.
+  - Smoke checks: the 7 audit endpoints, unmapped `/clinics/{id}/x` and `/patients/nonexistent` → 401 anonymous; `POST /clinics/register` `{}` → 400 `MISSING_REQUIRED_FIELD`; `/discovery/cities` → 200; `/actuator/health` → 200; CORS preflight → 200.
+  - Extra runtime checks on seeded data: patient listing hides elapsed and cancelled times; staff booking inside a cancelled range → 409 `SESSION_NOT_ACCEPTING_BOOKINGS`; staff booking of an elapsed slot → 409 `SLOT_DATE_IN_THE_PAST`; repeat whole cancel → 409 `SESSION_ALREADY_CANCELLED`; deleting a cancelled session → 409 `SESSION_DELETION_BLOCKED`.
+  - Browser (Playwright, staff login): the day sheet shows the range banner and marks the cancelled rows "Cancelled" with no Book link. Cancelling an empty session through "Cancel entire session" succeeds and the banner persists after reload.
 - [ ] T038 Update `docs/product-audit/07-BUG-AND-DEFECT-REGISTER.md`, `08-SECURITY-AUDIT.md` and `10-PRODUCT-IMPROVEMENT-BACKLOG.md` with each issue's status, root cause, fix, tests and verification. Add a row for 065 to `backlog/progress.md`.
 
 ## Dependencies

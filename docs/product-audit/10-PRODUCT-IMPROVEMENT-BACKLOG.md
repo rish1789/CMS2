@@ -18,7 +18,10 @@
 | B-04 | Creation half done (active role required); booking-state precondition open |
 | A-10 / H-02 | Root-cause mitigation applied; see 09 |
 | H-03 | Partly done: the fail-closed tests assert the default rule for unmapped paths, so no per-endpoint allowlist exists to fall out of sync |
-| A-01…A-04, C-01 | Blocked on the V41 migration |
+| A-01, A-02, A-03, C-01 | Done (V41 `session_cancellation` record, one bookability rule across all 5 booking paths, listings and waitlist matching; see 07 BUG-002/003/004) |
+| A-04 | Done (elapsed = `start_time < now` in listings and fixed-time booking; see 07 BUG-005) |
+| A-08 | Partly done: every booking path now uses the central rule and refuses past-dated and cancelled sessions (spec 065 FR-006, FR-013). Queue tokens for a session that ended earlier today are still accepted (walk-ins after the end are allowed by design, spec 063); that part of PB-004 stays open |
+| A-07 | Unchanged: the new rules use an injectable `Clock` in the server zone; the zone decision is still open |
 
 ## Suggested logical order (where dependencies make it clear)
 
