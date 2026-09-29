@@ -35,9 +35,9 @@ dependencies {
     runtimeOnly 'org.postgresql:postgresql'
 
     // T001 (002-patient-account-login): JWT issuance/validation for the patient-scoped session token.
-    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
-    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
-    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+    implementation 'io.jsonwebtoken:jjwt-api:0.13.0'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'
 
     // Interactive OpenAPI/Swagger docs (served at /docs, raw spec at /api-docs - see
     // application.yml's springdoc.* properties and com.cms.common.OpenApiConfig).
