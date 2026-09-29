@@ -80,6 +80,9 @@ public abstract class AbstractNoShowDetectionIntegrationTest extends AbstractSlo
     protected Booking saveBookingFor(Clinic clinic, DoctorProfile doctor, Slot slot) {
         AppointmentType appointmentType = appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
         Patient patient = patientRepository.save(new Patient(clinic, null, "Test Patient " + UUID.randomUUID(), null));
-        return bookingRepository.save(new Booking(slot, patient, appointmentType, new BigDecimal("300.00"), UUID.randomUUID()));
+        // booked_by_account_id is a foreign key to account, so it must be a real account;
+        // the doctor's own account is enough here - no test inspects who booked.
+        return bookingRepository.save(
+                new Booking(slot, patient, appointmentType, new BigDecimal("300.00"), doctor.getAccount().getId()));
     }
 }
