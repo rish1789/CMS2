@@ -100,7 +100,7 @@ public abstract class AbstractDiscoveryIntegrationTest {
             boolean visible) {
         Account account = accountRepository.save(new Account(
                 doctorName, licenseNumber + "@example.com", passwordEncoder.encode("Str0ng!Pass"),
-                "DR-" + licenseNumber, null));
+                "DR-" + java.util.UUID.randomUUID().toString().substring(0, 13), null));
         DoctorProfile profile = new DoctorProfile(account, specialization, licenseNumber, experienceYears);
         profile.setLicenseVerified(licenseVerified);
         profile.setVisible(visible);

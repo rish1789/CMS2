@@ -28,7 +28,7 @@ class SessionDaySheetControllerTest extends AbstractStaffBookingIntegrationTest 
     private UUID saveClinicAdminAccountId(Clinic clinic) {
         Account admin = accountRepository.save(new Account(
                 "Admin", "admin-" + UUID.randomUUID() + "@example.com",
-                passwordEncoder.encode("Str0ng!Pass"), "CA-" + UUID.randomUUID(), null));
+                passwordEncoder.encode("Str0ng!Pass"), "CA-" + UUID.randomUUID().toString().substring(0, 13), null));
         roleAssignmentRepository.save(new RoleAssignment(admin, clinic, RoleAssignment.Role.ClinicAdmin));
         return admin.getId();
     }

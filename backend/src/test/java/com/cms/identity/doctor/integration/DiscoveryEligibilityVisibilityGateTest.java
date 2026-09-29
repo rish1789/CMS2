@@ -10,7 +10,7 @@ class DiscoveryEligibilityVisibilityGateTest extends AbstractDoctorIntegrationTe
     @Test
     void invisibleProfileExcludesEvenWhenVerified() {
         var clinic = saveClinic("Sunrise Clinic", true);
-        var profile = saveDoctorProfile("LIC-GATE-VISIBILITY", true, false);
+        var profile = saveDoctorProfile("LIC-GATE-VISIBLE", true, false);
         linkDoctorToClinic(profile, clinic, true);
 
         assertThat(doctorProfileRepository.findDiscoveryEligible()).doesNotContain(profile);

@@ -30,7 +30,7 @@ class QueuePositionNotApplicableTest extends AbstractQueuePositionIntegrationTes
         var appointmentType = saveAppointmentTypeWithOverride(doctor, new BigDecimal("300.00"));
         var counterAdmin = accountRepository.save(new com.cms.identity.account.domain.Account(
                 "Admin FT", "adminft-" + java.util.UUID.randomUUID() + "@example.com",
-                passwordEncoder.encode("Str0ng!Pass"), "CAFT-" + java.util.UUID.randomUUID(), null));
+                passwordEncoder.encode("Str0ng!Pass"), "CAFT-" + java.util.UUID.randomUUID().toString().substring(0, 13), null));
         roleAssignmentRepository.save(new RoleAssignment(counterAdmin, clinic, RoleAssignment.Role.ClinicAdmin));
         String token = staffJwtService.issueToken(counterAdmin.getId());
 
