@@ -15,6 +15,9 @@ jobs:
   backend:
     name: Backend (Java / Gradle)
     runs-on: ubuntu-latest
+    # Tests take 15-18 min; without a limit a hung job holds the runner for GitHub's 6 h default.
+    # Raise this if the NVD_API_KEY secret is added: the OWASP scan's first NVD download is slow.
+    timeout-minutes: 45
     # `secrets` is not allowed in step-level `if:` (GitHub rejects the whole workflow), so expose
     # only whether the key is configured - never the key itself - to the conditions below.
     env:
@@ -24,16 +27,16 @@ jobs:
         working-directory: backend
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Check formatting (Spotless)
         run: ./gradlew spotlessCheck
@@ -43,21 +46,21 @@ jobs:
 
       - name: Upload test report on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-test-report
           path: backend/build/reports/tests/test
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-coverage-report
           path: backend/build/reports/jacoco/test/html
 
       - name: Cache OWASP Dependency-Check NVD database
         if: ${{ env.HAS_NVD_API_KEY == 'true' }}
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: backend/.dependency-check-data
           key: dependency-check-data-${{ github.run_id }}
@@ -82,7 +85,7 @@ jobs:
 
       - name: Upload dependency-check report on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-dependency-check-report
           path: backend/build/reports/dependency-check-report.html
@@ -90,15 +93,16 @@ jobs:
   frontend:
     name: Frontend (TypeScript / Vitest)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: frontend
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: 'npm'
