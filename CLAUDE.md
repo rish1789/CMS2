@@ -29,7 +29,7 @@ cd frontend && npm run lint     # oxlint (jsx-a11y, react, import-hygiene rules)
 cd frontend && npx tsc -b       # type-check (also runs as part of `npm run build`)
 ```
 
-These are exactly what CI (`.github/workflows/ci.yml`) runs — green locally means green in CI. Requires Java 21, Node 20+, and a local PostgreSQL 16+ reachable via the `DB_*` vars in `.env` (copied from `.env.example` by `dev.sh` on first run) — the project does not containerize its own database.
+These are exactly what CI (`.github/workflows/ci.yml`) runs — green locally means green in CI. Requires Java 21, Node 24+, and a local PostgreSQL 16+ reachable via the `DB_*` vars in `.env` (copied from `.env.example` by `dev.sh` on first run) — the project does not containerize its own database.
 
 **JWT secrets and the Super Admin credential have no default values on purpose.** If `PATIENT_JWT_SECRET`/`STAFF_JWT_SECRET`/`SUPER_ADMIN_JWT_SECRET` or `SUPER_ADMIN_USERNAME`/`SUPER_ADMIN_PASSWORD` are unset, the backend generates a random value at startup and logs a warning — safe for local dev, but it means **every backend restart invalidates every previously-issued session token** and rotates the Super Admin login. Set fixed values in `.env` for a stable long-running dev session.
 
