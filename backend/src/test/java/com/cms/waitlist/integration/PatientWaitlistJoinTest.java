@@ -68,7 +68,7 @@ class PatientWaitlistJoinTest extends AbstractWaitlistIntegrationTest {
                         .header("Authorization", "Bearer " + patientToken(patientAccount))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"doctorProfileId\":\"" + elsewhere.getId() + "\"}"))
-                .andExpect(status().isNotFound())
+                .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error").value("DOCTOR_NOT_STAFFED_AT_CLINIC"));
     }
 
