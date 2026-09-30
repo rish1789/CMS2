@@ -57,7 +57,7 @@ Each domain module owns its own controllers, services, repositories, and excepti
 ## Prerequisites
 
 - **Java 21** (a Gradle wrapper is included — no separate Gradle install needed)
-- **Node.js 20+** and npm
+- **Node.js 24+** and npm (jest-dom 7 and Vitest 5 require Node 22+; CI runs 24)
 - **PostgreSQL 16+**, running locally and reachable (this project does not containerize the database — bring your own local instance)
 - **bash** (Git Bash on Windows works fine) to run `dev.sh`
 
