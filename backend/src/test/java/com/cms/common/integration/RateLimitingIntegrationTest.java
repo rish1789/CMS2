@@ -12,7 +12,7 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -38,8 +38,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class RateLimitingIntegrationTest {
 
     @Container
-    static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>("postgres:16-alpine").withDatabaseName("cms_test");
+    static final PostgreSQLContainer POSTGRES =
+            new PostgreSQLContainer("postgres:16-alpine").withDatabaseName("cms_test");
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
