@@ -1,4 +1,4 @@
-# Handoff for Codex — CMS2 (as of 2026-09-29, `main` `8e7a224`)
+# Handoff for Codex — CMS2 (as of 2026-09-30, `main` `363cd73`)
 
 This note is self-contained. It assumes no prior conversation. For full history, see `HANDOFF.md` (Parts 13–14 cover the most recent work).
 
@@ -48,7 +48,7 @@ CMS2 is a multi-tenant clinic management system: a Spring Boot 3.3 / Java 21 bac
 The workflow lives in `.claude/skills/speckit-*/SKILL.md` (specify, clarify, plan, tasks, analyze, implement, converge). Read those files as plain instructions and follow them by hand:
 
 - **Templates:** `.specify/templates/{spec,plan,tasks,checklist}-template.md`.
-- **Numbering:** sequential. The next feature is **067**, because `specs/` ends at `066-patient-linking-race`.
+- **Numbering:** sequential. Feature **067** is implemented and merged. Inspect `specs/` before allocating the next number.
 - **Active feature:** write `.specify/feature.json` as `{"feature_directory": "specs/NNN-slug"}`.
 - **Scripts:** the `.specify/scripts/powershell/*.ps1` helpers need `pwsh`, which may not be installed. Doing their steps by hand is fine.
 - **Worked example:** `specs/066-patient-linking-race/`. It has a spec, a plan, research with rejected alternatives, and tasks with observed test results.
@@ -60,7 +60,7 @@ The workflow lives in `.claude/skills/speckit-*/SKILL.md` (specify, clarify, pla
 ./gradlew spotlessCheck -x spotlessApply
 ./gradlew test -x spotlessApply --tests "*SomeTest"          # one class
 ./gradlew test --rerun -x spotlessApply --tests "*SomeTest"  # force a real re-run (bypass the Gradle cache)
-./gradlew test -x spotlessApply                              # full suite: ~1,050 tests, ~22 min
+./gradlew test -x spotlessApply                              # full suite: 1,071 tests at this baseline, ~19 min in CI
 
 # Frontend (from frontend/)
 npm ci && npx tsc -b && npm run lint && npx vitest run       # 441 tests
@@ -75,28 +75,21 @@ npm ci && npx tsc -b && npm run lint && npx vitest run       # 441 tests
 
 ## 5. Current state
 
-- **Merged today:** PRs #11, #12, #13, #16, #15, #17 and #18. PR #19 (docs only: audit doc 07, `HANDOFF.md` Part 14 and this file) may still be open.
-- **Expected backend failures on `main`,** based on per-branch runs. There has been no full run on `8e7a224` itself.
-  1. `BookingRateLimitConcurrencyTest`: a **real bug**. A burst of simultaneous attempts exceeds the rate limit's race margin (12 against 9). The code is in `backend/src/main/java/com/cms/booking/service/BookingProtectionService.java` (`checkRateLimit`: count-then-insert with no lock).
-  2. `PatientWaitlistJoinTest.rejectsADoctorNotStaffedAtTheClinic`: **blocked on an owner decision**, 404 or 409. The code maps `DOCTOR_NOT_STAFFED_AT_CLINIC` to 409. Don't change either side without the owner's answer.
-- **Intermittent:**
-  - `PartialSessionCancellationRangeTest.toTimeLeavesSlotsAtOrAfterTheUpperBoundUntouched`: seen once, passes alone; not investigated.
-  - PB-003 `QueueSlotIssuanceConcurrencyTest` (concurrent queue-token issuance): not seen in recent runs.
-- **Time-of-day trap:** many integration fixtures generate *today's* 09:00–13:00 session. An assertion that needs a still-bookable slot fails for any run after 09:00, because `SessionAvailabilityService` (065) refuses elapsed slots. That was the whole cause of the `ClinicDeVerificationCascadeTest` "bug". Use a future-dated session (for example `saveFixedTimeSessionWithSlotsOn(..., LocalDate.now().plusDays(1))` in `AbstractSessionCancellationIntegrationTest`).
-- **CI:** `.github/workflows/ci.yml` has no `timeout-minutes`, so a hung backend job holds the runner for 6 h. CI on `main` after today's merges has not been checked.
+- **Verified baseline:** `main` at `363cd73`, after PRs #20, #23 and #22. [CI run 36694968509](https://github.com/rish1789/CMS2/actions/runs/36694968509) passed: backend **1,071 passed, 0 failed, 0 skipped**, counted from individual test-result lines; frontend **441 passed across 78 files**. Formatting, type-check, lint and frontend dependency audit passed. Backend OWASP scanning was skipped because `NVD_API_KEY` is not configured.
+- **Resolved:** #20 fixed booking rate limiting and the waitlist 409 expectation, and updated undici; #22 disables scheduled sweeps in tests; #23 implements 067 queue-token serialization and atomic queue booking to prevent orphan tokens. No revert is needed because #23 merged before #22.
+- **PR #19:** documentation only, refreshed onto this baseline. Its old [CI run 36605800183](https://github.com/rish1789/CMS2/actions/runs/36605800183) had **1,047 passed, 3 failed, 0 skipped**: booking rate-limit concurrency, queue-token issuance concurrency and the waitlist 404/409 expectation. Those failures preceded the fixes above. Check the latest PR checks before merging; the main baseline is not a substitute for PR CI.
+- **Remaining limitations:** cancellation does not take the session lock used by 067, so issuance concurrent with cancellation remains out of scope. `PartialSessionCancellationRangeTest` passed in the baseline; one passing run does not establish that its historical intermittency is eliminated.
+- **Time-of-day fixtures:** use future-dated sessions for new tests. Disabling sweeps does not fix assertions against already elapsed slots.
+- **Open:** Dependabot PRs #1-#10 require individual review and fresh CI. CI timeout, action upgrades and the stray gitlink remain separate housekeeping work. SEC-03 and PB-005 require owner decisions.
 
 ## 6. Suggested next work, in priority order
 
-1. Run the full backend suite on `main` to confirm the baseline in §5, then check GitHub Actions for `main`.
-2. **The booking rate-limit margin** (a real bug). Check `specs/060-booking-abuse-prevention` for the specified margin and whether this restores specified behaviour (a small fix) or needs a new spec. Close it at the data layer, for example with the same account row lock the booking-limit check takes.
-3. Investigate `PartialSessionCancellationRangeTest`. Suspect the time-of-day fixtures first.
-4. PB-003, queue-token issuance under concurrency (see `docs/product-audit/07-BUG-AND-DEFECT-REGISTER.md`).
-5. Housekeeping:
-   - add `timeout-minutes: 45` to the CI backend job;
-   - remove the stray gitlink `docs/.claude - Copy/worktrees/modest-tharp-3fd7e7`;
-   - upgrade `actions/*@v4` to v5.
-6. Run a converge pass for 065 and 066, following `.claude/skills/speckit-converge/SKILL.md`.
-7. **Waiting on the owner, don't start:** the 404/409 decision, SEC-03 (per-clinic pricing) and PB-005 (time zones). The Dependabot PRs #1–#10 are unreviewed; some are major-version bumps (Spring Boot 4, TypeScript 7, Vitest 5, react-router 7), so don't merge them blindly.
+1. Confirm PR #19's latest frontend and backend checks, then let the owner review and merge it.
+2. Review the smaller dependency changes first (#2, #10, #5), validating each against current main. Review the related JJWT updates (#3 and #4) together for version compatibility.
+3. Evaluate Testcontainers 2 (#6), then the larger frontend and Spring Boot upgrades (#7-#9 and #1) as separate compatibility changes; passing CI alone is not a migration review.
+4. In a separate housekeeping PR, consider a backend CI timeout, supported action upgrades and removal of the stray gitlink without deleting the owner's nested working files. Enabling OWASP requires the owner's repository secret configuration.
+5. Run convergence reviews for 065, 066 and 067. Investigate the historical partial-cancellation flake if it recurs; do not claim #22 definitively fixed it without evidence.
+6. Leave SEC-03 (per-clinic pricing) and PB-005 (time zones) pending the owner's decisions. Do not merge or deploy on the owner's behalf.
 
 ## 7. Working with the owner
 
