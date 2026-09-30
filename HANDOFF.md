@@ -1495,6 +1495,63 @@ PR #14 (the standalone deadlock fix) was closed after being ported into #12. The
 
 A separate, self-contained note for OpenAI Codex is in `CODEX_HANDOFF.md`.
 
+## Part 15 — Remaining bugs fixed, all dependency PRs resolved, Spring Boot 4 scoped (2026-09-30)
+
+On 2026-09-30, work happened in other sessions and in this one. **Part 14's "Test status" and "Still open" lists are superseded by this part.** `main` is at **`8df853b`**, and there are **no open PRs**.
+
+### Merged on 2026-09-30 (merge commits)
+
+| PR | What it did |
+|---|---|
+| #20 | Booking rate limit is exact under concurrent attempts (060). The waitlist not-staffed case now expects **409**, which resolves the 404/409 decision. undici bumped for high-severity advisories (#21 was closed as part of this). |
+| #23 | **Feature 067-queue-token-issuance-race:** PB-003 fixed. Queue-token issuance serializes on the session row, and queue booking is atomic, so there are no orphan tokens. The full spec-kit set is in `specs/067-queue-token-issuance-race/`. |
+| #22 | Scheduled sweeps no longer run inside integration tests. |
+| #19 | Docs (audit 07, Part 14, `CODEX_HANDOFF.md`), plus the ProtectionSettingsPage test now waits for initial effects before editing. CI had shown the value stuck at 8 again after #15, so #15 alone was not enough. |
+| #24 | CI `timeout-minutes` (backend 45, frontend 15), Node 24 action majors, and removal of the stray `docs/.claude - Copy` folder and gitlink. |
+| #25 | Testcontainers 1.21.3 → 2.0.5 (supersedes Dependabot #6). The full suite passed on Windows with Docker 29.8.1 *without* the `api.version` workaround. |
+| #26 | The frontend CI job runs on Node 24, a prerequisite for Vitest 5. |
+| Dependabot | #2 (dependency-management 1.1.7), #4 (JJWT 0.13.0, all three modules, so #3 was closed), #5 (vite 8.3.1), #7 (react-router-dom 7), #8 (Vitest 5), #9 (TypeScript 7), #10 (postcss). |
+
+### TypeScript 7 (#9): verification done in this session before the owner merged it
+
+- #9's own CI ran on a base without react-router 7 (#7). So it was re-verified merged onto `main` `d025e65`:
+  - `tsc` 7.0.2: 0 errors, and a planted type error was correctly reported (TS2322);
+  - lint clean, Vitest 441/441, `npm run build` OK, `npm audit --audit-level=high` clean.
+- TS 7 is the native compiler, shipped as per-platform binaries that include `win32-x64`. Nothing in the project uses the removed TypeScript JS API: only `tsc -b` runs it, oxlint does the linting, and Vite/Vitest don't depend on it.
+
+### Spring Boot 4 (#1): closed, needs a planned migration
+
+- CI failed in 25 s: `Spring Boot plugin requires Gradle 8.x (8.14 or later) or 9.x. The current version is Gradle 8.10`. Dependabot cannot bump the Gradle wrapper, so the PR could never pass on its own. It was closed with a scoping comment ([#1 comment](https://github.com/rish1789/CMS2/pull/1#issuecomment-5916579809)).
+- **Scope measured in a scratch worktree** (wrapper bumped to 8.14.3; nothing pushed):
+  - **Production code:** 1 file, 4 errors. `common/ApiErrorController.java` imports `org.springframework.boot.web.servlet.error`, which moved in the module split. The first compile may have stopped early.
+  - **Tests (~45 files):** `@MockBean`/`@SpyBean` were removed (26 files); the `@WebMvcTest`/`@AutoConfigureMockMvc` imports moved (45 files). The test sources were not compiled yet.
+  - **Flyway** auto-configuration moved to its own starter. With only `flyway-core`, migrations could silently not run, so check at startup that Flyway reports V41.
+  - springdoc 2.6.0 needs its Boot 4 line. `RateLimitingFilter` uses a Jackson 2 `ObjectMapper`, but Boot 4 defaults to Jackson 3.
+  - **Security** (6 filter chains, 3 JWT realms): needs the full suite plus a runtime login smoke test for all 3 roles.
+- **Estimate:** 2–3 hours, mostly the test-annotation changes.
+
+### Test and CI status
+
+- **Last counted full backend run:** `363cd73`, [CI run 36694968509](https://github.com/rish1789/CMS2/actions/runs/36694968509). **1,071 passed, 0 failed.** Frontend 441/441.
+- **Last completed CI on `main`:** `d025e65` (after react-router 7): success.
+- **CI on `8df853b`** (TypeScript 7, [run 36753530061](https://github.com/rish1789/CMS2/actions/runs/36753530061)) was **in progress** when this was written; check its result.
+- The backend OWASP scan is still skipped, because the `NVD_API_KEY` secret is not configured. That is the owner's decision.
+
+### Still open
+
+- **Spring Boot 4 migration:** the next big item.
+- **Convergence passes** for 065, 066 and 067 have not been run.
+- **067 known gap:** cancellation does not take the session lock that token issuance now uses. Closing it would be new behaviour, so it needs a spec (068).
+- **`PartialSessionCancellationRangeTest`:** historical intermittency; not proven fixed.
+- **Owner decisions:** SEC-03 (per-clinic pricing), PB-005 (time zones), and the `NVD_API_KEY` secret.
+
+### Sandbox gotchas (new)
+
+- **Maven Central 429s:** it rate-limits the cloud sandbox. Wait a few minutes and retry. `--refresh-dependencies` makes it worse.
+- **Scratch worktrees in this container** (not pushed; safe to delete):
+  - `/home/user/CMS2-ts7` (`scratch/ts7-check`, a local merge of #9 onto `main`);
+  - `/home/user/CMS2-sb4` (`scratch/sb4-check`, #1 plus a Gradle 8.14.3 wrapper, for scoping only).
+
 ## Reference
 
 Memory files at `C:\Users\risha\.claude\projects\C--Users-risha-OneDrive-Documents-CMS2\memory\`

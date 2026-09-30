@@ -1,6 +1,6 @@
-# Handoff for Codex — CMS2 (as of 2026-09-30, `main` `363cd73`)
+# Handoff for Codex — CMS2 (as of 2026-09-30 late evening, `main` `8df853b`)
 
-This note is self-contained. It assumes no prior conversation. For full history, see `HANDOFF.md` (Parts 13–14 cover the most recent work).
+This note is self-contained. It assumes no prior conversation. For full history, see `HANDOFF.md` (Parts 13–15 cover the most recent work).
 
 ## 1. What this project is
 
@@ -48,7 +48,7 @@ CMS2 is a multi-tenant clinic management system: a Spring Boot 3.3 / Java 21 bac
 The workflow lives in `.claude/skills/speckit-*/SKILL.md` (specify, clarify, plan, tasks, analyze, implement, converge). Read those files as plain instructions and follow them by hand:
 
 - **Templates:** `.specify/templates/{spec,plan,tasks,checklist}-template.md`.
-- **Numbering:** sequential. Feature **067** is implemented and merged. Inspect `specs/` before allocating the next number.
+- **Numbering:** sequential. Features up to **067** are implemented and merged, so the next free number is **068**. Inspect `specs/` before allocating it anyway.
 - **Active feature:** write `.specify/feature.json` as `{"feature_directory": "specs/NNN-slug"}`.
 - **Scripts:** the `.specify/scripts/powershell/*.ps1` helpers need `pwsh`, which may not be installed. Doing their steps by hand is fine.
 - **Worked example:** `specs/066-patient-linking-race/`. It has a spec, a plan, research with rejected alternatives, and tasks with observed test results.
@@ -66,7 +66,11 @@ The workflow lives in `.claude/skills/speckit-*/SKILL.md` (specify, clarify, pla
 npm ci && npx tsc -b && npm run lint && npx vitest run       # 441 tests
 ```
 
-**Docker in a Linux sandbox:** start the daemon with `DOCKER_MIN_API_VERSION=1.24 dockerd &`, because Testcontainers 1.21's docker-java is too old for Docker 29's default minimum API. Never `pkill -f` a broad pattern; it can kill the daemon or your own shell. Kill by PID.
+**Docker:**
+- Testcontainers is now **2.0.5** (#25).
+- The old `DOCKER_MIN_API_VERSION=1.24 dockerd &` workaround was needed for 1.21's docker-java against Docker 29. According to #25's commit message, the full suite ran on Docker 29.8.1 *without* the workaround. That was on Windows; it has not been re-checked in a Linux sandbox. If Testcontainers cannot reach Docker there, fall back to the workaround.
+- Never `pkill -f` a broad pattern; it can kill the daemon or your own shell. Kill by PID.
+- **Maven Central rate limit:** it can return HTTP 429 to sandboxes. Wait a few minutes and retry. Do **not** use `--refresh-dependencies`, which re-requests everything and makes the rate limiting worse.
 
 **Test shapes** (`CONTRIBUTING.md`):
 - pure Mockito unit tests;
@@ -75,21 +79,46 @@ npm ci && npx tsc -b && npm run lint && npx vitest run       # 441 tests
 
 ## 5. Current state
 
-- **Verified baseline:** `main` at `363cd73`, after PRs #20, #23 and #22. [CI run 36694968509](https://github.com/rish1789/CMS2/actions/runs/36694968509) passed: backend **1,071 passed, 0 failed, 0 skipped**, counted from individual test-result lines; frontend **441 passed across 78 files**. Formatting, type-check, lint and frontend dependency audit passed. Backend OWASP scanning was skipped because `NVD_API_KEY` is not configured.
-- **Resolved:** #20 fixed booking rate limiting and the waitlist 409 expectation, and updated undici; #22 disables scheduled sweeps in tests; #23 implements 067 queue-token serialization and atomic queue booking to prevent orphan tokens. No revert is needed because #23 merged before #22.
-- **PR #19:** documentation refreshed onto this baseline, plus synchronization of the numeric protection-setting test before editing. Run 36697988071 observed 440 frontend passes and one failure (input remained 8 instead of 5); the unchanged test passed 10 repeated local runs, so this is test hardening, not a locally reproduced product fix. Its old [CI run 36605800183](https://github.com/rish1789/CMS2/actions/runs/36605800183) had **1,047 passed, 3 failed, 0 skipped**: booking rate-limit concurrency, queue-token issuance concurrency and the waitlist 404/409 expectation. Those failures preceded the fixes above. Check the latest PR checks before merging; the main baseline is not a substitute for PR CI.
-- **Remaining limitations:** cancellation does not take the session lock used by 067, so issuance concurrent with cancellation remains out of scope. `PartialSessionCancellationRangeTest` passed in the baseline; one passing run does not establish that its historical intermittency is eliminated.
-- **Time-of-day fixtures:** use future-dated sessions for new tests. Disabling sweeps does not fix assertions against already elapsed slots.
-- **Open:** Dependabot PRs #1-#10 require individual review and fresh CI. CI timeout, action upgrades and the stray gitlink remain separate housekeeping work. SEC-03 and PB-005 require owner decisions.
+- **`main` is at `8df853b`.** There are **no open PRs**: every Dependabot PR is merged or closed.
+- **CI on `main`:**
+  - The last completed run is on `d025e65`, after the react-router 7 merge: [run 36745328664](https://github.com/rish1789/CMS2/actions/runs/36745328664), success.
+  - The run on `8df853b` (TypeScript 7), [run 36753530061](https://github.com/rish1789/CMS2/actions/runs/36753530061), was **still in progress** when this note was written. Check its result first.
+- **Last counted baseline:** `363cd73` ([run 36694968509](https://github.com/rish1789/CMS2/actions/runs/36694968509)).
+  - Backend: **1,071 passed, 0 failed**. Frontend: **441 passed across 78 files**.
+  - Backend OWASP scanning is skipped because the `NVD_API_KEY` repository secret is not configured. It is the owner's decision whether to add it.
+- **Resolved on 2026-09-30:**
+  - **#20:** the booking rate limit is exact under concurrency; the waitlist not-staffed case returns 409 (the owner's decision); undici bumped. #21 was closed as part of #20.
+  - **#23:** feature 067, which fixes PB-003 queue-token issuance under concurrency and prevents orphan tokens.
+  - **#22:** scheduled sweeps are disabled in integration tests.
+  - **#19:** docs, plus hardening of the numeric protection-setting test.
+  - **#24:** CI `timeout-minutes` (45 min backend, 15 min frontend), Node 24 action majors, and removal of the stray `docs/.claude - Copy` gitlink.
+  - **#25:** Testcontainers 2.0.5 (#6 closed as superseded).
+  - **#26:** the frontend CI runs on Node 24.
+  - **Dependabot:** #2, #4 (all three JJWT modules to 0.13.0, so #3 was closed), #5, #7 (react-router-dom 7), #8 (Vitest 5), #9 (TypeScript 7) and #10.
+- **TypeScript 7 (#9):** the native compiler, installed per platform (Windows included). Before merge it was verified against `main` with react-router 7:
+  - `tsc -b` reports 0 errors, and a planted type error was correctly reported (TS2322);
+  - lint is clean, 441/441 tests pass, the production build succeeds, and there are 0 high-severity audit findings.
+  - Nothing in the project uses the removed TypeScript JS API.
+- **Spring Boot 4 (#1) was closed without merging** ([comment](https://github.com/rish1789/CMS2/pull/1#issuecomment-5916579809)). It needs a planned migration; see §6.
+- **Remaining limitations:**
+  - Cancellation does not take the session lock used by 067, so token issuance concurrent with cancellation is out of scope.
+  - `PartialSessionCancellationRangeTest` passed in the baseline, but its historical intermittency is not proven fixed.
+- **Time-of-day fixtures:** use future-dated sessions for new tests. Many fixtures generate *today's* 09:00–13:00 session, so an assertion that needs a bookable slot fails for any run after 09:00. Disabling sweeps does not fix that.
+- **Owner decisions pending:** SEC-03 (per-clinic pricing), PB-005 (time zones) and the `NVD_API_KEY` secret.
 
 ## 6. Suggested next work, in priority order
 
-1. Confirm PR #19's latest frontend and backend checks, then let the owner review and merge it.
-2. Review the smaller dependency changes first (#2, #10, #5), validating each against current main. Review the related JJWT updates (#3 and #4) together for version compatibility.
-3. Evaluate Testcontainers 2 (#6), then the larger frontend and Spring Boot upgrades (#7-#9 and #1) as separate compatibility changes; passing CI alone is not a migration review.
-4. In a separate housekeeping PR, consider a backend CI timeout, supported action upgrades and removal of the stray gitlink without deleting the owner's nested working files. Enabling OWASP requires the owner's repository secret configuration.
-5. Run convergence reviews for 065, 066 and 067. Investigate the historical partial-cancellation flake if it recurs; do not claim #22 definitively fixed it without evidence.
-6. Leave SEC-03 (per-clinic pricing) and PB-005 (time zones) pending the owner's decisions. Do not merge or deploy on the owner's behalf.
+1. Confirm that CI run 36753530061 on `8df853b` is green. If it is red, investigate it before anything else.
+2. **The Spring Boot 3.3 → 4.1 migration,** on its own branch; not a version bump. The scope was measured in a scratch copy on 2026-09-30 (details are in PR #1's closing comment):
+   - Gradle wrapper 8.10 → 8.14+. The Boot 4 plugin refuses to apply on 8.10.
+   - Production code: after the wrapper bump, only **1 file, 4 errors**. `common/ApiErrorController.java` imports `org.springframework.boot.web.servlet.error`, which moved in the module split. The first compile may have stopped early, so expect more errors once these are fixed.
+   - Tests, about 45 files: `@MockBean`/`@SpyBean` were removed (26 files) → `@MockitoBean`/`@MockitoSpyBean`; the `@WebMvcTest`/`@AutoConfigureMockMvc` imports moved (45 files). The test sources were not compiled yet.
+   - **Flyway:** auto-configuration moved to its own starter. With only `flyway-core`, migrations could **silently stop running**, so verify at startup that Flyway reports V41.
+   - springdoc 2.6.0 → its Boot 4 line. `RateLimitingFilter` uses a Jackson 2 `ObjectMapper`, but Boot 4 defaults to Jackson 3.
+   - **Security:** 6 filter chains and 3 JWT realms. Run the full backend suite, plus a runtime login smoke test for patient, staff and Super Admin, before proposing the merge.
+3. Run convergence reviews for 065, 066 and 067 (`.claude/skills/speckit-converge/SKILL.md`). Investigate the historical partial-cancellation flake if it recurs.
+4. Consider a spec (068) for the gap between cancellation and 067's session lock, if the owner wants it closed.
+5. Leave SEC-03, PB-005 and the OWASP secret pending the owner's decisions. Do not merge or deploy on the owner's behalf.
 
 ## 7. Working with the owner
 
