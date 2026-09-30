@@ -5,7 +5,6 @@ import com.cms.identity.clinic.Clinic;
 import com.cms.identity.clinic.ClinicRepository;
 import com.cms.booking.domain.AppointmentType;
 import com.cms.booking.domain.Booking;
-import com.cms.booking.domain.BookingAttemptOutcome;
 import com.cms.booking.exception.AppointmentTypeNotFoundException;
 import com.cms.booking.exception.SessionNotAcceptingBookingsException;
 import com.cms.booking.exception.SlotAlreadyBookedException;
@@ -39,7 +38,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 021: the patient self-service analog of 020's {@link StaffBookingService} - same
@@ -62,6 +63,7 @@ public class PatientBookingService {
     private final BookingProtectionService bookingProtectionService;
     private final ClinicRepository clinicRepository;
     private final SessionAvailabilityService sessionAvailabilityService;
+    private final TransactionTemplate transactionTemplate;
 
     public PatientBookingService(
             SlotRepository slotRepository,
@@ -73,7 +75,8 @@ public class PatientBookingService {
             DoctorProfileRepository doctorProfileRepository,
             BookingProtectionService bookingProtectionService,
             ClinicRepository clinicRepository,
-            SessionAvailabilityService sessionAvailabilityService) {
+            SessionAvailabilityService sessionAvailabilityService,
+            PlatformTransactionManager transactionManager) {
         this.slotRepository = slotRepository;
         this.sessionRepository = sessionRepository;
         this.feeResolutionService = feeResolutionService;
@@ -84,6 +87,7 @@ public class PatientBookingService {
         this.bookingProtectionService = bookingProtectionService;
         this.clinicRepository = clinicRepository;
         this.sessionAvailabilityService = sessionAvailabilityService;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     /**
@@ -175,7 +179,6 @@ public class PatientBookingService {
         });
     }
 
-    @Transactional
     public Booking bookSlot(UUID patientAccountId, UUID clinicId, UUID slotId, BookSlotInput input) {
         // 062-rejected-clinic-gating (research.md Decision 1, "Ordering"): refused before the 060
         // rate-limit gate below, so an attempt at a rejected clinic is never recorded as booking
@@ -183,18 +186,20 @@ public class PatientBookingService {
         requireClinicAcceptingAppointments(clinicId);
         // 060-booking-abuse-prevention: the rate-limit/booking-limit gate - the very first thing
         // this method does, before the slot lookup, matching research.md Decision 6's fixed check
-        // order. Throws (and durably records the rejection itself) before anything else runs.
-        bookingProtectionService.checkAndRecordAttempt(patientAccountId, clinicId);
-
+        // order. The gate, its attempt row and the booking share one transaction, so the patient
+        // row lock the gate takes is held until the booking commits (research.md Decision 1).
         try {
-            Booking booking = doBookSlot(patientAccountId, clinicId, slotId, input);
-            bookingProtectionService.recordCompletion(patientAccountId, clinicId, BookingAttemptOutcome.SUCCESS, booking);
-            return booking;
+            return transactionTemplate.execute(status -> {
+                UUID attemptId = bookingProtectionService.checkAndRecordAttempt(patientAccountId, clinicId);
+                Booking booking = doBookSlot(patientAccountId, clinicId, slotId, input);
+                bookingProtectionService.recordSuccess(attemptId, booking);
+                return booking;
+            });
         } catch (RuntimeException e) {
-            // FR-008: every attempt counts, whatever the reason - a failure below the protection
-            // gate above (slot already taken, slot in the past, no fee configured, etc.) still
-            // counts toward the rate-limit window.
-            bookingProtectionService.recordCompletion(patientAccountId, clinicId, BookingAttemptOutcome.OTHER_FAILURE, null);
+            // FR-008: every attempt counts, whatever the reason - a rejection by the gate, or a
+            // failure below it (slot already taken, slot in the past, no fee configured, etc.).
+            // Its row rolled back with the transaction; recorded now that the lock is released.
+            bookingProtectionService.recordAfterRollback(patientAccountId, clinicId, e);
             throw e;
         }
     }

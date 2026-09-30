@@ -61,7 +61,7 @@ New module: `backend/src/main/java/com/cms/waitlist/`, `backend/src/test/java/co
 ### Tests for User Story 2 (write first, confirm they FAIL before implementation)
 
 - [X] T012 [P] [US2] Integration test: a patient joins for a specific doctor → `201`, `status: "WAITING"`, `doctorProfileId` set, `specialization` null; a patient joins for a specialization with no doctor → `201`, `specialization` set, `doctorProfileId` null (FR-001, US2 AC1/AC2) — in `backend/src/test/java/com/cms/waitlist/integration/PatientWaitlistJoinTest.java`
-- [X] T013 [P] [US2] Integration test: neither `doctorProfileId` nor `specialization` given → `400 WAITLIST_TARGET_REQUIRED`; a `doctorProfileId` not staffed at the clinic → `404 DOCTOR_NOT_STAFFED_AT_CLINIC`; an unknown `clinicId` → `404 CLINIC_NOT_FOUND` — in the same file as T012
+- [X] T013 [P] [US2] Integration test: neither `doctorProfileId` nor `specialization` given → `400 WAITLIST_TARGET_REQUIRED`; a `doctorProfileId` not staffed at the clinic → `409 DOCTOR_NOT_STAFFED_AT_CLINIC` (was 404; aligned with 013 on 2026-09-30); an unknown `clinicId` → `404 CLINIC_NOT_FOUND` — in the same file as T012
 - [X] T014 [P] [US2] Integration test: staff join on a patient's behalf produces the identical entry shape as the patient joining directly (US2 AC3); an unknown `patientAccountId` → `404 PATIENT_ACCOUNT_NOT_FOUND`; staff with zero role at the clinic → `403 FORBIDDEN`; a Doctor's own token → `403 FORBIDDEN` — in `backend/src/test/java/com/cms/waitlist/integration/StaffWaitlistJoinTest.java`
 
 ### Implementation for User Story 2

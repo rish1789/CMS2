@@ -38,7 +38,7 @@ Specialization-only:
 |---|---|---|
 | `401 Unauthorized` | Missing/invalid patient bearer token | — |
 | `404 Not Found` | No `Clinic` with `clinicId` | `CLINIC_NOT_FOUND` |
-| `404 Not Found` | `doctorProfileId` given but not staffed at `clinicId` | `DOCTOR_NOT_STAFFED_AT_CLINIC` |
+| `409 Conflict` | `doctorProfileId` given but not staffed at `clinicId` (2026-09-30: aligned with 013's shared `DOCTOR_NOT_STAFFED_AT_CLINIC` mapping - the doctor exists, the request breaks a staffing rule) | `DOCTOR_NOT_STAFFED_AT_CLINIC` |
 | `400 Bad Request` | Neither `doctorProfileId` nor `specialization` given | `WAITLIST_TARGET_REQUIRED` |
 
 ## `POST /api/v1/clinics/{clinicId}/waitlist` (staff, on a patient's behalf)

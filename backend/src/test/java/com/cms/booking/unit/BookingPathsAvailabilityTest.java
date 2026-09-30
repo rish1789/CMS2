@@ -118,7 +118,7 @@ class BookingPathsAvailabilityTest {
             return new PatientBookingService(
                     slotRepository, sessionRepository, feeResolutionService, appointmentTypeRepository,
                     patientLinkingService, bookingRepository, doctorProfileRepository, bookingProtectionService,
-                    clinicRepository, availability);
+                    clinicRepository, availability, mock(org.springframework.transaction.PlatformTransactionManager.class));
         }
 
         @ParameterizedTest

@@ -4,12 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.cms.booking.domain.Booking;
 import com.cms.booking.domain.BookingAttemptLog;
+import com.cms.booking.domain.BookingAttemptOutcome;
 import com.cms.booking.domain.BookingStatus;
 import com.cms.booking.domain.ClinicBookingLimitOverride;
 import com.cms.booking.exception.BookingLimitReachedException;
@@ -19,7 +23,6 @@ import com.cms.booking.repository.BookingRepository;
 import com.cms.booking.repository.ClinicBookingLimitOverrideRepository;
 import com.cms.booking.service.BookingAttemptRecorder;
 import com.cms.booking.service.BookingProtectionService;
-import com.cms.identity.clinic.ClinicRepository;
 import com.cms.patient.account.repository.PatientAccountRepository;
 import com.cms.protection.service.ProtectionSettingService;
 import java.time.Instant;
@@ -28,6 +31,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -52,9 +56,6 @@ class BookingProtectionServiceTest {
     private ClinicBookingLimitOverrideRepository clinicBookingLimitOverrideRepository;
 
     @Mock
-    private ClinicRepository clinicRepository;
-
-    @Mock
     private ProtectionSettingService protectionSettingService;
 
     @Mock
@@ -66,7 +67,6 @@ class BookingProtectionServiceTest {
                 bookingRepository,
                 patientAccountRepository,
                 clinicBookingLimitOverrideRepository,
-                clinicRepository,
                 protectionSettingService,
                 attemptRecorder);
     }
@@ -228,5 +228,89 @@ class BookingProtectionServiceTest {
         newService().checkAndRecordAttempt(patientAccountId, clinicId);
 
         verify(attemptLogRepository, never()).countByPatientAccount_IdAndAttemptedAtAfter(any(), any());
+    }
+
+    // ---- attempt recording (research.md Decision 1, FR-008) ----
+
+    @Test
+    void thePatientRowIsLockedBeforeTheAttemptCountIsRead() {
+        UUID patientAccountId = UUID.randomUUID();
+        UUID clinicId = UUID.randomUUID();
+        rateLimitPasses();
+        when(protectionSettingService.isBookingLimitEnabled()).thenReturn(false);
+
+        newService().checkAndRecordAttempt(patientAccountId, clinicId);
+
+        // Without the lock ahead of the count, simultaneous attempts all read the same count and
+        // all pass - the lock must be taken even with the booking limit turned off.
+        InOrder inOrder = inOrder(patientAccountRepository, attemptLogRepository);
+        inOrder.verify(patientAccountRepository).findWithLockById(patientAccountId);
+        inOrder.verify(attemptLogRepository).countByPatientAccount_IdAndAttemptedAtAfter(eq(patientAccountId), any());
+    }
+
+    @Test
+    void anAdmittedAttemptIsRecordedBeforeTheBookingRunsAndItsIdReturned() {
+        UUID patientAccountId = UUID.randomUUID();
+        UUID clinicId = UUID.randomUUID();
+        UUID attemptId = UUID.randomUUID();
+        rateLimitPasses();
+        when(protectionSettingService.isBookingLimitEnabled()).thenReturn(false);
+        when(attemptRecorder.recordAdmitted(patientAccountId, clinicId)).thenReturn(attemptId);
+
+        UUID returned = newService().checkAndRecordAttempt(patientAccountId, clinicId);
+
+        // Recorded as OTHER_FAILURE up front, in the caller's transaction and under its lock, so
+        // the next attempt counts it; only an actual success flips it.
+        assertThat(returned).isEqualTo(attemptId);
+    }
+
+    @Test
+    void aRejectionIsLeftForTheCallerToRecordAfterItsTransactionRollsBack() {
+        UUID patientAccountId = UUID.randomUUID();
+        UUID clinicId = UUID.randomUUID();
+        when(protectionSettingService.isRateLimitEnabled()).thenReturn(true);
+        when(protectionSettingService.getRateLimitMaxAttempts()).thenReturn(8);
+        when(protectionSettingService.getRateLimitWindowMinutes()).thenReturn(10);
+        when(protectionSettingService.getRateLimitCooldownMinutes()).thenReturn(15);
+        when(attemptLogRepository.findFirstByPatientAccount_IdAndOutcomeNotOrderByAttemptedAtDesc(any(), any()))
+                .thenReturn(Optional.empty());
+        when(attemptLogRepository.findFirstByPatientAccount_IdAndOutcomeAndAttemptedAtAfterOrderByAttemptedAtAsc(
+                        any(), any(), any()))
+                .thenReturn(Optional.empty());
+        when(attemptLogRepository.countByPatientAccount_IdAndAttemptedAtAfter(any(), any())).thenReturn(8L);
+
+        assertThatThrownBy(() -> newService().checkAndRecordAttempt(patientAccountId, clinicId))
+                .isInstanceOf(RateLimitedException.class);
+
+        // A write here would roll back with the rejection, or need a second connection while
+        // the patient row lock is held.
+        verifyNoInteractions(attemptRecorder);
+    }
+
+    @Test
+    void recordAfterRollbackLogsTheOutcomeTheFailureStandsFor() {
+        UUID patientAccountId = UUID.randomUUID();
+        UUID clinicId = UUID.randomUUID();
+        BookingProtectionService service = newService();
+
+        service.recordAfterRollback(patientAccountId, clinicId, new RateLimitedException(60));
+        service.recordAfterRollback(patientAccountId, clinicId, new BookingLimitReachedException());
+        service.recordAfterRollback(patientAccountId, clinicId, new IllegalStateException("slot taken"));
+
+        verify(attemptRecorder).record(patientAccountId, clinicId, BookingAttemptOutcome.RATE_LIMITED, null);
+        verify(attemptRecorder).record(patientAccountId, clinicId, BookingAttemptOutcome.LIMIT_REACHED, null);
+        verify(attemptRecorder).record(patientAccountId, clinicId, BookingAttemptOutcome.OTHER_FAILURE, null);
+    }
+
+    @Test
+    void recordSuccessMarksTheAttemptSucceededWithItsBooking() {
+        UUID attemptId = UUID.randomUUID();
+        BookingAttemptLog attempt = mock(BookingAttemptLog.class);
+        Booking booking = mock(Booking.class);
+        when(attemptLogRepository.findById(attemptId)).thenReturn(Optional.of(attempt));
+
+        newService().recordSuccess(attemptId, booking);
+
+        verify(attempt).markSucceeded(booking);
     }
 }

@@ -85,4 +85,14 @@ public class BookingAttemptLog {
     public Booking getBooking() {
         return booking;
     }
+
+    /**
+     * An admitted attempt is logged as {@code OTHER_FAILURE} before its booking runs (research.md
+     * Decision 1), so a failure or rollback still counts (FR-008); this is its one transition,
+     * taken only once the booking exists. Still one row per attempt.
+     */
+    public void markSucceeded(Booking booking) {
+        this.outcome = BookingAttemptOutcome.SUCCESS;
+        this.booking = booking;
+    }
 }

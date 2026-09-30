@@ -16,11 +16,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 060-booking-abuse-prevention: a separate bean (not a private method on {@link
- * BookingProtectionService}) specifically so {@link #record} can run in its own {@code
- * REQUIRES_NEW} transaction - a rejected attempt (RATE_LIMITED/LIMIT_REACHED) must still be
- * durably logged even though the {@code bookSlot} transaction it's part of is about to roll back
- * on the very exception this class's caller throws right after logging it. A private method on
- * the same class would bypass Spring's proxy and silently ignore the propagation setting.
+ * BookingProtectionService}) so its transaction settings go through Spring's proxy - a private
+ * method on the same class would silently ignore them.
+ *
+ * <p>{@link #record} is called once the attempt's own transaction has ended ({@code
+ * BookingProtectionService.recordAfterRollback}), or with a caller's outer transaction (a
+ * waitlist claim) still open and doomed around it - {@code REQUIRES_NEW} keeps the row out of
+ * that. {@link #recordAdmitted} is the opposite case: it joins the attempt's own transaction,
+ * which holds the patient row lock.
  */
 @Service
 public class BookingAttemptRecorder {
@@ -40,8 +43,18 @@ public class BookingAttemptRecorder {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void record(UUID patientAccountId, UUID clinicId, BookingAttemptOutcome outcome, Booking booking) {
+        save(patientAccountId, clinicId, outcome, booking);
+    }
+
+    /** An admitted attempt, logged as OTHER_FAILURE until its booking succeeds. Returns its id. */
+    @Transactional
+    public UUID recordAdmitted(UUID patientAccountId, UUID clinicId) {
+        return save(patientAccountId, clinicId, BookingAttemptOutcome.OTHER_FAILURE, null).getId();
+    }
+
+    private BookingAttemptLog save(UUID patientAccountId, UUID clinicId, BookingAttemptOutcome outcome, Booking booking) {
         PatientAccount patientAccount = patientAccountRepository.getReferenceById(patientAccountId);
         Clinic clinic = clinicRepository.getReferenceById(clinicId);
-        attemptLogRepository.save(new BookingAttemptLog(patientAccount, clinic, Instant.now(), outcome, booking));
+        return attemptLogRepository.save(new BookingAttemptLog(patientAccount, clinic, Instant.now(), outcome, booking));
     }
 }

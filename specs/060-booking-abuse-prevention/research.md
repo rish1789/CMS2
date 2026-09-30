@@ -16,6 +16,15 @@
   bounds the burst to at most one extra attempt beyond the configured threshold, never an unbounded
   bypass, and matches the spec's own framing of the limit as a threshold to catch bulk/bot abuse, not
   a hard real-time semaphore.
+
+  *2026-09-30 correction:* as shipped, the attempt row was inserted *after* the booking, not before
+  it, so a burst of simultaneous attempts all read the same pre-burst count - CI saw 12 of 12
+  admitted against a threshold of 8, well past the one-attempt margin above. Fixed by taking the
+  booking-limit row lock below *before* the rate-limit count as well, and inserting the attempt's
+  row inside that same locked transaction. This makes the rate limit exact too, not "within one".
+  A rejected or failed attempt's row rolls back with its transaction and is re-recorded once that
+  transaction has ended - never through a second connection while the lock is held, which stalled
+  a burst larger than the connection pool. See tasks.md T076.
 - **Booking limit**: stricter, because spec.md FR-006 and NFR-003 require the limit to hold exactly,
   not "within one." The count-then-insert sequence (count active bookings for this patient, then
   insert the new `Booking` row if under the limit) is wrapped so that a `SELECT ... FOR UPDATE`-style
