@@ -1,15 +1,18 @@
 package com.cms.scheduling.repository;
 
 import com.cms.scheduling.domain.Session;
+import jakarta.persistence.LockModeType;
 
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -19,6 +22,13 @@ public interface SessionRepository extends JpaRepository<Session, UUID> {
     List<Session> findBySchedule_IdAndSessionDateIn(UUID scheduleId, List<LocalDate> sessionDates);
 
     List<Session> findBySchedule_Id(UUID scheduleId);
+
+    /**
+     * 067 research.md Decision 1: locks the Session row (PostgreSQL {@code FOR NO KEY UPDATE}) for the
+     * rest of the caller's transaction - the per-session serialization point for token issuance.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<Session> findWithLockById(UUID id);
 
     /** super-admin-console-redesign: the clinic permanent-delete gate - a generated Session counts as real activity. */
     long countByClinic_Id(UUID clinicId);

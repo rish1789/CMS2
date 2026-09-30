@@ -10,40 +10,45 @@ import com.cms.scheduling.exception.SessionNotFoundException;
 import com.cms.scheduling.exception.TokenIssuanceFailedException;
 import com.cms.scheduling.repository.SessionRepository;
 import com.cms.scheduling.repository.SlotRepository;
-
-
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockTimeoutException;
+import jakarta.persistence.PessimisticLockException;
 import java.util.UUID;
-import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 019: issues one new, never-reused-token {@link Slot} per call for a Queue/Token
- * {@link Session}. No automatic trigger - 018 (unbuilt) is this feature's only real
- * caller (spec Assumptions).
+ * {@link Session}.
+ *
+ * <p>067-queue-token-issuance-race (research.md Decisions 1, 4, 5): issuance locks the Session row
+ * before reading {@code max(token) + 1}, so concurrent callers for one session take turns instead
+ * of colliding - no retry loop, and numbers stay 1..N with no gaps. The lock and the token join the
+ * caller's transaction and are held until it ends, so a booking or walk-in that fails afterwards
+ * rolls its token back too (FR-008); called without a transaction, each call is its own. Different
+ * sessions never wait on each other. A caller holding this lock must not open a second database
+ * connection before it commits (no {@code REQUIRES_NEW}). A wait longer than
+ * {@link #LOCK_TIMEOUT} is refused as {@link TokenIssuanceFailedException} (503, retry later).
  */
 @Service
 public class QueueSlotService {
 
-    private static final int MAX_ATTEMPTS = 5;
+    static final String LOCK_TIMEOUT = "5s";
 
     private final SessionRepository sessionRepository;
     private final SlotRepository slotRepository;
+    private final EntityManager entityManager;
 
-    public QueueSlotService(SessionRepository sessionRepository, SlotRepository slotRepository) {
+    public QueueSlotService(SessionRepository sessionRepository, SlotRepository slotRepository, EntityManager entityManager) {
         this.sessionRepository = sessionRepository;
         this.slotRepository = slotRepository;
+        this.entityManager = entityManager;
     }
 
-    /**
-     * Deliberately NOT {@code @Transactional}: each attempt runs in its own, fresh
-     * transaction via {@link #attemptIssueSlot}, mirroring 011's proven pattern - a lost
-     * race on one attempt never poisons a transaction the next attempt could otherwise
-     * use, and every caller here has an equally legitimate claim to a new token (unlike
-     * 011's own "whoever commits first wins, skip the rest" race).
-     */
+    @Transactional
     public Slot issueNextSlot(UUID sessionId) {
-        return issueWithRetry(sessionId, ScheduleMode.QUEUE);
+        return issue(sessionId, ScheduleMode.QUEUE);
     }
 
     /**
@@ -52,24 +57,13 @@ public class QueueSlotService {
      * unique index as a Queue session's tokens, so the walk-in line is not a second queue system.
      * A Fixed-Time session's timed Slots carry no token, so its walk-ins number from 1.
      */
-    public Slot issueNextWalkInSlot(UUID sessionId) {
-        return issueWithRetry(sessionId, ScheduleMode.FIXED_TIME);
-    }
-
-    private Slot issueWithRetry(UUID sessionId, ScheduleMode requiredMode) {
-        for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-            try {
-                return attemptIssueSlot(sessionId, requiredMode);
-            } catch (DataIntegrityViolationException e) {
-                // Lost the race for this token number; retry with a freshly-read max.
-            }
-        }
-        throw new TokenIssuanceFailedException(sessionId);
-    }
-
     @Transactional
-    Slot attemptIssueSlot(UUID sessionId, ScheduleMode requiredMode) {
-        Session session = sessionRepository.findById(sessionId).orElseThrow(() -> new SessionNotFoundException(sessionId));
+    public Slot issueNextWalkInSlot(UUID sessionId) {
+        return issue(sessionId, ScheduleMode.FIXED_TIME);
+    }
+
+    private Slot issue(UUID sessionId, ScheduleMode requiredMode) {
+        Session session = lockSession(sessionId);
         if (session.getMode() != requiredMode) {
             throw requiredMode == ScheduleMode.QUEUE
                     ? new NotAQueueSessionException(sessionId)
@@ -84,5 +78,15 @@ public class QueueSlotService {
         // issuance point, rather than in each booking path (they hold a detached Slot).
         token.setStatus(SlotStatus.BOOKED);
         return slotRepository.save(token);
+    }
+
+    private Session lockSession(UUID sessionId) {
+        // SET LOCAL: the bound applies to this transaction only (research.md Decision 5).
+        entityManager.createNativeQuery("SET LOCAL lock_timeout = '" + LOCK_TIMEOUT + "'").executeUpdate();
+        try {
+            return sessionRepository.findWithLockById(sessionId).orElseThrow(() -> new SessionNotFoundException(sessionId));
+        } catch (PessimisticLockingFailureException | PessimisticLockException | LockTimeoutException e) {
+            throw new TokenIssuanceFailedException(sessionId);
+        }
     }
 }

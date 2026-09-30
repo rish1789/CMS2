@@ -58,7 +58,7 @@ separate, derived concept this feature does not compute.
 | 409 | `NO_FEE_CONFIGURED` | No fee resolvable for the doctor/appointment-type pairing |
 | 404 | `PATIENT_NOT_FOUND` | (staff only) `patientId` given but not found at this clinic |
 | 400 | `INVALID_MOBILE_NUMBER` | (staff only) `patientPhone` given but not a valid Indian mobile number |
-| 503 | `TOKEN_ISSUANCE_FAILED` | Token issuance exhausted its retry budget under extreme contention (research.md) |
+| 503 | `TOKEN_ISSUANCE_FAILED` | The session's issuance lock could not be obtained within the bound (5 s); retry later. Ordinary concurrent bookings never produce this (updated 2026-09-30 by 067, `contracts/token-issuance.md`; formerly "exhausted its retry budget") |
 
 Note: there is no `SLOT_ALREADY_BOOKED` case for either endpoint — every queue booking mints
 a brand-new Slot, so the Fixed-Time "this Slot was just taken" race cannot occur here

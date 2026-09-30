@@ -129,7 +129,7 @@ class RejectedClinicBookingRefusalTest {
             PatientQueueBookingService service = new PatientQueueBookingService(
                     sessionRepository, queueSlotService, feeResolutionService, appointmentTypeRepository,
                     patientLinkingService, bookingRepository, bookingProtectionService, clinicRepository,
-                    sessionAvailabilityService);
+                    sessionAvailabilityService, mock(org.springframework.transaction.PlatformTransactionManager.class));
 
             assertThatThrownBy(() -> service.bookSlot(
                             callerId, clinicId, session.getId(),
@@ -165,7 +165,7 @@ class RejectedClinicBookingRefusalTest {
             StaffQueueBookingService service = new StaffQueueBookingService(
                     sessionRepository, queueSlotService, roleAssignmentRepository, feeResolutionService,
                     appointmentTypeRepository, patientRepository, bookingRepository, mobileNumberValidator,
-                    sessionAvailabilityService);
+                    sessionAvailabilityService, mock(org.springframework.transaction.PlatformTransactionManager.class));
 
             assertThatThrownBy(() -> service.bookSlot(
                             callerId, clinicId, session.getId(),

@@ -219,6 +219,31 @@ public abstract class AbstractQueueBookingIntegrationTest {
         return sessionRepository.findBySchedule_Id(schedule.getId()).get(0);
     }
 
+    /**
+     * 067: the Queue session generated for {@code date}. Concurrency tests date it tomorrow - a
+     * today-dated 09:00-13:00 session stops accepting after 13:00, which made fixtures depend on
+     * the time of day the suite runs.
+     */
+    protected Session saveQueueSessionOn(Clinic clinic, DoctorProfile doctor, LocalDate date) {
+        return sessionOn(scheduleRepository.save(new Schedule(
+                doctor, clinic, EnumSet.allOf(DayOfWeek.class), LocalTime.of(9, 0), LocalTime.of(13, 0), ScheduleMode.QUEUE, null)), date);
+    }
+
+    /** 067: the Fixed-Time session generated for {@code date}; see {@link #saveQueueSessionOn}. */
+    protected Session saveFixedTimeSessionOn(Clinic clinic, DoctorProfile doctor, LocalDate date) {
+        return sessionOn(scheduleRepository.save(new Schedule(
+                doctor, clinic, EnumSet.allOf(DayOfWeek.class),
+                LocalTime.of(9, 0), LocalTime.of(13, 0), ScheduleMode.FIXED_TIME, 15)), date);
+    }
+
+    private Session sessionOn(Schedule schedule, LocalDate date) {
+        sessionGenerationService.generate(date);
+        return sessionRepository.findBySchedule_Id(schedule.getId()).stream()
+                .filter(s -> s.getSessionDate().equals(date))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("No session generated on " + date));
+    }
+
     protected AppointmentType saveAppointmentTypeWithOverride(DoctorProfile doctor, BigDecimal feeOverride) {
         return appointmentTypeRepository.save(new AppointmentType(doctor, "Follow-up", feeOverride));
     }

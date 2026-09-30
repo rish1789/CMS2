@@ -20,4 +20,14 @@ public abstract class AbstractQueueSlotIntegrationTest extends AbstractSlotGener
         sessionGenerationService.generate(LocalDate.now());
         return sessionRepository.findBySchedule_Id(schedule.getId()).get(0);
     }
+
+    /** 067: the generated Queue/Token Session on {@code date} (tests date it tomorrow, not today). */
+    protected Session saveQueueSessionOn(Clinic clinic, DoctorProfile doctor, LocalDate date) {
+        var schedule = saveEveryDaySchedule(clinic, doctor, ScheduleMode.QUEUE, null);
+        sessionGenerationService.generate(date);
+        return sessionRepository.findBySchedule_Id(schedule.getId()).stream()
+                .filter(s -> s.getSessionDate().equals(date))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("No session generated on " + date));
+    }
 }

@@ -43,7 +43,7 @@ Errors (existing shape `{error, message, failedRules, field}`):
 | 409 | `DUPLICATE_WALK_IN` | patient already waiting in, or booked into, this session and `confirmDuplicate` is false |
 | 409 | `NO_FEE_CONFIGURED` | existing |
 | 409 | `CLINIC_NOT_ACCEPTING_APPOINTMENTS` | existing 062 |
-| 409 | `TOKEN_ISSUANCE_FAILED` | existing |
+| 503 | `TOKEN_ISSUANCE_FAILED` | existing: the session's issuance lock could not be obtained within the bound; retry later. *(Documentation fix 2026-09-30, 067: this row said 409, but `BookingExceptionHandler`, the only handler, has always returned 503.)* |
 
 ## 2. Session list: two more fields (existing endpoint)
 
