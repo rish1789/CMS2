@@ -152,7 +152,7 @@ class UntimedSlotGuardsTest {
         PatientBookingService service = new PatientBookingService(
                 slotRepository, sessionRepository, feeResolutionService, appointmentTypeRepository,
                 patientLinkingService, bookingRepository, doctorProfileRepository, bookingProtectionService,
-                clinicRepository, sessionAvailabilityService);
+                clinicRepository, sessionAvailabilityService, mock(org.springframework.transaction.PlatformTransactionManager.class));
 
         assertThatThrownBy(() -> service.bookSlot(
                         callerId, clinicId, walkIn.getId(), new PatientBookingService.BookSlotInput("X", UUID.randomUUID())))

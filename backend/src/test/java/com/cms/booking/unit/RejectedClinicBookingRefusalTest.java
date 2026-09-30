@@ -111,7 +111,7 @@ class RejectedClinicBookingRefusalTest {
             PatientBookingService service = new PatientBookingService(
                     slotRepository, sessionRepository, feeResolutionService, appointmentTypeRepository,
                     patientLinkingService, bookingRepository, doctorProfileRepository, bookingProtectionService,
-                    clinicRepository, sessionAvailabilityService);
+                    clinicRepository, sessionAvailabilityService, mock(org.springframework.transaction.PlatformTransactionManager.class));
 
             assertThatThrownBy(() -> service.bookSlot(
                             callerId, clinicId, slot.getId(), new PatientBookingService.BookSlotInput("Asha", UUID.randomUUID())))

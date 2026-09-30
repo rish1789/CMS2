@@ -188,6 +188,31 @@ No setup tasks. This feature adds zero new dependencies (plan.md Technical Conte
 
 ---
 
+## Phase 9: Post-release fix - rate-limit burst bypass (2026-09-30)
+
+**Found by**: CI on `main` (run 36604543917) - `BookingRateLimitConcurrencyTest` admitted 12 of 12
+simultaneous attempts against a threshold of 8. Cause: the attempt row was written *after* the
+booking, inside its transaction, so every attempt in a burst counted the same pre-burst rows
+(research.md Decision 1 says it is written *before*). The same placement meant a failed
+fixed-time attempt's row rolled back with its booking, so failures never counted (FR-008).
+
+- [x] T076 Test first: `BookingRateLimitConcurrencyTest` tightened from "at most threshold + 1" to
+  exactly the threshold, on both booking paths (the queue path was untested), plus a new case
+  proving a rolled-back fixed-time attempt still counts; four new `BookingProtectionServiceTest`
+  cases (lock taken before the count, admitted row recorded up front, rejection not written
+  inside the doomed transaction, `recordAfterRollback` outcome mapping). Fix:
+  `BookingProtectionService.checkAndRecordAttempt` takes the patient row lock *before* the
+  rate-limit count and inserts the admitted attempt's row (OTHER_FAILURE, flipped by
+  `recordSuccess`) in the same transaction; a rejection or failure is recorded by
+  `recordAfterRollback` once that transaction has ended. `PatientBookingService.bookSlot` now
+  runs its gate and booking in a `TransactionTemplate` so that recording happens outside it.
+  A first attempt that wrote the row via `REQUIRES_NEW` while holding the lock was rejected:
+  with a burst larger than the connection pool (10) every request timed out waiting for a
+  second connection. Verified with Docker: `com.cms.booking.*`, `com.cms.waitlist.*`,
+  `com.cms.protection.*`, `com.cms.patient.*` - 476/477 green; the one failure,
+  `SessionCancellationSuccessTest.fixedTimeSessionWithMixedSlotStatesCancelsOnlyTheActiveBookings`,
+  writes its bookings directly (not through this code), is today-dated, and passed on rerun.
+
 ## Dependencies & Execution Order
 
 - **Setup (Phase 1)**: none.

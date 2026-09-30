@@ -5,7 +5,6 @@ import com.cms.identity.clinic.Clinic;
 import com.cms.identity.clinic.ClinicRepository;
 import com.cms.booking.domain.AppointmentType;
 import com.cms.booking.domain.Booking;
-import com.cms.booking.domain.BookingAttemptOutcome;
 import com.cms.booking.exception.AppointmentTypeNotFoundException;
 import com.cms.booking.exception.SessionNotAcceptingBookingsException;
 import com.cms.booking.repository.AppointmentTypeRepository;
@@ -73,15 +72,19 @@ public class PatientQueueBookingService {
         requireClinicAcceptingAppointments(clinicId);
         // 060-booking-abuse-prevention: same fixed gate order as PatientBookingService.bookSlot
         // (research.md Decision 6) - first thing this method does.
-        bookingProtectionService.checkAndRecordAttempt(patientAccountId, clinicId);
+        // The gate runs in its own transaction here, so a rejection rolls back and is recorded
+        // after it; an admitted attempt's row is committed before the booking below runs, so a
+        // failure there is already counted (FR-008).
+        UUID attemptId;
         try {
-            Booking booking = doBookSlot(patientAccountId, clinicId, sessionId, input);
-            bookingProtectionService.recordCompletion(patientAccountId, clinicId, BookingAttemptOutcome.SUCCESS, booking);
-            return booking;
+            attemptId = bookingProtectionService.checkAndRecordAttempt(patientAccountId, clinicId);
         } catch (RuntimeException e) {
-            bookingProtectionService.recordCompletion(patientAccountId, clinicId, BookingAttemptOutcome.OTHER_FAILURE, null);
+            bookingProtectionService.recordAfterRollback(patientAccountId, clinicId, e);
             throw e;
         }
+        Booking booking = doBookSlot(patientAccountId, clinicId, sessionId, input);
+        bookingProtectionService.recordSuccess(attemptId, booking);
+        return booking;
     }
 
     private Booking doBookSlot(UUID patientAccountId, UUID clinicId, UUID sessionId, BookSlotInput input) {
