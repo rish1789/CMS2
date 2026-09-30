@@ -183,7 +183,7 @@ class BookingPathsAvailabilityTest {
             verdict(v);
             PatientQueueBookingService service = new PatientQueueBookingService(
                     sessionRepository, queueSlotService, feeResolutionService, appointmentTypeRepository,
-                    patientLinkingService, bookingRepository, bookingProtectionService, clinicRepository, availability);
+                    patientLinkingService, bookingRepository, bookingProtectionService, clinicRepository, availability, mock(org.springframework.transaction.PlatformTransactionManager.class));
 
             assertThatThrownBy(() -> service.bookSlot(
                             callerId, clinicId, session.getId(),
@@ -202,7 +202,7 @@ class BookingPathsAvailabilityTest {
             verdict(v);
             StaffQueueBookingService service = new StaffQueueBookingService(
                     sessionRepository, queueSlotService, roleAssignmentRepository, feeResolutionService,
-                    appointmentTypeRepository, patientRepository, bookingRepository, mobileNumberValidator, availability);
+                    appointmentTypeRepository, patientRepository, bookingRepository, mobileNumberValidator, availability, mock(org.springframework.transaction.PlatformTransactionManager.class));
 
             assertThatThrownBy(() -> service.bookSlot(
                             callerId, clinicId, session.getId(),

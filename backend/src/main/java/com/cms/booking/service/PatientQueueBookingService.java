@@ -25,11 +25,17 @@ import com.cms.scheduling.domain.Slot;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 022: the Queue-mode analog of 021's {@link PatientBookingService}. Same non-{@code
- * @Transactional} top-level calling convention as {@link StaffQueueBookingService} - see
- * its javadoc and research.md.
+ * 022: the Queue-mode analog of 021's {@link PatientBookingService}.
+ *
+ * <p>067-queue-token-issuance-race (research.md Decisions 2-4): patient linking, token issuance and
+ * the booking run in one transaction, so a booking that fails leaves no token behind (FR-008) and
+ * the session lock taken by {@link QueueSlotService} is held until the booking commits. This
+ * supersedes 022 research.md's "two separate atomic units". The 062 clinic check and the 060 gate
+ * stay before and outside that transaction, as merged in #20.
  */
 @Service
 public class PatientQueueBookingService {
@@ -43,6 +49,7 @@ public class PatientQueueBookingService {
     private final BookingProtectionService bookingProtectionService;
     private final ClinicRepository clinicRepository;
     private final SessionAvailabilityService sessionAvailabilityService;
+    private final TransactionTemplate transactionTemplate;
 
     public PatientQueueBookingService(
             SessionRepository sessionRepository,
@@ -53,7 +60,8 @@ public class PatientQueueBookingService {
             BookingRepository bookingRepository,
             BookingProtectionService bookingProtectionService,
             ClinicRepository clinicRepository,
-            SessionAvailabilityService sessionAvailabilityService) {
+            SessionAvailabilityService sessionAvailabilityService,
+            PlatformTransactionManager transactionManager) {
         this.sessionRepository = sessionRepository;
         this.queueSlotService = queueSlotService;
         this.feeResolutionService = feeResolutionService;
@@ -63,6 +71,7 @@ public class PatientQueueBookingService {
         this.bookingProtectionService = bookingProtectionService;
         this.clinicRepository = clinicRepository;
         this.sessionAvailabilityService = sessionAvailabilityService;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     public Booking bookSlot(UUID patientAccountId, UUID clinicId, UUID sessionId, BookSlotInput input) {
@@ -82,9 +91,13 @@ public class PatientQueueBookingService {
             bookingProtectionService.recordAfterRollback(patientAccountId, clinicId, e);
             throw e;
         }
-        Booking booking = doBookSlot(patientAccountId, clinicId, sessionId, input);
-        bookingProtectionService.recordSuccess(attemptId, booking);
-        return booking;
+        // 067: the success flag commits with the booking; on failure the admitted row stays a
+        // failure (060 FR-008) and the token is rolled back (067 FR-008).
+        return transactionTemplate.execute(status -> {
+            Booking booking = doBookSlot(patientAccountId, clinicId, sessionId, input);
+            bookingProtectionService.recordSuccess(attemptId, booking);
+            return booking;
+        });
     }
 
     private Booking doBookSlot(UUID patientAccountId, UUID clinicId, UUID sessionId, BookSlotInput input) {
@@ -111,14 +124,10 @@ public class PatientQueueBookingService {
 
         Patient patient = patientLinkingService.findOrCreatePatient(patientAccountId, clinicId, input.patientName());
 
-        // Called outside any transaction this method opens (research.md).
+        // 067: joins this booking's transaction and locks the session until it commits. Lock order:
+        // the patient account (findOrCreatePatient, 066) first, then the session.
         Slot slot = queueSlotService.issueNextSlot(sessionId);
 
-        // Convergence fix: no separate @Transactional helper here - self-invocation from
-        // this method would have silently bypassed it anyway (the same gotcha research.md
-        // documents for QueueSlotService.attemptIssueSlot). A detached Slot reference is
-        // fine for this simple, non-cascading INSERT (research.md); bookingRepository.save
-        // is independently atomic on its own via Spring Data JPA.
         // _diagnostics CRITICAL fix: patientAccountId is a patient_account.id, never an
         // account.id - Booking.bookedByPatient sets the correct disjoint-identity column.
         return bookingRepository.save(Booking.bookedByPatient(slot, patient, appointmentType, lockedFee, patientAccountId));

@@ -45,6 +45,8 @@ here requires it.
 
 ## Decision: Slot-issuance and Booking-creation are two separate atomic units, not one
 
+> **Superseded 2026-09-30 by 067 `research.md` Decision 2.** Since 064 (V40), tokens are minted `BOOKED`, so an orphan token is no longer harmless: it counts as a waiting patient in every later queue position. And 067's Session row lock removed the retry closure this decision protected. Queue booking is now one transaction. The original text is kept below for history.
+
 **Decision**: Accept that this feature's overall flow is not fully atomic end-to-end. Fee
 resolution (a pure read) gates everything. Patient resolution (its own already-transactional
 call) happens next. `queueSlotService.issueNextSlot` runs as its own already-proven,

@@ -3,6 +3,7 @@ package com.cms.scheduling.unit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -15,6 +16,8 @@ import com.cms.scheduling.exception.NotAQueueSessionException;
 import com.cms.scheduling.repository.SessionRepository;
 import com.cms.scheduling.repository.SlotRepository;
 import com.cms.scheduling.service.QueueSlotService;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +39,8 @@ class QueueSlotServiceWalkInTest {
 
     @Mock SessionRepository sessionRepository;
     @Mock SlotRepository slotRepository;
+    @Mock EntityManager entityManager;
+    @Mock Query setLockTimeout;
 
     private final UUID sessionId = UUID.randomUUID();
     private Session session;
@@ -43,12 +48,14 @@ class QueueSlotServiceWalkInTest {
     @BeforeEach
     void setUp() {
         session = mock(Session.class);
-        when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
+        // 067: issuance locks the session row after bounding the lock wait.
+        when(entityManager.createNativeQuery(anyString())).thenReturn(setLockTimeout);
+        when(sessionRepository.findWithLockById(sessionId)).thenReturn(Optional.of(session));
         when(slotRepository.save(any(Slot.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     private QueueSlotService service() {
-        return new QueueSlotService(sessionRepository, slotRepository);
+        return new QueueSlotService(sessionRepository, slotRepository, entityManager);
     }
 
     @Test

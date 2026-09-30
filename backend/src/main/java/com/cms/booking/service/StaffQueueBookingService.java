@@ -29,15 +29,19 @@ import com.cms.scheduling.domain.Slot;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 022: the Queue-mode analog of 020's {@link StaffBookingService}. Unlike Fixed-Time
  * booking, there is no pre-existing Slot to look up - booking itself mints one via
- * {@link QueueSlotService#issueNextSlot}. This top-level method is deliberately NOT
- * {@code @Transactional} (research.md): wrapping {@code issueNextSlot} in a broader
- * transaction here would silently defeat its own proven per-attempt-retry race closure,
- * the same class of bug already found and fixed twice this session (020, 021) - just
- * proactively avoided here instead of reactively fixed.
+ * {@link QueueSlotService#issueNextSlot}.
+ *
+ * <p>067-queue-token-issuance-race (research.md Decision 2): patient resolution, token issuance and
+ * the booking run in one transaction, so a booking that fails leaves no token behind (FR-008) and
+ * the session lock taken by {@link QueueSlotService} is held until the booking commits. This
+ * supersedes 022 research.md's "deliberately NOT @Transactional" - the retry closure it protected
+ * no longer exists.
  */
 @Service
 public class StaffQueueBookingService {
@@ -51,6 +55,7 @@ public class StaffQueueBookingService {
     private final BookingRepository bookingRepository;
     private final IndianMobileNumberValidator mobileNumberValidator;
     private final SessionAvailabilityService sessionAvailabilityService;
+    private final TransactionTemplate transactionTemplate;
 
     public StaffQueueBookingService(
             SessionRepository sessionRepository,
@@ -61,7 +66,8 @@ public class StaffQueueBookingService {
             PatientRepository patientRepository,
             BookingRepository bookingRepository,
             IndianMobileNumberValidator mobileNumberValidator,
-            SessionAvailabilityService sessionAvailabilityService) {
+            SessionAvailabilityService sessionAvailabilityService,
+            PlatformTransactionManager transactionManager) {
         this.sessionRepository = sessionRepository;
         this.queueSlotService = queueSlotService;
         this.roleAssignmentRepository = roleAssignmentRepository;
@@ -71,6 +77,7 @@ public class StaffQueueBookingService {
         this.bookingRepository = bookingRepository;
         this.mobileNumberValidator = mobileNumberValidator;
         this.sessionAvailabilityService = sessionAvailabilityService;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     public Booking bookSlot(UUID callerAccountId, UUID clinicId, UUID sessionId, BookSlotInput input) {
@@ -102,19 +109,12 @@ public class StaffQueueBookingService {
                 .findById(input.appointmentTypeId())
                 .orElseThrow(() -> new AppointmentTypeNotFoundException(input.appointmentTypeId()));
 
-        Patient patient = resolveOrCreatePatient(clinicId, session, input);
-
-        // Called outside any transaction this method opens (research.md).
-        Slot slot = queueSlotService.issueNextSlot(sessionId);
-
-        // Convergence fix: no separate @Transactional helper here - self-invocation from
-        // this method would have silently bypassed it anyway (the same gotcha research.md
-        // documents for QueueSlotService.attemptIssueSlot). A detached Slot reference is
-        // fine for this simple, non-cascading INSERT (research.md); bookingRepository.save
-        // is independently atomic on its own via Spring Data JPA. No race-closure catch
-        // needed either: this Slot was just freshly minted, so no other caller can already
-        // hold a reference to race against (research.md).
-        return bookingRepository.save(new Booking(slot, patient, appointmentType, lockedFee, callerAccountId));
+        return transactionTemplate.execute(status -> {
+            Patient patient = resolveOrCreatePatient(clinicId, session, input);
+            // 067: joins this transaction and locks the session until the booking commits.
+            Slot slot = queueSlotService.issueNextSlot(sessionId);
+            return bookingRepository.save(new Booking(slot, patient, appointmentType, lockedFee, callerAccountId));
+        });
     }
 
     private Patient resolveOrCreatePatient(UUID clinicId, Session session, BookSlotInput input) {
