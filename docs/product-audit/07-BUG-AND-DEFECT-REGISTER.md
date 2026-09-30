@@ -70,10 +70,11 @@ This is the first time the integration tests ran with a working Docker. The run 
     - Before the fix, the race also broke real bookings: fixed-time bookings with the booking limit disabled (`PatientBookingSameAccountRaceTest`) and queue bookings, 3 of 5 runs (`PatientQueueBookingSameAccountRaceTest`).
     - Tests: `PatientLinkingSameAccountRaceTest`, `PatientLinkingWinnerRollbackTest`, `PatientBookingFailureLeavesNoPatientTest`.
   - **De-verification cascade:** the waitlist offer is not persisted from the `AFTER_COMMIT` listener.
-    - **Still OPEN on `main` `715738b`**, even with PR #13's `WaitlistBumpListener` `REQUIRES_NEW` fix: `cancelledFixedTimeBookingProducesARealWaitlistOffer…` still gets `WAITING`, not `OFFERED`. The cause differs from #13's and has not been investigated. (PR #13 fixed the four `WaitlistMatching*` tests only.)
+    - **RESOLVED 2026-09-29 (PR #18) — not a product bug.** The offer path works. The test fixture generated *today's* 09:00–13:00 session, so for any run after 09:00 the booked slot had already started, and 065's availability rule correctly refused to offer it (traced: verdict `ELAPSED`). The test now uses tomorrow's session. The earlier "listener not persisting" description was wrong for this test; PR #13 fixed that listener bug for the four `WaitlistMatching*` tests.
   - **Booking rate limiter:** exceeds its bounded race margin (12 against 9). Still open.
-  - **Waitlist claim/decline race** (found 2026-09-29, open): `WaitlistClaimService.decline()` reports success even when it loses its guarded update to a concurrent `claim()`, so both callers "win".
-    - `WaitlistClaimConcurrencyTest.claimAndDeclineRacingOnTheSameEntryOnlyOneWins` fails intermittently on `main` `715738b` (5 of 8 `--rerun` runs).
+  - **Waitlist claim/decline race** (found 2026-09-29): `WaitlistClaimService.decline()` reported success even when it lost its guarded update to a concurrent `claim()`, so both callers "won" (032 FR-010/SC-004).
+    - **FIXED 2026-09-29 (PR #18).** `WaitlistReleaseService.release()` now returns whether it won; `decline()` throws `WaitlistOfferNotClaimableException` on a lost race.
+    - `WaitlistClaimConcurrencyTest` failed 5 of 8 `--rerun` runs on `715738b`; after the fix it passes 10 of 10 on its branch and 10 of 10 on `main` `8e7a224`, where it runs together with 066's account lock.
 
 ---
 

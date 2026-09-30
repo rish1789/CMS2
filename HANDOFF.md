@@ -1414,6 +1414,87 @@ These are test-only commits, each verified by re-running the affected classes be
   - `/home/user/CMS2-waitlist`: #13
   - `/home/user/CMS2-protection`: local branch with the CI commits only, on hold
 
+## Part 14 — Everything merged; duplicate-key, patient-linking and waitlist races fixed; flaky test hardened (2026-09-29, cloud sandbox, continued)
+
+This continues Part 13 in the same cloud container. **Part 13's "Open items" and "Still open" lists are superseded by this part.**
+
+### State of `main`
+
+`main` is at **`8e7a224`** (plus this docs PR, #19, once merged). Every PR from this session was merged with **merge commits** (no squash, so stacked branches stayed valid), in this order:
+
+| PR | What it did |
+|---|---|
+| #11 | 065 verification and audit docs, plus the CI repair (`ci.yml` secrets-in-`if`, `gradlew` mode) |
+| #12 | Test-harness repair: `@DirtiesContext`, teardown order, stale assertions, and the ported waitlist-claim self-deadlock fix `6ed89c0`. The later commits (`888240a` retention-purge fixture, `f682771` inbox teardown, roster `active=true`, reuse counts) are also in. |
+| #13 | `WaitlistBumpListener` `REQUIRES_NEW`: waitlist offers are now actually saved |
+| #16 | Duplicate email/license submissions return 409, not 500. Clinic registration, patient signup, staff onboarding (email and license) and the Super Admin license edit each had the right catch, but `save()` deferred the INSERT past it; now `saveAndFlush()` inside the `try`. The license edit failed even without concurrency. |
+| #15 | `ProtectionSettingsPage` test sets the number input in one `fireEvent.change` (CI had shown `"85"`, a lost clear). This is a hardening: it was never reproduced locally, so only a quiet CI history proves it. |
+| #17 | **Feature 066-patient-linking-race**, the full spec-kit set with 17/17 tasks. See below. |
+| #18 | The claim/decline race is fixed; the de-verification offer test was re-dated. See below. |
+
+PR #14 (the standalone deadlock fix) was closed after being ported into #12. The Dependabot PRs #1–#10 are untouched and still open.
+
+### 066-patient-linking-race (spec → plan → tasks → implement, test-first)
+
+- **Bug:** concurrent first bookings by one patient at a new clinic. The loser's INSERT hit `uq_patient_clinic_account`, PostgreSQL aborted the transaction, and the catch's re-read re-flushed the failed INSERT, so the request returned 500.
+- **Fix:** `PatientLinkingService.findOrCreatePatient` takes the existing 060 row lock (`PatientAccountRepository.findWithLockById`), so same-account calls serialize. The broken re-read was removed, and the unique index stays as the backstop. There is no schema change.
+- **Research finding:** 060's booking-limit gate already serialized fixed-time bookings, but only with the limit enabled. The queue path is not `@Transactional` (022), so it was always exposed.
+- **Spec change:** FR-003 was narrowed during planning. The queue path already commits the Patient record separately, and that is unchanged.
+- **Tests:**
+
+  | Test | Before | After |
+  |---|---|---|
+  | `PatientLinkingSameAccountRaceTest` | RED | GREEN |
+  | new fixed-time race test (booking limit off) | RED | GREEN |
+  | new queue race test | RED in 3 of 5 runs | GREEN in 10 of 10 |
+  | winner-rollback test | green (characterization) | green |
+  | failed-booking-leaves-no-patient test | green (characterization) | green |
+
+  Observed results are recorded in `specs/066-patient-linking-race/tasks.md`.
+- **Not done:** no `/speckit-converge` pass has been run for 066, or for 065.
+
+### PR #18 findings
+
+- **Claim/decline race (a real bug, 032 FR-010/SC-004):** `decline()` reported success after losing `expireIfOffered` to a concurrent claim. Now `WaitlistReleaseService.release()` returns a boolean, and `decline()` throws `WaitlistOfferNotClaimableException` on a loss. `WaitlistClaimConcurrencyTest` went from 5 of 8 failing to 0 of 10, including on combined `main` with 066's lock.
+- **`ClinicDeVerificationCascadeTest…WaitlistOffer` was not a product bug.** Its fixture generated *today's* 09:00–13:00 session, so after 09:00 the slot had already started, and 065's availability rule correctly refused the offer (traced: verdict `ELAPSED`). The test now uses tomorrow's session, via a new `saveFixedTimeSessionWithSlotsOn` overload in `AbstractSessionCancellationIntegrationTest`.
+  - **Watch for this pattern elsewhere:** several fixtures still date sessions *today* at 09:00–13:00, so any assertion that needs a still-bookable slot is time-of-day dependent.
+
+### Test status
+
+- **Last full backend run:** on the 066 branch before #18. 1,050 tests, 4 failures, 2 of which #18 has since fixed.
+- **Expected on current `main`, not yet run as a full suite:**
+  - `BookingRateLimitConcurrencyTest`: a real bug; the margin is 12 against 9.
+  - `PatientWaitlistJoinTest.rejectsADoctorNotStaffedAtTheClinic`: **owner decision pending**, 404 or 409. The code maps `DOCTOR_NOT_STAFFED_AT_CLINIC` to 409, and the test expects 404. The owner said "decide later".
+- **Intermittent:**
+  - `PartialSessionCancellationRangeTest.toTimeLeavesSlotsAtOrAfterTheUpperBoundUntouched`: seen once in a full run; it passes alone (3 of 3). It may be order- or time-dependent, like the de-verification fixture; not investigated.
+  - PB-003 `QueueSlotIssuanceConcurrencyTest`: not seen in the last three full runs.
+- **Frontend:** Vitest 441/441 on `main`.
+- **CI on `main` after the merges was not observed.** Watching stopped at the owner's request.
+- **CI has no `timeout-minutes`,** so a hung backend job holds the runner for 6 h. Recommended: 45.
+
+### Still open (next candidates)
+
+- the booking rate-limit margin;
+- PB-003;
+- the 404/409 decision;
+- the `PartialSessionCancellationRangeTest` flake;
+- SEC-03 and PB-005 (both need owner decisions);
+- a converge pass for 065 and 066;
+- CI `timeout-minutes`;
+- the stray `docs/.claude - Copy/worktrees/...` gitlink;
+- `actions/*@v4` → v5.
+
+### Sandbox gotchas (in addition to Part 13)
+
+- **spec-kit scripts:** `.specify/scripts` are **PowerShell-only**, and `pwsh` is not installed in the cloud container. Their steps (copy the template, write `.specify/feature.json`) were done by hand. `update-agent-context` was not run.
+- **Transient permission-classifier errors:** the auto-mode permission classifier sometimes returned "no verdict" and blocked `Bash`. Retrying later worked; editing via the file tools did not need it.
+- **Worktrees in this container:**
+  - `/home/user/CMS2-066`, `CMS2-wl`, `CMS2-dup`, `CMS2-psp` and `CMS2-harness`: all merged.
+  - `CMS2-main`: detached, scratch.
+  - `CMS2-doc`: PR #19.
+
+A separate, self-contained note for OpenAI Codex is in `CODEX_HANDOFF.md`.
+
 ## Reference
 
 Memory files at `C:\Users\risha\.claude\projects\C--Users-risha-OneDrive-Documents-CMS2\memory\`

@@ -1,7 +1,7 @@
 // 060-booking-abuse-prevention T055: renders every setting, editing and saving one calls the
 // update endpoint, expanding a setting's history calls the history endpoint and renders its
 // entries.
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ProtectionSettingsPage } from '../../src/features/admin-protection-settings/ProtectionSettingsPage'
@@ -66,9 +66,13 @@ describe('ProtectionSettingsPage', () => {
       updatedBy: 'super-admin',
     })
 
-    render(<ProtectionSettingsPage />)
+    // Flush the async settings load and each row's draft-sync effect before editing.
+    // Finding the label alone can observe the DOM before passive effects have settled.
+    await act(async () => {
+      render(<ProtectionSettingsPage />)
+    })
 
-    await screen.findByText('rate-limit.max-attempts')
+    expect(screen.getByText('rate-limit.max-attempts')).toBeInTheDocument()
     const inputs = screen.getAllByRole('spinbutton')
     const rateLimitInput = inputs.find((el) => (el as HTMLInputElement).value === '8')!
     // One change event, not user.clear() + user.type(): in CI the clear was occasionally lost
