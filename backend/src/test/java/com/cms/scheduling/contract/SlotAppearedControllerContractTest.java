@@ -35,7 +35,8 @@ import org.springframework.test.web.servlet.MockMvc;
  * (its own exhaustive branch coverage lives in SlotAppearedServiceTest).
  */
 @WebMvcTest(controllers = SlotAppearedController.class)
-@Import({ScheduleExceptionHandler.class, SecurityConfig.class, StaffAuthenticationEntryPoint.class, StaffJwtService.class})
+@Import({
+    com.cms.support.AllowAllStaffSessionsTestConfig.class,ScheduleExceptionHandler.class, SecurityConfig.class, StaffAuthenticationEntryPoint.class, StaffJwtService.class})
 @TestPropertySource(properties = "staff.jwt.secret=test-only-contract-test-secret-at-least-64-characters-long-ok")
 class SlotAppearedControllerContractTest {
 

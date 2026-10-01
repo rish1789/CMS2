@@ -61,7 +61,10 @@ describe('StaffLoginForm - staff code identifier (T004)', () => {
   })
 
   it('surfaces the same error on an unrecognized staff code as an unrecognized email', async () => {
-    mockedLoginStaff.mockRejectedValueOnce(new LoginStaffApiError({ error: 'UNAUTHORIZED' }))
+    // 075-login-hardening (D-3C-2): the server's one generic answer for any unknown identifier.
+    mockedLoginStaff.mockRejectedValueOnce(
+      new LoginStaffApiError({ error: 'INVALID_CREDENTIALS', message: 'Incorrect email, staff code or password.' }),
+    )
     const user = userEvent.setup()
     render(<StaffLoginForm />)
 
@@ -69,7 +72,7 @@ describe('StaffLoginForm - staff code identifier (T004)', () => {
     await user.type(screen.getByLabelText(/password/i), 'wrong')
     await user.click(screen.getByRole('button', { name: /sign in/i }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/invalid/i)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Incorrect email, staff code or password.')
   })
 
   // 062-rejected-clinic-gating FR-007: a Doctor/Operations member of a rejected clinic sees why
@@ -142,5 +145,38 @@ describe('StaffLoginForm - Super Admin role resolution (040-super-admin-rbac-log
     })
     expect(sessionStorage.getItem('cms.staffToken')).toContain('staff-jwt')
     expect(sessionStorage.getItem('cms.superAdminToken')).toBeNull()
+  })
+
+  // 075-login-hardening (D-3C-1, D-3C-2)
+  it('explains a temporary lockout with how long to wait', async () => {
+    const user = userEvent.setup()
+    mockedLoginStaff.mockRejectedValueOnce(
+      new LoginStaffApiError({
+        error: 'TOO_MANY_LOGIN_ATTEMPTS',
+        message: 'Too many failed sign-in attempts. Please wait and try again.',
+        retryAfterSeconds: 45,
+      }),
+    )
+    render(<StaffLoginForm />)
+    await user.type(screen.getByLabelText(/email or staff code/i), 'ops@clinic.example')
+    await user.type(screen.getByLabelText(/password/i), 'wrong')
+    await user.click(screen.getByRole('button', { name: /sign in/i }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/too many failed sign-in attempts/i)
+    expect(alert).toHaveTextContent(/less than a minute/i)
+  })
+
+  it('tells a deactivated staff member they have no active clinic access', async () => {
+    const user = userEvent.setup()
+    mockedLoginStaff.mockRejectedValueOnce(
+      new LoginStaffApiError({ error: 'NO_ACTIVE_CLINIC_ACCESS', message: 'This account has no active clinic access.' }),
+    )
+    render(<StaffLoginForm />)
+    await user.type(screen.getByLabelText(/email or staff code/i), 'ops@clinic.example')
+    await user.type(screen.getByLabelText(/password/i), 'Str0ng!Pass')
+    await user.click(screen.getByRole('button', { name: /sign in/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no active clinic access/i)
   })
 })

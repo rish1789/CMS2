@@ -40,7 +40,8 @@ import org.springframework.test.web.servlet.MockMvc;
  * <p>doctor-console-cross-doctor-leak fix: also covers the doctor self-scoping now applied here.
  */
 @WebMvcTest(controllers = TodaySessionStatsController.class)
-@Import({ScheduleExceptionHandler.class, SecurityConfig.class, StaffAuthenticationEntryPoint.class, StaffJwtService.class})
+@Import({
+    com.cms.support.AllowAllStaffSessionsTestConfig.class,ScheduleExceptionHandler.class, SecurityConfig.class, StaffAuthenticationEntryPoint.class, StaffJwtService.class})
 @TestPropertySource(properties = "staff.jwt.secret=test-only-contract-test-secret-at-least-64-characters-long-ok")
 class TodaySessionStatsControllerContractTest {
 

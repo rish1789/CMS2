@@ -35,7 +35,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /** 068-per-clinic-fees (contracts/clinic-fees-api.md): the clinic-scoped fee endpoints' success and error shapes. */
 @WebMvcTest(controllers = ClinicFeeController.class)
-@Import({BookingExceptionHandler.class, SecurityConfig.class, StaffAuthenticationEntryPoint.class, StaffJwtService.class})
+@Import({
+    com.cms.support.AllowAllStaffSessionsTestConfig.class,BookingExceptionHandler.class, SecurityConfig.class, StaffAuthenticationEntryPoint.class, StaffJwtService.class})
 @TestPropertySource(properties = "staff.jwt.secret=test-only-contract-test-secret-at-least-64-characters-long-ok")
 class ClinicFeeControllerContractTest {
 

@@ -46,7 +46,8 @@ import org.springframework.test.web.servlet.MockMvc;
  * error mapped to its documented status, and 401 without a staff token.
  */
 @WebMvcTest(controllers = FrontDeskWalkInController.class)
-@Import({BookingExceptionHandler.class, SecurityConfig.class, StaffAuthenticationEntryPoint.class, StaffJwtService.class})
+@Import({
+    com.cms.support.AllowAllStaffSessionsTestConfig.class,BookingExceptionHandler.class, SecurityConfig.class, StaffAuthenticationEntryPoint.class, StaffJwtService.class})
 @TestPropertySource(properties = "staff.jwt.secret=test-only-contract-test-secret-at-least-64-characters-long-ok")
 class FrontDeskWalkInControllerContractTest {
 

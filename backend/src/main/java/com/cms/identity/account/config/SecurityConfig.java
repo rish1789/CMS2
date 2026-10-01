@@ -146,13 +146,17 @@ public class SecurityConfig {
      */
     @Bean
     @Order(1)
-    public SecurityFilterChain filterChain(HttpSecurity http, StaffJwtService staffJwtService,
-            StaffAuthenticationEntryPoint staffAuthenticationEntryPoint) throws Exception {
+    public SecurityFilterChain filterChain(
+            HttpSecurity http,
+            StaffJwtService staffJwtService,
+            StaffSessionPolicy staffSessionPolicy,
+            StaffAuthenticationEntryPoint staffAuthenticationEntryPoint)
+            throws Exception {
         http.securityMatcher("/api/v1/clinics/**")
                 .csrf(csrf -> csrf.disable())
                 .cors(withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .addFilterBefore(new StaffJwtAuthenticationFilter(staffJwtService), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new StaffJwtAuthenticationFilter(staffJwtService, staffSessionPolicy), UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(staffAuthenticationEntryPoint))
                 // 065-phase1-stabilization (SEC-01 / BUG-001): fail-closed. Clinic registration is the
                 // only public endpoint under this prefix; every other path - including any endpoint

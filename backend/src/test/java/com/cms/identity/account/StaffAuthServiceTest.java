@@ -3,8 +3,10 @@ package com.cms.identity.account;
 import com.cms.identity.account.api.StaffAuthController;
 import com.cms.identity.account.config.StaffJwtService;
 import com.cms.identity.account.domain.Account;
-import com.cms.identity.account.exception.AccountNotFoundException;
-import com.cms.identity.account.exception.IncorrectPasswordException;
+import com.cms.common.login.LoginAttemptGuard;
+import com.cms.common.login.LoginRealm;
+import com.cms.identity.account.exception.InvalidCredentialsException;
+import com.cms.identity.account.exception.NoActiveClinicAccessException;
 import com.cms.identity.account.domain.RoleAssignment;
 import com.cms.identity.account.exception.StaffClinicNotActiveException;
 import com.cms.identity.account.repository.AccountRepository;
@@ -62,10 +64,15 @@ class StaffAuthServiceTest {
     @Mock
     private RoleAssignmentRepository roleAssignmentRepository;
 
+    // 075-login-hardening: the lockout guard (its own behaviour is LoginAttemptStateTest's and
+    // LoginHardeningTest's); here only that failures and successes are reported to it.
+    @Mock
+    private LoginAttemptGuard loginAttemptGuard;
+
     private StaffAuthService staffAuthService() {
         return new StaffAuthService(
                 accountRepository, passwordEncoder, staffJwtService, superAdminAuthenticationService,
-                roleAssignmentRepository);
+                roleAssignmentRepository, loginAttemptGuard);
     }
 
     @Test
@@ -91,6 +98,7 @@ class StaffAuthServiceTest {
         when(account.getId()).thenReturn(accountId);
         when(account.getEmail()).thenReturn("staff@example.com");
         when(staffJwtService.issueToken(accountId)).thenReturn("staff-jwt");
+        when(roleAssignmentRepository.existsByAccount_IdAndActiveTrue(accountId)).thenReturn(true);
 
         StaffLoginResponse response =
                 staffAuthService().login(new StaffLoginRequest("staff@example.com", "Str0ng!Pass"));
@@ -110,6 +118,7 @@ class StaffAuthServiceTest {
         when(account.getId()).thenReturn(accountId);
         when(account.getEmail()).thenReturn("ops@example.com");
         when(staffJwtService.issueToken(accountId)).thenReturn("staff-jwt");
+        when(roleAssignmentRepository.existsByAccount_IdAndActiveTrue(accountId)).thenReturn(true);
 
         StaffLoginResponse response = staffAuthService().login(new StaffLoginRequest("OP-0042", "Str0ng!Pass"));
 
@@ -118,7 +127,7 @@ class StaffAuthServiceTest {
     }
 
     @Test
-    void wrongPasswordForAKnownIdentifierThrowsIncorrectPasswordWithoutIssuingAToken() {
+    void wrongPasswordForAKnownIdentifierFailsGenericallyWithoutIssuingAToken() {
         when(superAdminAuthenticationService.authenticate(anyString(), anyString())).thenReturn(Optional.empty());
         when(superAdminAuthenticationService.identifierMatches("staff@example.com")).thenReturn(false);
         when(accountRepository.findByEmail("staff@example.com")).thenReturn(Optional.of(account));
@@ -127,12 +136,14 @@ class StaffAuthServiceTest {
 
         assertThatThrownBy(
                         () -> staffAuthService().login(new StaffLoginRequest("staff@example.com", "wrong-password")))
-                .isInstanceOf(IncorrectPasswordException.class);
+                .isInstanceOf(InvalidCredentialsException.class);
         verify(staffJwtService, never()).issueToken(any());
+        verify(loginAttemptGuard).recordFailure(LoginRealm.STAFF, "staff@example.com");
     }
 
     @Test
-    void unknownIdentifierThrowsAccountNotFound() {
+    /** 075-login-hardening (D-3C-2): the same failure as a wrong password - and the same hash work, so timing can't tell them apart. */
+    void unknownIdentifierFailsExactlyLikeAWrongPassword() {
         when(superAdminAuthenticationService.authenticate(anyString(), anyString())).thenReturn(Optional.empty());
         when(superAdminAuthenticationService.identifierMatches("nobody@example.com")).thenReturn(false);
         when(accountRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
@@ -140,19 +151,22 @@ class StaffAuthServiceTest {
 
         assertThatThrownBy(() ->
                         staffAuthService().login(new StaffLoginRequest("nobody@example.com", "irrelevant")))
-                .isInstanceOf(AccountNotFoundException.class);
-        verifyNoInteractions(passwordEncoder, staffJwtService);
+                .isInstanceOf(InvalidCredentialsException.class);
+        verify(passwordEncoder).matches(org.mockito.ArgumentMatchers.eq("irrelevant"), any());
+        verifyNoInteractions(staffJwtService);
+        verify(loginAttemptGuard).recordFailure(LoginRealm.STAFF, "nobody@example.com");
     }
 
     @Test
-    void wrongPasswordForTheSuperAdminIdentifierThrowsIncorrectPasswordNotAccountNotFound() {
+    void wrongPasswordForTheSuperAdminIdentifierFailsGenericallyAndCounts() {
         when(superAdminAuthenticationService.authenticate("superadmin", "wrong-password"))
                 .thenReturn(Optional.empty());
         when(superAdminAuthenticationService.identifierMatches("superadmin")).thenReturn(true);
 
         assertThatThrownBy(() -> staffAuthService().login(new StaffLoginRequest("superadmin", "wrong-password")))
-                .isInstanceOf(IncorrectPasswordException.class);
-        verifyNoInteractions(accountRepository, passwordEncoder, staffJwtService);
+                .isInstanceOf(InvalidCredentialsException.class);
+        verifyNoInteractions(accountRepository, staffJwtService);
+        verify(loginAttemptGuard).recordFailure(LoginRealm.STAFF, "superadmin");
     }
 
     // ---- 062-rejected-clinic-gating (FR-007, tasks.md T022): only a ClinicAdmin keeps access to a rejected clinic ----
@@ -197,6 +211,7 @@ class StaffAuthServiceTest {
         passwordMatchesFor(accountId);
         when(roleAssignmentRepository.findByAccount_IdAndActiveTrue(accountId))
                 .thenReturn(List.of(role(RoleAssignment.Role.ClinicAdmin, true)));
+        when(roleAssignmentRepository.existsByAccount_IdAndActiveTrue(accountId)).thenReturn(true);
 
         assertThat(staffAuthService().login(new StaffLoginRequest("staff@example.com", "Str0ng!Pass")).token())
                 .isEqualTo("staff-jwt");
@@ -208,18 +223,26 @@ class StaffAuthServiceTest {
         passwordMatchesFor(accountId);
         when(roleAssignmentRepository.findByAccount_IdAndActiveTrue(accountId))
                 .thenReturn(List.of(role(RoleAssignment.Role.Doctor, true), role(RoleAssignment.Role.Doctor, false)));
+        when(roleAssignmentRepository.existsByAccount_IdAndActiveTrue(accountId)).thenReturn(true);
 
         assertThat(staffAuthService().login(new StaffLoginRequest("staff@example.com", "Str0ng!Pass")).token())
                 .isEqualTo("staff-jwt");
     }
 
+    /**
+     * 075-login-hardening (D-3C-1) supersedes 062's "an account with no roles signs in exactly as
+     * before": with no active role at any clinic, the right password now gets NO_ACTIVE_CLINIC_ACCESS.
+     */
     @Test
-    void anAccountWithNoRoleAssignmentsSignsInExactlyAsBefore() {
+    void anAccountWithNoActiveRoleIsRefusedAfterTheRightPassword() {
         UUID accountId = UUID.randomUUID();
         passwordMatchesFor(accountId);
         when(roleAssignmentRepository.findByAccount_IdAndActiveTrue(accountId)).thenReturn(List.of());
+        when(roleAssignmentRepository.existsByAccount_IdAndActiveTrue(accountId)).thenReturn(false);
 
-        assertThat(staffAuthService().login(new StaffLoginRequest("staff@example.com", "Str0ng!Pass")).token())
-                .isEqualTo("staff-jwt");
+        assertThatThrownBy(() -> staffAuthService().login(new StaffLoginRequest("staff@example.com", "Str0ng!Pass")))
+                .isInstanceOf(NoActiveClinicAccessException.class);
+        verify(staffJwtService, never()).issueToken(any());
+        verify(loginAttemptGuard).recordSuccess(LoginRealm.STAFF, "staff@example.com");
     }
 }

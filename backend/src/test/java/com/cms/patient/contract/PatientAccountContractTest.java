@@ -8,8 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.cms.patient.account.exception.EmailAlreadyInUseException;
-import com.cms.patient.account.exception.AccountNotFoundException;
-import com.cms.patient.account.exception.IncorrectPasswordException;
+import com.cms.patient.account.exception.InvalidCredentialsException;
 import com.cms.patient.account.exception.InvalidPasswordException;
 import com.cms.patient.account.config.JwtService;
 import com.cms.patient.account.service.PatientAccountService;
@@ -162,9 +161,10 @@ class PatientAccountContractTest {
                 .andExpect(jsonPath("$.error").value("MISSING_REQUIRED_FIELD"));
     }
 
+    /** 075-login-hardening (D-3C-2): one generic answer for a wrong password and an unknown email alike. */
     @Test
-    void loginWithWrongPasswordReturns401WithIncorrectPasswordError() throws Exception {
-        when(patientAccountService.authenticate(any())).thenThrow(new IncorrectPasswordException());
+    void invalidCredentialsReturn401WithTheGenericError() throws Exception {
+        when(patientAccountService.authenticate(any())).thenThrow(new InvalidCredentialsException("Incorrect email or password."));
 
         mockMvc.perform(post("/api/v1/patients/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -173,20 +173,7 @@ class PatientAccountContractTest {
                                 { "email": "owner@example.com", "password": "wrong-password" }
                                 """))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("INCORRECT_PASSWORD"));
-    }
-
-    @Test
-    void loginWithUnknownEmailReturns401WithAccountNotFoundError() throws Exception {
-        when(patientAccountService.authenticate(any())).thenThrow(new AccountNotFoundException());
-
-        mockMvc.perform(post("/api/v1/patients/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(
-                                """
-                                { "email": "nobody@example.com", "password": "Str0ng!Pass" }
-                                """))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("ACCOUNT_NOT_FOUND"));
+                .andExpect(jsonPath("$.error").value("INVALID_CREDENTIALS"))
+                .andExpect(jsonPath("$.message").value("Incorrect email or password."));
     }
 }

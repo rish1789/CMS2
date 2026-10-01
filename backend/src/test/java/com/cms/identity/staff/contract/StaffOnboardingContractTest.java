@@ -36,6 +36,7 @@ import org.springframework.test.web.servlet.MockMvc;
  */
 @WebMvcTest(controllers = StaffOnboardingController.class)
 @Import({
+    com.cms.support.AllowAllStaffSessionsTestConfig.class,
     StaffExceptionHandler.class,
     GlobalExceptionHandler.class,
     SecurityConfig.class,

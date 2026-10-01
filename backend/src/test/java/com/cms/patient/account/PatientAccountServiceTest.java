@@ -2,9 +2,10 @@ package com.cms.patient.account;
 
 import com.cms.patient.account.config.JwtService;
 import com.cms.patient.account.domain.PatientAccount;
-import com.cms.patient.account.exception.AccountNotFoundException;
+import com.cms.common.login.LoginAttemptGuard;
+import com.cms.common.login.LoginRealm;
 import com.cms.patient.account.exception.EmailAlreadyInUseException;
-import com.cms.patient.account.exception.IncorrectPasswordException;
+import com.cms.patient.account.exception.InvalidCredentialsException;
 import com.cms.patient.account.exception.InvalidMobileNumberException;
 import com.cms.patient.account.exception.InvalidPasswordException;
 import com.cms.patient.account.repository.PatientAccountRepository;
@@ -64,9 +65,15 @@ class PatientAccountServiceTest {
     @Mock
     private PatientAccount account;
 
+    // 075-login-hardening: the lockout guard; its own behaviour is covered by LoginAttemptStateTest
+    // and LoginHardeningTest.
+    @Mock
+    private LoginAttemptGuard loginAttemptGuard;
+
     private PatientAccountService service() {
         return new PatientAccountService(
-                patientAccountRepository, passwordPolicyValidator, mobileNumberValidator, passwordEncoder, jwtService);
+                patientAccountRepository, passwordPolicyValidator, mobileNumberValidator, passwordEncoder, jwtService,
+                loginAttemptGuard);
     }
 
     @Test
@@ -134,20 +141,24 @@ class PatientAccountServiceTest {
     }
 
     @Test
-    void loginWithWrongPasswordForARegisteredEmailThrowsIncorrectPassword() {
+    void loginWithWrongPasswordForARegisteredEmailFailsGenerically() {
         when(patientAccountRepository.findByEmail("owner@example.com")).thenReturn(Optional.of(account));
         when(account.getPasswordHash()).thenReturn("hashed-pw");
         when(passwordEncoder.matches("wrong-password", "hashed-pw")).thenReturn(false);
 
         assertThatThrownBy(() -> service().authenticate(new LoginRequest("owner@example.com", "wrong-password")))
-                .isInstanceOf(IncorrectPasswordException.class);
+                .isInstanceOf(InvalidCredentialsException.class)
+                .hasMessage("Incorrect email or password.");
+        org.mockito.Mockito.verify(loginAttemptGuard).recordFailure(LoginRealm.PATIENT, "owner@example.com");
     }
 
     @Test
-    void loginWithAnUnregisteredEmailThrowsAccountNotFound() {
+    void loginWithAnUnregisteredEmailFailsExactlyLikeAWrongPassword() {
         when(patientAccountRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service().authenticate(new LoginRequest("nobody@example.com", "irrelevant")))
-                .isInstanceOf(AccountNotFoundException.class);
+                .isInstanceOf(InvalidCredentialsException.class)
+                .hasMessage("Incorrect email or password.");
+        org.mockito.Mockito.verify(loginAttemptGuard).recordFailure(LoginRealm.PATIENT, "nobody@example.com");
     }
 }

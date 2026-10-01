@@ -8,8 +8,10 @@ import java.util.UUID;
 import com.cms.identity.account.api.StaffAuthController;
 import com.cms.identity.account.config.StaffJwtService;
 import com.cms.identity.account.domain.Account;
-import com.cms.identity.account.exception.AccountNotFoundException;
-import com.cms.identity.account.exception.IncorrectPasswordException;
+import com.cms.common.login.LoginAttemptGuard;
+import com.cms.common.login.LoginRealm;
+import com.cms.identity.account.exception.InvalidCredentialsException;
+import com.cms.identity.account.exception.NoActiveClinicAccessException;
 import com.cms.identity.account.repository.AccountRepository;
 
 
@@ -50,44 +52,71 @@ public class StaffAuthService {
     private final StaffJwtService staffJwtService;
     private final SuperAdminAuthenticationService superAdminAuthenticationService;
     private final RoleAssignmentRepository roleAssignmentRepository;
+    private final LoginAttemptGuard loginAttemptGuard;
+    // 075-login-hardening FR-002: compared against when the identifier matches no account, so an
+    // unknown identifier costs the same hash work as a wrong password.
+    private volatile String timingEqualiserHash;
+
+    static final String INVALID_CREDENTIALS_MESSAGE = "Incorrect email, staff code or password.";
 
     public StaffAuthService(
             AccountRepository accountRepository,
             PasswordEncoder passwordEncoder,
             StaffJwtService staffJwtService,
             SuperAdminAuthenticationService superAdminAuthenticationService,
-            RoleAssignmentRepository roleAssignmentRepository) {
+            RoleAssignmentRepository roleAssignmentRepository,
+            LoginAttemptGuard loginAttemptGuard) {
         this.accountRepository = accountRepository;
         this.passwordEncoder = passwordEncoder;
         this.staffJwtService = staffJwtService;
         this.superAdminAuthenticationService = superAdminAuthenticationService;
         this.roleAssignmentRepository = roleAssignmentRepository;
+        this.loginAttemptGuard = loginAttemptGuard;
     }
 
+    /**
+     * 075-login-hardening (D-3C-1, D-3C-2): a locked identifier is refused before any password
+     * check; an unknown identifier and a wrong password both fail with one generic answer and count
+     * towards the lock; only after a correct password does the caller learn about clinic access.
+     */
     public StaffLoginResponse login(StaffLoginRequest request) {
+        loginAttemptGuard.requireNotLocked(LoginRealm.STAFF, request.identifier());
+
         Optional<String> superAdminToken =
                 superAdminAuthenticationService.authenticate(request.identifier(), request.password());
         if (superAdminToken.isPresent()) {
+            loginAttemptGuard.recordSuccess(LoginRealm.STAFF, request.identifier());
             return new StaffLoginResponse(superAdminToken.get(), null, request.identifier(), "SUPER_ADMIN");
         }
 
-        // The identifier matched the configured Super Admin username above, but the password
-        // didn't - report it as a wrong password, not "account not found", rather than falling
-        // through to a staff lookup that can never match a Super Admin username anyway.
+        // The Super Admin username with a wrong password: the same generic failure - never a
+        // staff lookup, which can't match a Super Admin username anyway.
         if (superAdminAuthenticationService.identifierMatches(request.identifier())) {
-            throw new IncorrectPasswordException();
+            throw failed(request.identifier());
         }
 
-        Account account = accountRepository
+        Optional<Account> found = accountRepository
                 .findByEmail(request.identifier())
-                .or(() -> accountRepository.findByStaffCode(request.identifier()))
-                .orElseThrow(AccountNotFoundException::new);
-        if (!passwordEncoder.matches(request.password(), account.getPasswordHash())) {
-            throw new IncorrectPasswordException();
+                .or(() -> accountRepository.findByStaffCode(request.identifier()));
+        boolean passwordMatches = passwordEncoder.matches(
+                request.password(), found.map(Account::getPasswordHash).orElseGet(this::timingEqualiserHash));
+        if (found.isEmpty() || !passwordMatches) {
+            throw failed(request.identifier());
         }
+        Account account = found.get();
+        loginAttemptGuard.recordSuccess(LoginRealm.STAFF, request.identifier());
+
         requireAnActiveClinic(account.getId());
+        if (!roleAssignmentRepository.existsByAccount_IdAndActiveTrue(account.getId())) {
+            throw new NoActiveClinicAccessException();
+        }
         String token = staffJwtService.issueToken(account.getId());
         return new StaffLoginResponse(token, account.getId(), account.getEmail(), "STAFF");
+    }
+
+    private InvalidCredentialsException failed(String identifier) {
+        loginAttemptGuard.recordFailure(LoginRealm.STAFF, identifier);
+        return new InvalidCredentialsException(INVALID_CREDENTIALS_MESSAGE);
     }
 
     /**
@@ -105,5 +134,15 @@ public class StaffAuthService {
         if (allBlocked) {
             throw new StaffClinicNotActiveException();
         }
+    }
+
+    /** Built on first use (not at startup) - one bcrypt hash an unknown identifier is compared against. */
+    private String timingEqualiserHash() {
+        String hash = timingEqualiserHash;
+        if (hash == null) {
+            hash = passwordEncoder.encode("timing-equaliser-not-a-real-password");
+            timingEqualiserHash = hash;
+        }
+        return hash;
     }
 }

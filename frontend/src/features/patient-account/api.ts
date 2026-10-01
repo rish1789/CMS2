@@ -1,6 +1,8 @@
 // Client for POST /api/v1/patients/signup and POST /api/v1/patients/login
 // See specs/002-patient-account-login/contracts/patient-account.md
 
+import type { LoginLockedBody } from '../../lib/loginLockout'
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
 
 export interface SignupPatientRequest {
@@ -69,12 +71,12 @@ export interface LoginPatientResponse {
   email: string
 }
 
-// ACCOUNT_NOT_FOUND (no registered account for that email) and INCORRECT_PASSWORD (email is
-// registered, password didn't match) are reported separately - a product decision accepting
-// the resulting user-enumeration tradeoff in exchange for a more specific login error.
+// 075-login-hardening (D-3C-2): one INVALID_CREDENTIALS for an unknown email and a wrong password
+// alike; 5 failures lock the email for 15 minutes (TOO_MANY_LOGIN_ATTEMPTS, 429).
 export type LoginPatientErrorBody =
-  | { error: 'ACCOUNT_NOT_FOUND'; message: string }
-  | { error: 'INCORRECT_PASSWORD'; message: string }
+  | { error: 'INVALID_CREDENTIALS'; message: string }
+  | LoginLockedBody
+  | { error: 'RATE_LIMIT_EXCEEDED'; message?: string }
   | { error: 'MISSING_REQUIRED_FIELD'; field: string; message?: string }
 
 export class LoginPatientApiError extends Error {

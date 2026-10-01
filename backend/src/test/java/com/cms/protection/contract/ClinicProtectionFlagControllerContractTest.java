@@ -38,7 +38,8 @@ import org.springframework.test.web.servlet.MockMvc;
  * contract tier. Web-layer only (mocked service), real JWT auth via a real token.
  */
 @WebMvcTest(controllers = ClinicProtectionFlagController.class)
-@Import({ProtectionExceptionHandler.class, SecurityConfig.class, StaffAuthenticationEntryPoint.class, StaffJwtService.class})
+@Import({
+    com.cms.support.AllowAllStaffSessionsTestConfig.class,ProtectionExceptionHandler.class, SecurityConfig.class, StaffAuthenticationEntryPoint.class, StaffJwtService.class})
 @TestPropertySource(properties = "staff.jwt.secret=test-only-contract-test-secret-at-least-64-characters-long-ok")
 class ClinicProtectionFlagControllerContractTest {
 

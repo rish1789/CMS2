@@ -1,6 +1,8 @@
 // Client for POST /api/v1/staff/login
 // See specs/004-staff-onboarding-direct-hire/contracts/staff-onboarding.md
 
+import type { LoginLockedBody } from '../../lib/loginLockout'
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
 
 export interface LoginStaffRequest {
@@ -20,14 +22,16 @@ export interface LoginStaffResponse {
 
 // _diagnostics [MEDIUM] - [STAFF_LOGIN] - [TYPE_MISMATCH]: POST /api/v1/staff/login never actually
 // returns "UNAUTHORIZED" - that code belongs to a different, JWT-gated endpoint family
-// (StaffAuthenticationEntryPoint). This endpoint returns ACCOUNT_NOT_FOUND/INCORRECT_PASSWORD
-// (401) or MISSING_REQUIRED_FIELD (400).
-// ACCOUNT_NOT_FOUND (no matching email/staff code/Super Admin username) and INCORRECT_PASSWORD
-// (identifier resolved, password didn't match) are reported separately - a product decision
-// accepting the resulting user-enumeration tradeoff in exchange for a more specific login error.
+// (StaffAuthenticationEntryPoint).
+// 075-login-hardening (D-3C-2): one INVALID_CREDENTIALS (401) for an unknown identifier and a wrong
+// password alike - the earlier ACCOUNT_NOT_FOUND / INCORRECT_PASSWORD split revealed which emails and
+// staff codes exist. 5 failures lock the identifier (TOO_MANY_LOGIN_ATTEMPTS, 429); a correct
+// password on an account with no active clinic role gets NO_ACTIVE_CLINIC_ACCESS (403).
 export type LoginStaffErrorBody =
-  | { error: 'ACCOUNT_NOT_FOUND'; message?: string }
-  | { error: 'INCORRECT_PASSWORD'; message?: string }
+  | { error: 'INVALID_CREDENTIALS'; message?: string }
+  | LoginLockedBody
+  | { error: 'NO_ACTIVE_CLINIC_ACCESS'; message?: string }
+  | { error: 'RATE_LIMIT_EXCEEDED'; message?: string }
   // 062-rejected-clinic-gating FR-007: every role this account holds is Doctor/Operations at a rejected clinic.
   | { error: 'CLINIC_NOT_ACTIVE'; message?: string }
   | { error: 'MISSING_REQUIRED_FIELD'; field?: string; message?: string }
@@ -36,7 +40,7 @@ export class LoginStaffApiError extends Error {
   readonly body: LoginStaffErrorBody
 
   constructor(body: LoginStaffErrorBody) {
-    super(body.message ?? 'Invalid email or password.')
+    super(body.message ?? 'Incorrect email, staff code or password.')
     this.name = 'LoginStaffApiError'
     this.body = body
   }
@@ -54,9 +58,9 @@ export async function loginStaff(payload: LoginStaffRequest): Promise<LoginStaff
     try {
       body = (await response.json()) as LoginStaffErrorBody
     } catch {
-      // Response body didn't parse as JSON - we can't tell which of the two failure modes
-      // this was, so fall back to the generic wording rather than guessing one.
-      body = { error: 'ACCOUNT_NOT_FOUND', message: 'Invalid email or password.' }
+      // Response body didn't parse as JSON (e.g. a proxy error page) - don't claim the
+      // credentials were wrong when we can't tell.
+      body = { error: 'INVALID_CREDENTIALS', message: 'Could not sign in. Please try again.' }
     }
     throw new LoginStaffApiError(body)
   }

@@ -196,10 +196,12 @@ describe('LoginForm', () => {
     })
   })
 
-  it('shows a distinct error for an unregistered email', async () => {
+  // 075-login-hardening (D-3C-2): one generic message for an unknown email and a wrong password -
+  // the earlier separate messages told anyone which emails are registered.
+  it('shows the one generic error for invalid credentials', async () => {
     const user = userEvent.setup()
     mockedLoginPatient.mockRejectedValueOnce(
-      new LoginPatientApiError({ error: 'ACCOUNT_NOT_FOUND', message: 'No account found with that email.' }),
+      new LoginPatientApiError({ error: 'INVALID_CREDENTIALS', message: 'Incorrect email or password.' }),
     )
 
     renderLoginForm()
@@ -207,15 +209,18 @@ describe('LoginForm', () => {
     await user.type(screen.getByLabelText(/password/i), 'whatever')
     await user.click(screen.getByRole('button', { name: /log in/i }))
 
-    await waitFor(() => {
-      expect(screen.getByText(/no account found with that email/i)).toBeInTheDocument()
-    })
+    expect(await screen.findByRole('alert')).toHaveTextContent('Incorrect email or password.')
+    expect(screen.queryByText(/no account found/i)).not.toBeInTheDocument()
   })
 
-  it('shows a distinct error for a wrong password on a registered email', async () => {
+  it('explains a temporary lockout with how long to wait', async () => {
     const user = userEvent.setup()
     mockedLoginPatient.mockRejectedValueOnce(
-      new LoginPatientApiError({ error: 'INCORRECT_PASSWORD', message: 'Incorrect password.' }),
+      new LoginPatientApiError({
+        error: 'TOO_MANY_LOGIN_ATTEMPTS',
+        message: 'Too many failed sign-in attempts. Please wait and try again.',
+        retryAfterSeconds: 840,
+      }),
     )
 
     renderLoginForm()
@@ -223,9 +228,9 @@ describe('LoginForm', () => {
     await user.type(screen.getByLabelText(/password/i), 'wrong-password')
     await user.click(screen.getByRole('button', { name: /log in/i }))
 
-    await waitFor(() => {
-      expect(screen.getByText(/incorrect password/i)).toBeInTheDocument()
-    })
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/too many failed sign-in attempts/i)
+    expect(alert).toHaveTextContent(/about 14 minutes/i)
   })
 
   it('shows an informational toast for "Forgot password?" instead of a dead link', async () => {

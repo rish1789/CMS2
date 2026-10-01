@@ -3,6 +3,7 @@ import { loginStaff, LoginStaffApiError } from './api'
 import { storeStaffSession } from './token'
 import type { ClinicPortalRole } from './destination'
 import { storeSuperAdminSession } from '../super-admin/token'
+import { loginLockedMessage } from '../../lib/loginLockout'
 
 interface FormState {
   identifier: string
@@ -46,7 +47,12 @@ export function StaffLoginForm({ onSuccess }: StaffLoginFormProps) {
       onSuccess?.({ role: response.role })
     } catch (err) {
       if (err instanceof LoginStaffApiError) {
-        setFormError(err.body.message ?? 'Invalid email or password.')
+        // 075-login-hardening: a lockout also says how long to wait.
+        setFormError(
+          err.body.error === 'TOO_MANY_LOGIN_ATTEMPTS'
+            ? loginLockedMessage(err.body)
+            : (err.body.message ?? 'Incorrect email, staff code or password.'),
+        )
       } else {
         setFormError('Something went wrong. Please try again.')
       }

@@ -47,6 +47,7 @@ import org.springframework.test.web.servlet.MockMvc;
  */
 @WebMvcTest(controllers = PatientBookingHistoryController.class)
 @Import({
+    com.cms.support.AllowAllStaffSessionsTestConfig.class,
     PatientRecordExceptionHandler.class,
     SecurityConfig.class,
     StaffAuthenticationEntryPoint.class,

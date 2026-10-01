@@ -78,7 +78,10 @@ describe('StaffLoginForm', () => {
   })
 
   it('shows an error on invalid credentials', async () => {
-    mockedLoginStaff.mockRejectedValueOnce(new LoginStaffApiError({ error: 'UNAUTHORIZED' }))
+    // 075-login-hardening (D-3C-2): the server's one generic answer.
+    mockedLoginStaff.mockRejectedValueOnce(
+      new LoginStaffApiError({ error: 'INVALID_CREDENTIALS', message: 'Incorrect email, staff code or password.' }),
+    )
     const user = userEvent.setup(TYPING_OPTIONS)
     render(<StaffLoginForm />)
 
@@ -86,7 +89,7 @@ describe('StaffLoginForm', () => {
     await user.type(screen.getByLabelText(/password/i), 'wrong')
     await user.click(screen.getByRole('button', { name: /sign in/i }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/invalid email or password/i)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Incorrect email, staff code or password.')
   })
 })
 

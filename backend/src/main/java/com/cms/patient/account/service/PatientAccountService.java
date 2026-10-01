@@ -2,9 +2,8 @@ package com.cms.patient.account.service;
 
 import com.cms.patient.account.config.JwtService;
 import com.cms.patient.account.domain.PatientAccount;
-import com.cms.patient.account.exception.AccountNotFoundException;
 import com.cms.patient.account.exception.EmailAlreadyInUseException;
-import com.cms.patient.account.exception.IncorrectPasswordException;
+import com.cms.patient.account.exception.InvalidCredentialsException;
 import com.cms.patient.account.exception.InvalidMobileNumberException;
 import com.cms.patient.account.exception.InvalidPasswordException;
 import com.cms.patient.account.exception.MissingRequiredFieldException;
@@ -17,7 +16,10 @@ import com.cms.patient.api.dto.LoginRequest;
 import com.cms.patient.api.dto.LoginResponse;
 import com.cms.patient.api.dto.SignupRequest;
 import com.cms.patient.api.dto.SignupResponse;
+import com.cms.common.login.LoginAttemptGuard;
+import com.cms.common.login.LoginRealm;
 import java.util.List;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
@@ -40,18 +42,22 @@ public class PatientAccountService {
     private final IndianMobileNumberValidator mobileNumberValidator;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final LoginAttemptGuard loginAttemptGuard;
+    private volatile String timingEqualiserHash;
 
     public PatientAccountService(
             PatientAccountRepository patientAccountRepository,
             PasswordPolicyValidator passwordPolicyValidator,
             IndianMobileNumberValidator mobileNumberValidator,
             PasswordEncoder passwordEncoder,
-            JwtService jwtService) {
+            JwtService jwtService,
+            LoginAttemptGuard loginAttemptGuard) {
         this.patientAccountRepository = patientAccountRepository;
         this.passwordPolicyValidator = passwordPolicyValidator;
         this.mobileNumberValidator = mobileNumberValidator;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.loginAttemptGuard = loginAttemptGuard;
     }
 
     @Transactional
@@ -82,19 +88,23 @@ public class PatientAccountService {
     }
 
     /**
-     * Distinguishes an unregistered email ({@link AccountNotFoundException}) from a wrong
-     * password for a real account ({@link IncorrectPasswordException}) - a product decision
-     * accepting the resulting user-enumeration tradeoff in exchange for a more specific login
-     * error (supersedes this feature's original FR-007 no-leak behavior).
+     * 075-login-hardening (D-3C-2): an unregistered email and a wrong password get one generic
+     * answer again - restoring this feature's original FR-007 no-leak behaviour, which an earlier
+     * product decision had traded away - and both count towards the per-email lockout. An unknown
+     * email still costs one hash comparison, so response time does not tell the two apart.
      */
     public LoginResponse authenticate(LoginRequest request) {
-        PatientAccount account = patientAccountRepository
-                .findByEmail(request.email())
-                .orElseThrow(AccountNotFoundException::new);
+        loginAttemptGuard.requireNotLocked(LoginRealm.PATIENT, request.email());
 
-        if (!passwordEncoder.matches(request.password(), account.getPasswordHash())) {
-            throw new IncorrectPasswordException();
+        Optional<PatientAccount> found = patientAccountRepository.findByEmail(request.email());
+        boolean passwordMatches = passwordEncoder.matches(
+                request.password(), found.map(PatientAccount::getPasswordHash).orElseGet(this::timingEqualiserHash));
+        if (found.isEmpty() || !passwordMatches) {
+            loginAttemptGuard.recordFailure(LoginRealm.PATIENT, request.email());
+            throw new InvalidCredentialsException("Incorrect email or password.");
         }
+        PatientAccount account = found.get();
+        loginAttemptGuard.recordSuccess(LoginRealm.PATIENT, request.email());
 
         String token = jwtService.issueToken(account.getId());
         log.info("Patient Account login succeeded: patientAccountId={}", account.getId());
@@ -133,5 +143,15 @@ public class PatientAccountService {
     private boolean isUniqueConstraintViolation(DataAccessException e, String constraintName) {
         String message = e.getMostSpecificCause().getMessage();
         return message != null && message.contains(constraintName);
+    }
+
+    /** Built on first use (not at startup) - one bcrypt hash an unknown identifier is compared against. */
+    private String timingEqualiserHash() {
+        String hash = timingEqualiserHash;
+        if (hash == null) {
+            hash = passwordEncoder.encode("timing-equaliser-not-a-real-password");
+            timingEqualiserHash = hash;
+        }
+        return hash;
     }
 }

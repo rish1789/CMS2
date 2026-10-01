@@ -2,8 +2,8 @@ package com.cms.identity.staff.exception;
 
 
 
-import com.cms.identity.account.exception.AccountNotFoundException;
-import com.cms.identity.account.exception.IncorrectPasswordException;
+import com.cms.identity.account.exception.InvalidCredentialsException;
+import com.cms.identity.account.exception.NoActiveClinicAccessException;
 import com.cms.identity.account.exception.StaffClinicNotActiveException;
 import com.cms.identity.api.dto.ErrorResponse;
 import java.util.NoSuchElementException;
@@ -49,18 +49,18 @@ public class StaffExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse.of("CLINIC_NOT_FOUND", e.getMessage()));
     }
 
-    /** Login: identifier (email/staff code/Super Admin username) matched nothing on file. */
-    @ExceptionHandler(AccountNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleAccountNotFound(AccountNotFoundException e) {
+    /** 075-login-hardening (D-3C-2): unknown identifier and wrong password get this one answer. */
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidCredentials(InvalidCredentialsException e) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ErrorResponse.of("ACCOUNT_NOT_FOUND", e.getMessage()));
+                .body(ErrorResponse.of("INVALID_CREDENTIALS", e.getMessage()));
     }
 
-    /** Login: identifier resolved to a real account, but the password didn't match. */
-    @ExceptionHandler(IncorrectPasswordException.class)
-    public ResponseEntity<ErrorResponse> handleIncorrectPassword(IncorrectPasswordException e) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ErrorResponse.of("INCORRECT_PASSWORD", e.getMessage()));
+    /** 075-login-hardening (D-3C-1): the right password, but no active role at any clinic. */
+    @ExceptionHandler(NoActiveClinicAccessException.class)
+    public ResponseEntity<ErrorResponse> handleNoActiveClinicAccess(NoActiveClinicAccessException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ErrorResponse.of("NO_ACTIVE_CLINIC_ACCESS", e.getMessage()));
     }
 
     /** 062-rejected-clinic-gating (FR-007): every role this account holds is Doctor/Operations at a rejected clinic. */

@@ -5,6 +5,7 @@ package com.cms.booking.config;
 import com.cms.identity.account.config.StaffAuthenticationEntryPoint;
 import com.cms.identity.account.config.StaffJwtAuthenticationFilter;
 import com.cms.identity.account.config.StaffJwtService;
+import com.cms.identity.account.config.StaffSessionPolicy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -28,13 +29,16 @@ public class BookingSecurityConfig {
     @Bean
     @Order(6)
     public SecurityFilterChain bookingFilterChain(
-            HttpSecurity http, StaffJwtService staffJwtService, StaffAuthenticationEntryPoint staffAuthenticationEntryPoint)
+            HttpSecurity http,
+            StaffJwtService staffJwtService,
+            StaffSessionPolicy staffSessionPolicy,
+            StaffAuthenticationEntryPoint staffAuthenticationEntryPoint)
             throws Exception {
         http.securityMatcher("/api/v1/doctors/**")
                 .csrf(csrf -> csrf.disable())
                 .cors(withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .addFilterBefore(new StaffJwtAuthenticationFilter(staffJwtService), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new StaffJwtAuthenticationFilter(staffJwtService, staffSessionPolicy), UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(staffAuthenticationEntryPoint))
                 .authorizeHttpRequests(auth -> auth.anyRequest().authenticated());
         return http.build();

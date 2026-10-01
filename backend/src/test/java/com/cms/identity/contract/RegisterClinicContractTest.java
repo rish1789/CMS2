@@ -37,6 +37,7 @@ import org.springframework.test.web.servlet.MockMvc;
  */
 @WebMvcTest(controllers = ClinicRegistrationController.class)
 @org.springframework.context.annotation.Import({
+    com.cms.support.AllowAllStaffSessionsTestConfig.class,
     GlobalExceptionHandler.class,
     SecurityConfig.class,
     StaffAuthenticationEntryPoint.class,

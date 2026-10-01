@@ -4,6 +4,7 @@ import { loginPatient, LoginPatientApiError, type LoginPatientResponse } from '.
 import { storePatientSession, type StoredPatientSession } from './token'
 import { withReturnTo } from './returnTo'
 import { useToast } from '../../components/Toast'
+import { loginLockedMessage } from '../../lib/loginLockout'
 
 interface FormState {
   email: string
@@ -53,7 +54,12 @@ export function LoginForm({ onSuccess, returnTo }: LoginFormProps = {}) {
       onSuccess?.(session)
     } catch (err) {
       if (err instanceof LoginPatientApiError) {
-        setFormError(err.body.message ?? 'Something went wrong. Please try again.')
+        // 075-login-hardening: a lockout also says how long to wait.
+        setFormError(
+          err.body.error === 'TOO_MANY_LOGIN_ATTEMPTS'
+            ? loginLockedMessage(err.body)
+            : (err.body.message ?? 'Something went wrong. Please try again.'),
+        )
       } else {
         setFormError('Something went wrong. Please try again.')
       }

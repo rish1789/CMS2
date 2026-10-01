@@ -34,9 +34,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class StaffJwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final StaffJwtService staffJwtService;
+    private final StaffSessionPolicy staffSessionPolicy;
 
-    public StaffJwtAuthenticationFilter(StaffJwtService staffJwtService) {
+    public StaffJwtAuthenticationFilter(StaffJwtService staffJwtService, StaffSessionPolicy staffSessionPolicy) {
         this.staffJwtService = staffJwtService;
+        this.staffSessionPolicy = staffSessionPolicy;
     }
 
     @Override
@@ -45,7 +47,10 @@ public class StaffJwtAuthenticationFilter extends OncePerRequestFilter {
         String header = request.getHeader("Authorization");
         if (header != null && header.startsWith("Bearer ")) {
             String token = header.substring("Bearer ".length());
-            Optional<UUID> accountId = staffJwtService.validateAndGetAccountId(token);
+            // 075-login-hardening (D-3C-1): a valid signature is not enough once the account has no
+            // active role anywhere - the request then stays unauthenticated (401).
+            Optional<UUID> accountId =
+                    staffJwtService.validateAndGetAccountId(token).filter(staffSessionPolicy::allows);
             accountId.ifPresent(id -> SecurityContextHolder.getContext()
                     .setAuthentication(new UsernamePasswordAuthenticationToken(
                             id, null, List.of(new SimpleGrantedAuthority("ROLE_STAFF")))));

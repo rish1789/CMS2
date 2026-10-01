@@ -54,6 +54,9 @@ public interface RoleAssignmentRepository extends JpaRepository<RoleAssignment, 
     /** 062-rejected-clinic-gating (FR-007): every active role of an account, for the sign-in rule. */
     List<RoleAssignment> findByAccount_IdAndActiveTrue(UUID accountId);
 
+    /** 075-login-hardening (D-3C-1): does this account still hold an active role at any clinic? */
+    boolean existsByAccount_IdAndActiveTrue(UUID accountId);
+
     /**
      * 062-rejected-clinic-gating (FR-007): the clinic picker's memberships - active roles, minus
      * Doctor/Operations roles at a rejected clinic (the ClinicAdmin of a rejected clinic still sees

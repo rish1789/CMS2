@@ -1,8 +1,7 @@
 package com.cms.patient.api;
 
-import com.cms.patient.account.exception.AccountNotFoundException;
+import com.cms.patient.account.exception.InvalidCredentialsException;
 import com.cms.patient.account.exception.EmailAlreadyInUseException;
-import com.cms.patient.account.exception.IncorrectPasswordException;
 import com.cms.patient.account.exception.InvalidMobileNumberException;
 import com.cms.patient.account.exception.InvalidPasswordException;
 import com.cms.patient.account.exception.MissingRequiredFieldException;
@@ -47,18 +46,11 @@ public class PatientExceptionHandler {
                 .body(ErrorResponse.withField("MISSING_REQUIRED_FIELD", e.getMessage(), e.getField()));
     }
 
-    /** Login: email matched no registered PatientAccount. */
-    @ExceptionHandler(AccountNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleAccountNotFound(AccountNotFoundException e) {
+    /** 075-login-hardening (D-3C-2): unknown email and wrong password get this one answer. */
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidCredentials(InvalidCredentialsException e) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ErrorResponse.of("ACCOUNT_NOT_FOUND", e.getMessage()));
-    }
-
-    /** Login: email matched a real PatientAccount, but the password didn't match. */
-    @ExceptionHandler(IncorrectPasswordException.class)
-    public ResponseEntity<ErrorResponse> handleIncorrectPassword(IncorrectPasswordException e) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ErrorResponse.of("INCORRECT_PASSWORD", e.getMessage()));
+                .body(ErrorResponse.of("INVALID_CREDENTIALS", e.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

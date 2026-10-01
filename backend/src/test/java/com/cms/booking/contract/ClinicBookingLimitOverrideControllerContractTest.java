@@ -34,7 +34,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /** 060-booking-abuse-prevention (contracts/booking-protection.md #3): ClinicAdmin-only, clinic-scoped. */
 @WebMvcTest(controllers = ClinicBookingLimitOverrideController.class)
-@Import({BookingExceptionHandler.class, SecurityConfig.class, StaffAuthenticationEntryPoint.class, StaffJwtService.class})
+@Import({
+    com.cms.support.AllowAllStaffSessionsTestConfig.class,BookingExceptionHandler.class, SecurityConfig.class, StaffAuthenticationEntryPoint.class, StaffJwtService.class})
 @TestPropertySource(properties = "staff.jwt.secret=test-only-contract-test-secret-at-least-64-characters-long-ok")
 class ClinicBookingLimitOverrideControllerContractTest {
 
