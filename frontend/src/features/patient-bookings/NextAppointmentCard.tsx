@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listMyBookings, type PatientBookingSummary } from './api'
+import { selectNextVisit } from './visitOutcome'
 import { loadPatientSession } from '../patient-account/token'
 import { BookingIcon } from '../../components/patientIcons'
 
 // A single patient's own booking history is personal-scale (not the platform-wide "hundreds to
 // thousands" the admin verification queues have to handle) - fetching one page this size and
-// picking the soonest upcoming ACTIVE booking client-side is safe, and avoids a second
-// date-aware sort on the backend just for this one homepage widget.
+// picking the soonest upcoming booking client-side is safe. 069-patient-visit-outcomes: "upcoming"
+// comes from the server's own visitOutcome (live-audit finding 2), never booking state or the
+// browser's date alone - a no-show today is no longer "Your next visit".
 const LOOKAHEAD_PAGE_SIZE = 50
 
 function todayIsoDate(): string {
@@ -33,16 +35,6 @@ function formatTime(time: string): string {
   return time.slice(0, 5)
 }
 
-function findNextUpcoming(bookings: PatientBookingSummary[]): PatientBookingSummary | null {
-  const today = todayIsoDate()
-  const upcoming = bookings.filter((b) => b.status === 'ACTIVE' && b.sessionDate >= today)
-  upcoming.sort((a, b) => {
-    if (a.sessionDate !== b.sessionDate) return a.sessionDate < b.sessionDate ? -1 : 1
-    return (a.startTime ?? '') < (b.startTime ?? '') ? -1 : 1
-  })
-  return upcoming[0] ?? null
-}
-
 // patient-dashboard-entry-page: the "your next appointment" highlight - a welcoming home surfaces
 // what's actually coming up, not just a menu of places to go. Renders nothing when there is no
 // upcoming booking, so a new patient's dashboard stays uncluttered.
@@ -53,7 +45,7 @@ export function NextAppointmentCard() {
   useEffect(() => {
     if (!session) return
     listMyBookings(session.token, { size: LOOKAHEAD_PAGE_SIZE })
-      .then((result) => setNext(findNextUpcoming(result.bookings)))
+      .then((result) => setNext(selectNextVisit(result.bookings)))
       .catch(() => setNext(null))
   }, [session])
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listMyBookings, type PatientBookingSummary } from './api'
+import { VISIT_OUTCOME_LABEL, visitOutcomeBadgeClass } from './visitOutcome'
 import { getClinicalRecordAvailability } from '../patient-clinical-records/api'
 import { loadPatientSession } from '../patient-account/token'
 import { todayIsoDate } from '../patient-booking/DateStrip'
@@ -10,10 +11,6 @@ import { IconBadge } from '../../components/adminIcons'
 import { BookingIcon } from '../../components/patientIcons'
 
 const BOOKINGS_PAGE_SIZE = 20
-
-function statusBadgeClass(status: PatientBookingSummary['status']): string {
-  return status === 'ACTIVE' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'
-}
 
 // "10:45:00" -> "10:45" - the seconds are never meaningful to a patient.
 function formatTime(time: string): string {
@@ -120,8 +117,10 @@ export function MyBookings() {
                       <p className="mt-0.5 text-xs font-medium text-indigo-600">Record available</p>
                     )}
                   </div>
-                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(booking.status)}`}>
-                    {booking.status === 'ACTIVE' ? 'Active' : 'Cancelled'}
+                  {/* 069-patient-visit-outcomes (live-audit finding 2): the patient's own visit
+                      outcome, not the booking state - a no-show is never shown as "Active". */}
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${visitOutcomeBadgeClass(booking.visitOutcome)}`}>
+                    {VISIT_OUTCOME_LABEL[booking.visitOutcome]}
                   </span>
                 </Link>
               </li>
