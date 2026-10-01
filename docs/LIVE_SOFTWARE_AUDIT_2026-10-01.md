@@ -4,6 +4,20 @@ Scope: the running frontend at http://localhost:5173 and backend at http://local
 
 No application code, bookings, clinical records, accounts, or clinic settings were changed. The rate-limit probe sent invalid empty signup bodies; no accounts were created. Credentials are intentionally omitted from this report.
 
+## Status (updated 2026-10-01, IST)
+
+| Finding | Status | Evidence |
+|---|---|---|
+| 1. No-show shown as "Visit complete" | **Fixed:** spec 069, rish1789/CMS2#34 | Live-status text follows the patient's own outcome ("Missed appointment"). Verified via test-first unit, integration and contract tests, and at runtime with synthetic data. |
+| 2. No-show stays "Your next visit" or "Active" | **Fixed:** spec 069, #34 | The server derives `visitOutcome`. The next visit is chosen from upcoming outcomes only, and My bookings shows outcome labels. Verified in a browser: the dashboard showed the next real booking. |
+| 3. Cancel offered for ineligible appointments | **Fixed:** spec 069, #34 | The server derives `cancellation {allowed, reason}`. The detail page offers Cancel only when allowed and otherwise explains why. The endpoint still re-checks on submit. |
+| 4. Login loses the selected clinic and doctor | Open (Phase 2R.2) | — |
+| 5. 429 unreadable by the browser (CORS) | Open (Phase 2R.3) | — |
+| 6. Discovery stops after 20 results | Open (Phase 2R.4) | — |
+| 7. Doctor sees admin-only tools | Open (Phase 2R.5) | — |
+
+The original observations below are preserved unchanged.
+
 ## Findings
 
 ### 1. P2 — A missed appointment is described as “Visit complete”

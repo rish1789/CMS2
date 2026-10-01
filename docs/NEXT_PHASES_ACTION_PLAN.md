@@ -23,7 +23,11 @@ Added after the plan was written. The original text below is preserved as writte
 - **Phase 3A, operational time zone (PB-005): decided and done.** The JVM is pinned to `Asia/Kolkata` (#29). Session-bookability guards come from 065.
 - **Phase 3B, fee ownership (SEC-03): decided and done.** Fees are clinic-owned; see spec 068 (#30 and #32).
 - **Numbering:** 068 is taken, so the next spec is **069**.
-- **Next package:** 2R.1.
+- **Phase 2R.1: done.** Spec 069 was merged in #34; live-audit findings 1–3 are fixed. Evidence:
+  - full backend suite: 1,133 passed, 0 failed;
+  - frontend: Vitest 457/457;
+  - runtime UI verified with synthetic data.
+- **Next package:** 2R.2 (login return).
 
 ## Current position
 

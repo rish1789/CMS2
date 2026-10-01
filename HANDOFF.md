@@ -1660,7 +1660,18 @@ This was done on branch `claude/spring-boot-4` while the owner was away. **It is
 - **Optional, only if the owner asks:** 069, the gap between cancellation and 067's session lock.
 - **`NVD_API_KEY`:** deferred (see above). **The owner asked not to be reminded about it**; raise it only if they bring it up, or when a real deployment is actually being prepared.
 
-## Reference
+## Part 18 — Phase 2 of the next-phases plan (2026-10-01 afternoon, IST)
+
+- **The owner supplied the plan and the audit.** They are `docs/NEXT_PHASES_ACTION_PLAN.md` and `docs/LIVE_SOFTWARE_AUDIT_2026-10-01.md`. Work proceeds one package at a time, with one PR per package; the owner merges.
+- **2A is closed.** See the status block at the top of the plan. 3A (IST) and 3B (per-clinic fees) were already done.
+- **2R.1 is done: spec 069, #34, merged.**
+  - Patients now see their own visit outcome (`visitOutcome`), not the booking state or the session's progress.
+  - The cancel action is offered only when the server says it can succeed. The cancel endpoint and the display share one policy class, `PatientVisitOutcomes`.
+  - There is a new owner-only `GET /api/v1/patients/bookings/{id}`.
+  - **The delayed rule (decided in the spec):** a booking today that is still Booked stays the next visit even after its time passes.
+  - **Verification:** full backend suite 1,133 passed, 0 failed; Vitest 457/457; browser-verified with synthetic data.
+- **Next:** 2R.2, then 2R.3, 2R.4, 2R.5, then 2B. Spec numbers continue from 070.
+
 
 Memory files at `C:\Users\risha\.claude\projects\C--Users-risha-OneDrive-Documents-CMS2\memory\`
 — gradle bootstrap (updated this session with the `/tmp`-is-ephemeral gotcha), OneDrive
