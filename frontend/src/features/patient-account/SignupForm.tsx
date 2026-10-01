@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { signupPatient, SignupPatientApiError, type SignupPatientResponse } from './api'
 import { FormField } from '../../components/FormField'
 import { formatRetryAfter } from '../../lib/rateLimitMessage'
+import { withReturnTo } from './returnTo'
 
 interface FormState {
   email: string
@@ -22,7 +24,12 @@ interface FieldErrors {
   mobile?: string
 }
 
-export function SignupForm() {
+export interface SignupFormProps {
+  /** 070-login-return-path: carried onto the success screen's "Log in" link. */
+  returnTo?: string | null
+}
+
+export function SignupForm({ returnTo }: SignupFormProps = {}) {
   const [form, setForm] = useState<FormState>(initialState)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
@@ -98,6 +105,12 @@ export function SignupForm() {
         <p className="mt-2 text-sm text-gray-600">
           You can now log in with {result.email} across any clinic on the platform.
         </p>
+        <Link
+          to={withReturnTo('/patient/login', returnTo)}
+          className="mt-4 inline-block rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+        >
+          Log in
+        </Link>
       </div>
     )
   }

@@ -32,7 +32,7 @@ describe('SignupForm', () => {
   })
 
   it('renders no social-login/SSO field and no staff-identity field', () => {
-    render(<SignupForm />)
+    render(<MemoryRouter><SignupForm /></MemoryRouter>)
 
     expect(screen.queryByText(/sign in with google/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/sign in with facebook/i)).not.toBeInTheDocument()
@@ -50,7 +50,7 @@ describe('SignupForm', () => {
       email: 'priya@example.com',
     })
 
-    render(<SignupForm />)
+    render(<MemoryRouter><SignupForm /></MemoryRouter>)
     await user.type(screen.getByLabelText(/^email/i), 'priya@example.com')
     await user.type(screen.getByLabelText(/^password/i), 'Str0ng!Pass')
     await user.click(screen.getByRole('button', { name: /create account/i }))
@@ -72,7 +72,7 @@ describe('SignupForm', () => {
       email: 'ravi@example.com',
     })
 
-    render(<SignupForm />)
+    render(<MemoryRouter><SignupForm /></MemoryRouter>)
     await user.type(screen.getByLabelText(/^email/i), 'ravi@example.com')
     await user.type(screen.getByLabelText(/^password/i), 'Str0ng!Pass')
     await user.type(screen.getByLabelText(/mobile/i), '9876543210')
@@ -96,7 +96,7 @@ describe('SignupForm', () => {
       }),
     )
 
-    render(<SignupForm />)
+    render(<MemoryRouter><SignupForm /></MemoryRouter>)
     await user.type(screen.getByLabelText(/^email/i), 'dup@example.com')
     await user.type(screen.getByLabelText(/^password/i), 'Str0ng!Pass')
     await user.click(screen.getByRole('button', { name: /create account/i }))
@@ -116,7 +116,7 @@ describe('SignupForm', () => {
       }),
     )
 
-    render(<SignupForm />)
+    render(<MemoryRouter><SignupForm /></MemoryRouter>)
     await user.type(screen.getByLabelText(/^email/i), 'weak@example.com')
     await user.type(screen.getByLabelText(/^password/i), 'weak')
     await user.click(screen.getByRole('button', { name: /create account/i }))
@@ -137,7 +137,7 @@ describe('SignupForm', () => {
       }),
     )
 
-    render(<SignupForm />)
+    render(<MemoryRouter><SignupForm /></MemoryRouter>)
     await user.type(screen.getByLabelText(/^email/i), 'badmobile@example.com')
     await user.type(screen.getByLabelText(/^password/i), 'Str0ng!Pass')
     await user.type(screen.getByLabelText(/mobile/i), '12345')
