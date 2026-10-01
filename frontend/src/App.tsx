@@ -5,7 +5,6 @@ import { NotFoundPage } from './routes/NotFoundPage'
 import { PublicHeader } from './routes/PublicHeader'
 import { RegistrationForm } from './features/clinic-registration/RegistrationForm'
 import { DiscoverySearch } from './features/discovery/DiscoverySearch'
-import { SignupForm } from './features/patient-account/SignupForm'
 import { RequirePatientSession, RequireStaffSession, RequireSuperAdminSession } from './routes/guards'
 
 import { StaffLoginPage } from './routes/staff/StaffLoginPage'
@@ -35,6 +34,7 @@ import {
 } from './routes/staff/ClinicToolPages'
 
 import { PatientLoginPage } from './routes/patient/PatientLoginPage'
+import { PatientSignupPage } from './routes/patient/PatientSignupPage'
 import { PatientShell } from './routes/patient/PatientShell'
 import { PatientDashboard } from './routes/patient/PatientDashboard'
 import { PatientClinicHubPage } from './routes/patient/PatientClinicHubPage'
@@ -97,17 +97,7 @@ function App() {
         />
 
         <Route path="/patient/login" element={<PatientLoginPage />} />
-        <Route
-          path="/patient/signup"
-          element={
-            <div className="min-h-screen bg-gray-50">
-              <PublicHeader />
-              <div className="flex items-center justify-center px-6 py-12">
-                <SignupForm />
-              </div>
-            </div>
-          }
-        />
+        <Route path="/patient/signup" element={<PatientSignupPage />} />
         <Route element={<RequirePatientSession />}>
           <Route element={<PatientShell />}>
             <Route path="/patient" element={<PatientDashboard />} />
