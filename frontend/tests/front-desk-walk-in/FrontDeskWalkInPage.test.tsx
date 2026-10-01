@@ -334,4 +334,54 @@ describe('FrontDeskWalkInPage (063-front-desk-walk-in US1)', () => {
 
     await waitFor(() => expect(screen.getByRole('radio', { name: /dr\. mehta/i })).toBeChecked())
   })
+
+  // 074-duplicate-patient-phone (PB-002): was an unhandled 500 at the last step.
+  it('on a duplicate phone, keeps the walk-in and lets staff switch to the existing patient', async () => {
+    mockedRegister.mockRejectedValueOnce(
+      new ApiError(409, 'A patient with this phone number is already registered at this clinic.', {
+        error: 'PATIENT_PHONE_ALREADY_REGISTERED',
+        message: 'A patient with this phone number is already registered at this clinic.',
+        existingPatient: { id: 'patient-9', name: 'Asha Rao' },
+      }),
+    )
+    const user = userEvent.setup()
+    renderPage()
+    await fillNewPatientAndReason(user)
+    await user.type(screen.getByLabelText(/phone/i), '9876543210')
+    await chooseSessionAndType(user)
+    await user.click(screen.getByRole('button', { name: /register walk-in/i }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/already registered at this clinic/i)
+    expect(screen.getByLabelText(/reason for visit/i)).toHaveValue('PAIN')
+
+    await user.click(within(alert).getByRole('button', { name: /use asha rao/i }))
+
+    expect(screen.getByText(/selected patient/i)).toBeInTheDocument()
+    expect(screen.getByText('Asha Rao')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+
+    mockedRegister.mockResolvedValueOnce({
+      bookingId: 'booking-9',
+      slotId: 'slot-9',
+      sessionId: 'session-fixed',
+      mode: 'FIXED_TIME',
+      tokenNumber: 4,
+      walkInPosition: 4,
+      patientId: 'patient-9',
+      patientName: 'Asha Rao',
+      doctorName: 'Dr. Rao',
+      appointmentTypeId: 'type-1',
+      lockedFee: 450,
+      visitReason: 'PAIN',
+      visitReasonDetail: null,
+    })
+    await user.click(screen.getByRole('button', { name: /register walk-in/i }))
+    expect(await screen.findByText('W4')).toBeInTheDocument()
+    expect(mockedRegister).toHaveBeenLastCalledWith(
+      'clinic-1',
+      expect.objectContaining({ patientId: 'patient-9', visitReason: 'PAIN' }),
+      'staff-jwt',
+    )
+  })
 })

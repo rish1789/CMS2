@@ -117,7 +117,7 @@ class FrontDeskWalkInServiceTest {
         // 068: the walk-in resolves at its own clinic.
         when(feeResolutionService.resolve(eq(clinicId), any(), eq(appointmentTypeId))).thenReturn(new BigDecimal("450.00"));
         when(mobileNumberValidator.isValid(any())).thenReturn(true);
-        when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(patientRepository.saveAndFlush(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
         when(bookingRepository.saveAndFlush(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
         when(queuePositionService.positionOf(any())).thenReturn(new QueuePositionService.QueuePosition(true, 1));
         // 065-phase1-stabilization: an open session - the refusals are covered in BookingPathsAvailabilityTest.

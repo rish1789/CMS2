@@ -10,6 +10,8 @@ import { SessionStep } from './SessionStep'
 import { VisitReasonStep } from './VisitReasonStep'
 import { WalkInLinePanel } from './WalkInLinePanel'
 import { visitReasonLabel, type VisitReason } from './visitReasons'
+import { DuplicatePhoneConflict } from '../patient-search/DuplicatePhoneConflict'
+import { duplicatePhoneConflictOf, type DuplicatePhoneConflictBody } from '../patient-search/duplicatePhoneConflict'
 
 interface FieldErrors {
   patient?: string
@@ -80,6 +82,7 @@ export function FrontDeskWalkInPage({ clinicId }: { clinicId: string }) {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [duplicatePrompt, setDuplicatePrompt] = useState<string | null>(null)
+  const [phoneConflict, setPhoneConflict] = useState<DuplicatePhoneConflictBody | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<WalkInRegistration | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -120,12 +123,17 @@ export function FrontDeskWalkInPage({ clinicId }: { clinicId: string }) {
     setSubmitting(true)
     setFormError(null)
     setDuplicatePrompt(null)
+    setPhoneConflict(null)
     try {
       setResult(await registerWalkIn(clinicId, payload, token))
       setRefreshKey((k) => k + 1)
     } catch (err) {
       const code = err instanceof ApiError ? (err.body as { error?: string } | undefined)?.error : undefined
-      if (code === 'DUPLICATE_WALK_IN') {
+      // 074-duplicate-patient-phone: everything entered stays; staff can switch to the existing patient.
+      const conflict = err instanceof ApiError ? duplicatePhoneConflictOf(err.body) : null
+      if (conflict) {
+        setPhoneConflict(conflict)
+      } else if (code === 'DUPLICATE_WALK_IN') {
         setDuplicatePrompt((err as ApiError).message)
       } else {
         setFormError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
@@ -176,6 +184,16 @@ export function FrontDeskWalkInPage({ clinicId }: { clinicId: string }) {
             )}
 
             <Section step={1} title="Patient">
+              {phoneConflict && (
+                <DuplicatePhoneConflict
+                  conflict={phoneConflict}
+                  actionLabel={(name) => `Use ${name}`}
+                  onUseExisting={(existing) => {
+                    setPatient({ mode: 'existing', patientId: existing.id, name: existing.name })
+                    setPhoneConflict(null)
+                  }}
+                />
+              )}
               <PatientStep clinicId={clinicId} token={token} value={patient} onChange={setPatient} error={fieldErrors.patient} />
             </Section>
 

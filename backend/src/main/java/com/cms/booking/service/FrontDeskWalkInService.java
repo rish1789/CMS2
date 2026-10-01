@@ -62,6 +62,7 @@ public class FrontDeskWalkInService {
     private final FeeResolutionService feeResolutionService;
     private final AppointmentTypeRepository appointmentTypeRepository;
     private final PatientRepository patientRepository;
+    private final WalkInPatientRegistrar walkInPatientRegistrar;
     private final BookingRepository bookingRepository;
     private final IndianMobileNumberValidator mobileNumberValidator;
     private final QueueSlotService queueSlotService;
@@ -86,6 +87,7 @@ public class FrontDeskWalkInService {
         this.feeResolutionService = feeResolutionService;
         this.appointmentTypeRepository = appointmentTypeRepository;
         this.patientRepository = patientRepository;
+        this.walkInPatientRegistrar = new WalkInPatientRegistrar(patientRepository);
         this.bookingRepository = bookingRepository;
         this.mobileNumberValidator = mobileNumberValidator;
         this.queueSlotService = queueSlotService;
@@ -140,12 +142,12 @@ public class FrontDeskWalkInService {
 
         Patient patient = existingPatient != null
                 ? existingPatient
-                : patientRepository.save(new Patient(
+                // 074-duplicate-patient-phone: flushed before the token is issued, so a refusal leaves no token.
+                : walkInPatientRegistrar.register(
                         session.getClinic(),
-                        null,
                         input.patientName().trim(),
                         blankToNull(input.patientPhone()),
-                        blankToNull(input.patientEmail())));
+                        blankToNull(input.patientEmail()));
 
         // Both issue a waiting (BOOKED) untimed token - 064-queue-send-in-complete minted every token
         // BOOKED at the single issuance point.

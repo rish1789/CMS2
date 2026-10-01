@@ -99,6 +99,20 @@ public class BookingExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse.of("SLOT_NOT_FOUND", e.getMessage()));
     }
 
+    /**
+     * 074-duplicate-patient-phone: names the clinic's existing unlinked patient with that phone (null
+     * when only the database index caught a concurrent registration) so staff can book them instead.
+     */
+    @ExceptionHandler(PatientPhoneAlreadyRegisteredException.class)
+    public ResponseEntity<DuplicatePatientPhoneErrorResponse> handlePatientPhoneAlreadyRegistered(
+            PatientPhoneAlreadyRegisteredException e) {
+        ExistingPatient existing = e.existingPatientId() == null
+                ? null
+                : new ExistingPatient(e.existingPatientId(), e.existingPatientName());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new DuplicatePatientPhoneErrorResponse("PATIENT_PHONE_ALREADY_REGISTERED", e.getMessage(), existing));
+    }
+
     @ExceptionHandler(SlotAlreadyBookedException.class)
     public ResponseEntity<ErrorResponse> handleSlotAlreadyBooked(SlotAlreadyBookedException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of("SLOT_ALREADY_BOOKED", e.getMessage()));
@@ -231,6 +245,11 @@ public class BookingExceptionHandler {
 
     /** contracts/booking-protection.md: the RATE_LIMITED response carries retryAfterSeconds alongside the standard error/message shape. */
     public record RateLimitedErrorResponse(String error, String message, long retryAfterSeconds) {}
+
+    /** 074-duplicate-patient-phone: the standard error/message shape plus the existing patient, when known. */
+    public record DuplicatePatientPhoneErrorResponse(String error, String message, ExistingPatient existingPatient) {}
+
+    public record ExistingPatient(java.util.UUID id, String name) {}
 
     /** 060-booking-abuse-prevention BR-005: a clinic's supplementary limit may only ever be equal to or stricter than the current platform-wide cap. */
     @ExceptionHandler(ClinicLimitExceedsGlobalCapException.class)

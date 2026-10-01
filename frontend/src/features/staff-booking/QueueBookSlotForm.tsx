@@ -3,6 +3,8 @@ import { bookQueueSlot, QueueBookSlotApiError, type QueueBookingResponse } from 
 import { loadStaffSession } from '../staff-login/token'
 import { AppointmentTypeSelect } from '../appointment-types/AppointmentTypeSelect'
 import { PatientPicker } from '../patient-search/PatientPicker'
+import { DuplicatePhoneConflict } from '../patient-search/DuplicatePhoneConflict'
+import { duplicatePhoneConflictOf, type DuplicatePhoneConflictBody } from '../patient-search/duplicatePhoneConflict'
 
 type PatientMode = 'existing' | 'new'
 
@@ -34,6 +36,7 @@ export function QueueBookSlotForm({ clinicId, sessionId, doctorProfileId }: Queu
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<QueueBookingResponse | null>(null)
+  const [phoneConflict, setPhoneConflict] = useState<DuplicatePhoneConflictBody | null>(null)
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -41,26 +44,32 @@ export function QueueBookSlotForm({ clinicId, sessionId, doctorProfileId }: Queu
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    await submitBooking(
+      form.patientMode === 'existing'
+        ? { patientId: form.patientId, appointmentTypeId: form.appointmentTypeId }
+        : {
+            patientName: form.patientName,
+            patientPhone: form.patientPhone.trim() === '' ? undefined : form.patientPhone,
+            appointmentTypeId: form.appointmentTypeId,
+          },
+    )
+  }
+
+  async function submitBooking(request: Parameters<typeof bookQueueSlot>[2]) {
     if (!session) return
     setSubmitting(true)
     setFormError(null)
+    setPhoneConflict(null)
 
     try {
-      const response = await bookQueueSlot(
-        clinicId,
-        sessionId,
-        form.patientMode === 'existing'
-          ? { patientId: form.patientId, appointmentTypeId: form.appointmentTypeId }
-          : {
-              patientName: form.patientName,
-              patientPhone: form.patientPhone.trim() === '' ? undefined : form.patientPhone,
-              appointmentTypeId: form.appointmentTypeId,
-            },
-        session.token,
-      )
+      const response = await bookQueueSlot(clinicId, sessionId, request, session.token)
       setResult(response)
     } catch (err) {
-      if (err instanceof QueueBookSlotApiError) {
+      // 074-duplicate-patient-phone: the typed values stay; staff choose what to do next.
+      const conflict = err instanceof QueueBookSlotApiError ? duplicatePhoneConflictOf(err.body) : null
+      if (conflict) {
+        setPhoneConflict(conflict)
+      } else if (err instanceof QueueBookSlotApiError) {
         setFormError(err.message)
       } else {
         setFormError('Something went wrong. Please try again.')
@@ -102,6 +111,17 @@ export function QueueBookSlotForm({ clinicId, sessionId, doctorProfileId }: Queu
         <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">
           {formError}
         </p>
+      )}
+
+      {phoneConflict && (
+        <DuplicatePhoneConflict
+          conflict={phoneConflict}
+          busy={submitting}
+          actionLabel={(name) => `Book ${name} instead`}
+          onUseExisting={(existing) =>
+            void submitBooking({ patientId: existing.id, appointmentTypeId: form.appointmentTypeId })
+          }
+        />
       )}
 
       <fieldset>

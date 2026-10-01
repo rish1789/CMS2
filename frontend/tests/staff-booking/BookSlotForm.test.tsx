@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BookSlotForm } from '../../src/features/staff-booking/BookSlotForm'
@@ -175,5 +175,75 @@ describe('BookSlotForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/please select an appointment type/i)
     expect(mockedBookSlot).not.toHaveBeenCalled()
     expect(screen.getByText('Asha Rao')).toBeInTheDocument()
+  })
+
+  // 074-duplicate-patient-phone (PB-001): the real reason, the typed values kept, and an explicit
+  // way to book the existing patient instead - never a silent merge.
+  describe('when the new patient\'s phone already belongs to a patient here', () => {
+    async function submitNewPatient(user: ReturnType<typeof userEvent.setup>) {
+      render(<BookSlotForm clinicId={CLINIC_ID} slotId={SLOT_ID} doctorProfileId={DOCTOR_PROFILE_ID} />)
+      await user.click(screen.getByLabelText(/new walk-in patient/i))
+      await user.type(screen.getByLabelText(/patient name/i), 'New Person')
+      await user.type(screen.getByLabelText(/phone/i), '9876543210')
+      await selectAppointmentType(user)
+      await user.click(screen.getByRole('button', { name: /book slot/i }))
+    }
+
+    it('names the existing patient, keeps the typed values, and books them on request', async () => {
+      const user = userEvent.setup()
+      mockedBookSlot.mockRejectedValueOnce(
+        new ApiError(409, 'A patient with this phone number is already registered at this clinic.', {
+          error: 'PATIENT_PHONE_ALREADY_REGISTERED',
+          message: 'A patient with this phone number is already registered at this clinic.',
+          existingPatient: { id: 'patient-9', name: 'Asha Rao' },
+        }),
+      )
+      mockedBookSlot.mockResolvedValueOnce({
+        id: 'booking-9',
+        slotId: SLOT_ID,
+        patientId: 'patient-9',
+        patientName: 'Asha Rao',
+        doctorName: 'Dr. Kavita Iyer',
+        appointmentTypeId: 'type-1',
+        lockedFee: 500,
+        paymentStatus: 'PENDING',
+        createdAt: '2026-10-01T10:00:00Z',
+      })
+
+      await submitNewPatient(user)
+
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent(/already registered at this clinic/i)
+      expect(alert).toHaveTextContent('Asha Rao')
+      expect(screen.queryByText(/slot is already booked/i)).not.toBeInTheDocument()
+      expect(screen.getByLabelText(/patient name/i)).toHaveValue('New Person')
+      expect(screen.getByLabelText(/phone/i)).toHaveValue('9876543210')
+
+      await user.click(within(alert).getByRole('button', { name: /book asha rao instead/i }))
+
+      expect(await screen.findByText(/booking confirmed/i)).toBeInTheDocument()
+      expect(mockedBookSlot).toHaveBeenLastCalledWith(
+        CLINIC_ID,
+        SLOT_ID,
+        { patientId: 'patient-9', appointmentTypeId: 'type-1' },
+        'a.jwt.token',
+      )
+    })
+
+    it('suggests searching when the existing patient could not be named', async () => {
+      const user = userEvent.setup()
+      mockedBookSlot.mockRejectedValueOnce(
+        new ApiError(409, 'A patient with this phone number is already registered at this clinic.', {
+          error: 'PATIENT_PHONE_ALREADY_REGISTERED',
+          existingPatient: null,
+        }),
+      )
+
+      await submitNewPatient(user)
+
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent(/search for them under existing patient/i)
+      expect(within(alert).queryByRole('button')).not.toBeInTheDocument()
+    })
   })
 })

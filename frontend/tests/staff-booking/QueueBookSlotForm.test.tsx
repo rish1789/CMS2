@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueueBookSlotForm } from '../../src/features/staff-booking/QueueBookSlotForm'
@@ -112,5 +112,49 @@ describe('QueueBookSlotForm (staff)', () => {
     await user.click(screen.getByRole('button', { name: /book into queue/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/not a queue\/token session/i)
+  })
+
+  // 074-duplicate-patient-phone (PB-002): was an unhandled 500.
+  it('names the existing patient on a duplicate phone and books them on request', async () => {
+    const user = userEvent.setup()
+    mockedBookQueueSlot.mockRejectedValueOnce(
+      new QueueBookSlotApiError({
+        error: 'PATIENT_PHONE_ALREADY_REGISTERED',
+        message: 'A patient with this phone number is already registered at this clinic.',
+        existingPatient: { id: 'patient-9', name: 'Asha Rao' },
+      }),
+    )
+    mockedBookQueueSlot.mockResolvedValueOnce({
+      id: 'booking-9',
+      slotId: 'slot-9',
+      tokenNumber: 4,
+      patientId: 'patient-9',
+      appointmentTypeId: 'type-1',
+      lockedFee: 300,
+      paymentStatus: 'PENDING',
+      createdAt: '2026-10-01T10:00:00Z',
+    })
+
+    render(<QueueBookSlotForm clinicId={CLINIC_ID} sessionId={SESSION_ID} doctorProfileId={DOCTOR_PROFILE_ID} />)
+    await user.click(screen.getByLabelText(/new walk-in patient/i))
+    await user.type(screen.getByLabelText(/patient name/i), 'New Person')
+    await user.type(screen.getByLabelText(/phone/i), '9876543210')
+    await screen.findByRole('option', { name: /general consult/i })
+    await user.selectOptions(screen.getByLabelText(/appointment type/i), 'type-1')
+    await user.click(screen.getByRole('button', { name: /book into queue/i }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/already registered at this clinic/i)
+    expect(screen.getByLabelText(/patient name/i)).toHaveValue('New Person')
+
+    await user.click(within(alert).getByRole('button', { name: /book asha rao instead/i }))
+
+    expect(await screen.findByText(/token number: 4/i)).toBeInTheDocument()
+    expect(mockedBookQueueSlot).toHaveBeenLastCalledWith(
+      CLINIC_ID,
+      SESSION_ID,
+      { patientId: 'patient-9', appointmentTypeId: 'type-1' },
+      'a.jwt.token',
+    )
   })
 })

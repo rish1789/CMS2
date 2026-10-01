@@ -8,6 +8,7 @@
 // `ApiError`.
 
 import { apiRequest } from '../../lib/apiClient'
+import type { DuplicatePhoneConflictBody } from '../patient-search/duplicatePhoneConflict'
 
 export interface BookSlotRequest {
   patientId?: string
@@ -38,6 +39,8 @@ export type BookSlotErrorBody =
   | { error: 'CLINIC_NOT_ACCEPTING_APPOINTMENTS'; message?: string }
   | { error: 'INVALID_MOBILE_NUMBER'; message?: string }
   | { error: 'UNAUTHORIZED'; message?: string }
+  // 074-duplicate-patient-phone
+  | DuplicatePhoneConflictBody
 
 function defaultMessageFor(body: unknown): string {
   const error = (body as BookSlotErrorBody | undefined)?.error
@@ -60,6 +63,8 @@ function defaultMessageFor(body: unknown): string {
       return 'Your session has expired. Please sign in again.'
     case 'CLINIC_NOT_ACCEPTING_APPOINTMENTS':
       return 'This clinic is not accepting appointments.'
+    case 'PATIENT_PHONE_ALREADY_REGISTERED':
+      return 'A patient with this phone number is already registered at this clinic.'
     default:
       return 'Something went wrong. Please try again.'
   }
