@@ -1,4 +1,4 @@
-# Handoff for Codex — CMS2 (as of 2026-10-01, Spring Boot 4 migration on branch `claude/spring-boot-4`)
+# Handoff for Codex — CMS2 (as of 2026-10-01: Spring Boot 4, IST time-zone pin and 068 per-clinic fees merged)
 
 This note is self-contained. It assumes no prior conversation. For full history, see `HANDOFF.md` (Parts 13–16 cover the most recent work).
 
