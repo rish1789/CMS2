@@ -79,7 +79,9 @@ npm ci && npx tsc -b && npm run lint && npx vitest run       # 441 tests
 
 ## 5. Current state
 
-- **`main` is at `8df853b`.** There are **no open PRs**: every Dependabot PR is merged or closed.
+- **`main` is at `7b2550a`** (end of 2026-10-01) and is **the only branch**. There are **no open PRs**.
+- **Merged on 2026-10-01:** #28 Spring Boot 4.1, #29 IST time-zone pin, #30 068 per-clinic fees, #31 handoff docs, #32 convergence 065–068 (065/066/067 converged; 068 T033 doctor reads own prices, T034 dead queries removed). Every tracked feature is now converged.
+- **Last full backend suite (#32):** 1,113 passed, 0 failed. Frontend: 445/445.
 - **CI on `main`:**
   - The last completed run is on `d025e65`, after the react-router 7 merge: [run 36745328664](https://github.com/rish1789/CMS2/actions/runs/36745328664), success.
   - The run on `8df853b` (TypeScript 7), [run 36753530061](https://github.com/rish1789/CMS2/actions/runs/36753530061): **success**.
@@ -122,14 +124,15 @@ npm ci && npx tsc -b && npm run lint && npx vitest run       # 441 tests
 
 1. **Spring Boot 4 is merged and confirmed** (CI green; Windows launch confirmed by the owner). Nothing is pending here.
 2. **Watch for the midnight-wrap test pattern.** Building `HH:MM` fixture times as `now ± N hours` on today's date wraps past midnight. Two instances were fixed in the Boot 4 PR: `SlotCompletionServiceTest` now takes date and time from one `LocalDateTime`, and `FrontDeskWalkInPage.test.tsx` pins `Date` to midday. Prefer the same approaches in new tests.
-3. Run convergence reviews for 065, 066, 067 and 068 (`.claude/skills/speckit-converge/SKILL.md`). Investigate the historical partial-cancellation flake if it recurs.
+3. Convergence for 065–068 is **done** (#32). Investigate the historical partial-cancellation flake only if it recurs.
 4. Consider a spec (**069**) for the gap between cancellation and 067's session lock, if the owner wants it closed.
-5. Before launch only: the `NVD_API_KEY` step above (owner adds the secret; you raise the CI timeout). Do not merge or deploy on the owner's behalf.
+5. `NVD_API_KEY`: deferred. **Do not remind the owner about it**; act only if they raise it or a real deployment is being prepared. Do not merge or deploy on the owner's behalf.
 
 ## 7. Working with the owner
 
 - **Recommend, don't list options.** Give a recommendation rather than a survey of options, and ask only when a decision is genuinely theirs.
 - **Honest reporting.** Report failures with the actual output. Separate "verified" from "expected". Correct your own earlier claims explicitly when they turn out wrong.
 - **Timestamps** in IST.
+- **Don't nag:** the owner asked not to be reminded about the `NVD_API_KEY` scan. Mention it only if they ask.
 - **Long runs:** the owner likes live progress on long test runs (counts passed and failed so far).
 - **Pre-existing failures:** keep them separate from failures caused by your change. Prove it by running the same test on `main` without your change.

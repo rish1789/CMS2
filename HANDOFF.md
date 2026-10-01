@@ -1645,11 +1645,20 @@ This was done on branch `claude/spring-boot-4` while the owner was away. **It is
   - In the same change, raise the backend job's `timeout-minutes` (45 → about 90): the first NVD download adds about 20 minutes.
   - Run one full scan, fix any serious findings, and keep the scan on from then on.
 
-### Still open
+### Convergence 065–068 (rish1789/CMS2#32, merged)
 
-- Convergence passes for 065–068.
-- The pre-launch `NVD_API_KEY` step above.
-- Optional 069: the gap between cancellation and 067's session lock.
+- **065, 066 and 067 converged** with no findings. Every FR and SC was checked against the code, along with the named tests.
+- **068 had two LOW findings**, appended as Phase 8 and implemented in the same PR:
+  - **T033 (FR-006):** the doctor concerned can read their own prices at a clinic even after their role there was deactivated. Writes stay clinic-admin-only. The access check runs before "doctor not found", so outsiders cannot probe doctor ids. Test-first: red 403, then green.
+  - **T034:** removed three repository queries that 068 left dead (the doctor-wide readiness queries and `DoctorDefaultFeeRepository.findByDoctorProfile_Id`).
+- **Verification:** full backend suite 1,113 passed, 0 failed, `spotlessCheck` green; CI green.
+
+### State at end of day (2026-10-01)
+
+- **`main` is the only branch.** The owner deleted every merged `claude/…` branch; there are no open PRs.
+- **Every tracked feature is converged.** Nothing required is open.
+- **Optional, only if the owner asks:** 069, the gap between cancellation and 067's session lock.
+- **`NVD_API_KEY`:** deferred (see above). **The owner asked not to be reminded about it**; raise it only if they bring it up, or when a real deployment is actually being prepared.
 
 ## Reference
 
