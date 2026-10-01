@@ -9,7 +9,7 @@
         "-ExecutionPolicy",
         "Bypass",
         "-Command",
-        "Get-Content .env | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*=' } | ForEach-Object { $k, $v = $_ -split '=', 2; Set-Item -Path \"Env:$k\" -Value $v }; & 'C:/Users/risha/AppData/Local/Temp/gradle-8.10/bin/gradle.bat' -p backend bootRun"
+        "Get-Content .env | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*=' } | ForEach-Object { $k, $v = $_ -split '=', 2; Set-Item -Path \"Env:$k\" -Value $v }; & './backend/gradlew.bat' -p backend bootRun"
       ],
       "port": 8080
     },
@@ -21,7 +21,7 @@
         "-ExecutionPolicy",
         "Bypass",
         "-Command",
-        "Get-Content .env | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*=' } | ForEach-Object { $k, $v = $_ -split '=', 2; Set-Item -Path \"Env:$k\" -Value $v }; $env:PORT = '8081'; & 'C:/Users/risha/AppData/Local/Temp/gradle-8.10/bin/gradle.bat' -p backend bootRun"
+        "Get-Content .env | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*=' } | ForEach-Object { $k, $v = $_ -split '=', 2; Set-Item -Path \"Env:$k\" -Value $v }; $env:PORT = '8081'; & './backend/gradlew.bat' -p backend bootRun"
       ],
       "port": 8081
     },

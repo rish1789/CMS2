@@ -32,8 +32,8 @@ import com.cms.waitlist.service.WaitlistJoinService;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -70,37 +70,37 @@ class StaffChainFailClosedContractTest {
     @Autowired
     private StaffJwtService staffJwtService;
 
-    @MockBean
+    @MockitoBean
     private BookingRepository bookingRepository;
 
-    @MockBean
+    @MockitoBean
     private RoleAssignmentRepository roleAssignmentRepository;
 
-    @MockBean
+    @MockitoBean
     private DoctorProfileRepository doctorProfileRepository;
 
-    @MockBean
+    @MockitoBean
     private DoctorBookingReadinessService doctorBookingReadinessService;
 
-    @MockBean
+    @MockitoBean
     private WaitlistJoinService waitlistJoinService;
 
-    @MockBean
+    @MockitoBean
     private WaitlistEntryRepository waitlistEntryRepository;
 
-    @MockBean
+    @MockitoBean
     private StaffPasswordResetService staffPasswordResetService;
 
-    @MockBean
+    @MockitoBean
     private SessionRepository sessionRepository;
 
-    @MockBean
+    @MockitoBean
     private SessionDeletionService sessionDeletionService;
 
-    @MockBean
+    @MockitoBean
     private ScheduleDeletionService scheduleDeletionService;
 
-    @MockBean
+    @MockitoBean
     private ClinicRegistrationService clinicRegistrationService;
 
     private void assertUnauthenticated(RequestBuilder request) throws Exception {

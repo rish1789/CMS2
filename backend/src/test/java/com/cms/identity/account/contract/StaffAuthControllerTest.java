@@ -20,8 +20,8 @@ import com.cms.identity.staff.exception.StaffExceptionHandler;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -39,16 +39,16 @@ class StaffAuthControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private StaffAuthService staffAuthService;
 
     // Not exercised by this endpoint directly, but SecurityConfig's OTHER filter chain
     // (/api/v1/clinics/**) depends on both, and Spring eagerly constructs every @Bean in a
     // @Configuration class - these just need to exist to satisfy that wiring.
-    @MockBean
+    @MockitoBean
     private StaffJwtService staffJwtService;
 
-    @MockBean
+    @MockitoBean
     private StaffAuthenticationEntryPoint staffAuthenticationEntryPoint;
 
     @Test

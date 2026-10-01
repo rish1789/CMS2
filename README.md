@@ -17,7 +17,7 @@ graph TB
         AC["Super Admin Console"]
     end
 
-    subgraph Backend["Backend — Spring Boot 3 REST API (Java 21)"]
+    subgraph Backend["Backend — Spring Boot 4 REST API (Java 21)"]
         SEC["Spring Security<br/>6 path-scoped filter chains,<br/>3 independent JWT realms<br/>(patient / staff / super-admin)"]
         subgraph Modules["Domain modules (package-per-feature)"]
             IDN["identity<br/>(accounts, clinics, staff, doctors)"]
@@ -48,7 +48,7 @@ Each domain module owns its own controllers, services, repositories, and excepti
 
 | | |
 |---|---|
-| **Backend** | Java 21, Spring Boot 3.3, Spring Security (JWT), Spring Data JPA, Flyway, PostgreSQL, Gradle |
+| **Backend** | Java 21, Spring Boot 4.1, Spring Security (JWT), Spring Data JPA, Flyway, PostgreSQL, Gradle |
 | **Frontend** | React 18, TypeScript, Vite, Tailwind CSS 4, React Router |
 | **Testing** | JUnit 5 + Mockito + AssertJ + Testcontainers (backend), Vitest + Testing Library (frontend) |
 | **API docs** | springdoc-openapi (Swagger UI) |
