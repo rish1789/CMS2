@@ -3,6 +3,7 @@ package com.cms.booking.dto;
 import com.cms.booking.domain.Booking;
 import com.cms.booking.domain.BookingCancellationReason;
 import com.cms.booking.domain.BookingStatus;
+import com.cms.booking.domain.VisitOutcome;
 import com.cms.booking.domain.PaymentStatus;
 import com.cms.scheduling.domain.ScheduleMode;
 import com.cms.scheduling.domain.Session;
@@ -34,9 +35,14 @@ public record PatientBookingSummaryResponse(
         BigDecimal lockedFee,
         Instant createdAt,
         /** 062-rejected-clinic-gating (FR-010): lets the patient console explain a CLINIC_REJECTED cancellation. Null unless a reason was recorded. */
-        BookingCancellationReason cancellationReason) {
+        BookingCancellationReason cancellationReason,
+        /** 069 FR-001: the patient's own visit outcome - not the booking state, not the session's progress. */
+        VisitOutcome visitOutcome,
+        /** 069 FR-002: advisory self-cancellation eligibility; the cancel endpoint always re-checks. */
+        CancellationEligibility cancellation) {
 
-    public static PatientBookingSummaryResponse of(Booking booking) {
+    public static PatientBookingSummaryResponse of(
+            Booking booking, VisitOutcome visitOutcome, CancellationEligibility cancellation) {
         Slot slot = booking.getSlot();
         Session session = slot.getSession();
         return new PatientBookingSummaryResponse(
@@ -54,6 +60,8 @@ public record PatientBookingSummaryResponse(
                 booking.getPaymentStatus(),
                 booking.getLockedFee(),
                 booking.getCreatedAt(),
-                booking.getCancellationReason());
+                booking.getCancellationReason(),
+                visitOutcome,
+                cancellation);
     }
 }
