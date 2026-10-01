@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { loginPatient, LoginPatientApiError, type LoginPatientResponse } from './api'
 import { storePatientSession, type StoredPatientSession } from './token'
+import { withReturnTo } from './returnTo'
 import { useToast } from '../../components/Toast'
 
 interface FormState {
@@ -16,13 +17,15 @@ const initialState: FormState = {
 
 export interface LoginFormProps {
   onSuccess?: (session: StoredPatientSession) => void
+  /** 070-login-return-path: carried onto the "Create an account" link. */
+  returnTo?: string | null
 }
 
 // 056-design-copy-quality-pass (2026-09-16 login-page rebuild): matches design/
 // patient-login-reference.html's card layout/copy structure, reusing this project's own
 // tokens (index.css) rather than the reference's own palette/serif font - same substitution
 // already applied to HomePage.tsx.
-export function LoginForm({ onSuccess }: LoginFormProps = {}) {
+export function LoginForm({ onSuccess, returnTo }: LoginFormProps = {}) {
   const [form, setForm] = useState<FormState>(initialState)
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -152,7 +155,7 @@ export function LoginForm({ onSuccess }: LoginFormProps = {}) {
 
       <p className="mt-3.5 text-center text-sm text-gray-600">
         <Link
-          to="/patient/signup"
+          to={withReturnTo('/patient/signup', returnTo)}
           className="rounded font-semibold text-indigo-600 hover:text-indigo-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
         >
           Create an account
