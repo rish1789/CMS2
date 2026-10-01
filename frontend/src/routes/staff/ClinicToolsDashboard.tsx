@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useOutletContext, useParams } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { loadStaffSession } from '../../features/staff-login/token'
+import type { StaffRole } from '../../components/RoleBadge'
+import type { ClinicShellOutletContext } from './ClinicShell'
+import { CLINIC_TOOL_ROLES, hasAnyRole } from './clinicRoles'
 import { getTodayStats, listSessions, type SessionSummary, type TodaySessionStats } from '../../features/day-sheet/api'
 import { listInboxItems } from '../../features/inbox/api'
 import { getWaitlistCount } from '../../features/waitlist/api'
@@ -126,6 +129,8 @@ interface QuickLink {
   description: string
   path: (clinicId: string) => string
   icon: ReactNode
+  /** 073-role-aware-clinic-tools: omit for every role; otherwise shown only once roles are known and allowed. */
+  roles?: readonly StaffRole[]
 }
 
 const LINKS: QuickLink[] = [
@@ -162,6 +167,7 @@ const LINKS: QuickLink[] = [
     description: 'Add a new Doctor or Operations staff member.',
     path: (clinicId) => `/staff/clinics/${clinicId}/onboard`,
     icon: <UserPlusIcon />,
+    roles: CLINIC_TOOL_ROLES.onboard,
   },
   {
     title: 'Join a patient to the waitlist',
@@ -174,6 +180,7 @@ const LINKS: QuickLink[] = [
     description: 'Review flagged suspicious booking activity and manage this clinic’s appointment limit.',
     path: (clinicId) => `/staff/clinics/${clinicId}/protection`,
     icon: <ShieldIcon />,
+    roles: CLINIC_TOOL_ROLES.protection,
   },
 ]
 
@@ -209,6 +216,11 @@ export function ClinicToolsDashboard() {
   const [unclaimedInboxCount, setUnclaimedInboxCount] = useState<number | null>(null)
   const [waitingCount, setWaitingCount] = useState<number | null>(null)
   const [todayStats, setTodayStats] = useState<TodaySessionStats | null>(null)
+  // Undefined when rendered outside ClinicShell - then no restricted tile is offered.
+  const shell = useOutletContext<ClinicShellOutletContext | undefined>()
+  const visibleLinks = LINKS.filter(
+    (link) => !link.roles || (shell?.rolesStatus === 'ready' && hasAnyRole(shell.roles, link.roles)),
+  )
 
   useEffect(() => {
     if (!clinicId) return
@@ -270,7 +282,7 @@ export function ClinicToolsDashboard() {
       <TodayStatsTile stats={todayStats} />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {LINKS.map((link) => (
+        {visibleLinks.map((link) => (
           <Link
             key={link.title}
             to={link.path(clinicId)}

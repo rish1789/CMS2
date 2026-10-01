@@ -1,5 +1,9 @@
-import { Navigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
+import type { ReactNode } from 'react'
+import { Link, Navigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import type { ClinicShellOutletContext } from './ClinicShell'
+import { CLINIC_TOOL_ROLES, hasAnyRole } from './clinicRoles'
+import type { StaffRole } from '../../components/RoleBadge'
+import { LoadingState } from '../../components/LoadingState'
 import { OnboardStaffForm } from '../../features/staff-onboarding/OnboardStaffForm'
 import { DoctorScheduleManager } from '../../features/scheduling/DoctorScheduleManager'
 import { AppointmentTypeConfigForm } from '../../features/appointment-types/AppointmentTypeConfigForm'
@@ -24,10 +28,72 @@ import { ClinicLimitOverrideForm } from '../../features/clinic-protection/Clinic
 // tool, extracting ids from the URL and rendering the already-built, already-tested feature
 // component - every one of these previously had no way to be reached by a real user at all.
 
+// 073-role-aware-clinic-tools (live-audit finding 7): a restricted tool's page renders its form
+// only once the caller's roles at this clinic are known and allowed - never while they load, and
+// never on a failed lookup. The backend still refuses on its own; this stops the UI offering a
+// form the server will reject.
+function RequireClinicRole({
+  clinicId,
+  allowed,
+  tool,
+  whoCanUseIt,
+  children,
+}: {
+  clinicId: string
+  allowed: readonly StaffRole[]
+  tool: string
+  whoCanUseIt: string
+  children: ReactNode
+}) {
+  const { roles, rolesStatus } = useOutletContext<ClinicShellOutletContext>()
+
+  if (rolesStatus === 'loading') {
+    return (
+      <div className="space-y-3">
+        <p role="status" className="text-sm text-gray-500">
+          Checking your access…
+        </p>
+        <LoadingState />
+      </div>
+    )
+  }
+
+  if (rolesStatus === 'failed') {
+    return (
+      <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+        We couldn&apos;t confirm your access to {tool}. Reload the page to try again.
+      </p>
+    )
+  }
+
+  if (!hasAnyRole(roles, allowed)) {
+    return (
+      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <h1 className="text-lg font-semibold text-gray-900">{tool} isn&apos;t available for your role at this clinic</h1>
+        <p className="mt-2 text-sm text-gray-600">{whoCanUseIt}</p>
+        <Link
+          to={`/staff/clinics/${clinicId}`}
+          className="mt-4 inline-block text-sm font-medium text-indigo-600 transition-colors duration-150 hover:text-indigo-700"
+        >
+          Back to the clinic dashboard
+        </Link>
+      </div>
+    )
+  }
+
+  return <>{children}</>
+}
+
+const ADMINS_ONLY = 'Only clinic administrators can use it. Ask a ClinicAdmin at this clinic if you need this done.'
+
 export function OnboardStaffPage() {
   const { clinicId } = useParams<{ clinicId: string }>()
   if (!clinicId) return null
-  return <OnboardStaffForm clinicId={clinicId} />
+  return (
+    <RequireClinicRole clinicId={clinicId} allowed={CLINIC_TOOL_ROLES.onboard} tool="Onboard staff" whoCanUseIt={ADMINS_ONLY}>
+      <OnboardStaffForm clinicId={clinicId} />
+    </RequireClinicRole>
+  )
 }
 
 export function DefineSchedulePage() {
@@ -77,7 +143,16 @@ export function LegacyWalkInRedirect() {
 export function FrontDeskWalkInRoutePage() {
   const { clinicId } = useParams<{ clinicId: string }>()
   if (!clinicId) return null
-  return <FrontDeskWalkInPage clinicId={clinicId} />
+  return (
+    <RequireClinicRole
+      clinicId={clinicId}
+      allowed={CLINIC_TOOL_ROLES.walkIn}
+      tool="Walk-in registration"
+      whoCanUseIt="Only clinic administrators and operations staff register walk-ins at the front desk."
+    >
+      <FrontDeskWalkInPage clinicId={clinicId} />
+    </RequireClinicRole>
+  )
 }
 
 export function SessionOperationsPage() {
@@ -184,11 +259,19 @@ export function InboxRoutePage() {
 export function ProtectionFlagsPage() {
   const { clinicId } = useParams<{ clinicId: string }>()
   if (!clinicId) return null
-  return <ProtectionFlagsList clinicId={clinicId} />
+  return (
+    <RequireClinicRole clinicId={clinicId} allowed={CLINIC_TOOL_ROLES.protection} tool="Booking protection" whoCanUseIt={ADMINS_ONLY}>
+      <ProtectionFlagsList clinicId={clinicId} />
+    </RequireClinicRole>
+  )
 }
 
 export function ClinicLimitOverridePage() {
   const { clinicId } = useParams<{ clinicId: string }>()
   if (!clinicId) return null
-  return <ClinicLimitOverrideForm clinicId={clinicId} />
+  return (
+    <RequireClinicRole clinicId={clinicId} allowed={CLINIC_TOOL_ROLES.protection} tool="Booking protection" whoCanUseIt={ADMINS_ONLY}>
+      <ClinicLimitOverrideForm clinicId={clinicId} />
+    </RequireClinicRole>
+  )
 }
