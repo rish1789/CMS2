@@ -3,7 +3,7 @@ import { OpenSlotList } from '../../features/patient-booking/OpenSlotList'
 import { QueueBookSlotForm } from '../../features/patient-booking/QueueBookSlotForm'
 import { QueueSessionList } from '../../features/patient-booking/QueueSessionList'
 import type { AppointmentTypeOption } from '../../features/patient-booking/api'
-import { CancelBookingButton } from '../../features/booking-cancellation/CancelBookingButton'
+import { PatientBookingOverview } from '../../features/patient-bookings/PatientBookingOverview'
 import { QueuePositionIndicator } from '../../features/queue-position/QueuePositionIndicator'
 import { JoinWaitlistForm } from '../../features/waitlist/JoinWaitlistForm'
 import { MyWaitlistEntries } from '../../features/waitlist/MyWaitlistEntries'
@@ -116,9 +116,11 @@ export function PatientBookingDetailPage() {
   if (!bookingId) return null
   return (
     <div className="mx-auto max-w-md space-y-4">
+      {/* 069-patient-visit-outcomes: the outcome header and an eligibility-aware cancel action
+          replace the unconditional cancel button (live-audit finding 3). */}
+      <PatientBookingOverview bookingId={bookingId} />
       <LiveScheduleStatusIndicator mode="patient" bookingId={bookingId} />
       <QueuePositionIndicator mode="patient" bookingId={bookingId} />
-      <CancelBookingButton mode="patient" bookingId={bookingId} />
       <VisitRecordSection bookingId={bookingId} />
     </div>
   )

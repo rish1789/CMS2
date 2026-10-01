@@ -39,6 +39,8 @@ const DOCUMENTED_BOOKING: PatientBookingSummary = {
   lockedFee: 500,
   createdAt: '2026-08-01T09:00:00Z',
   cancellationReason: null,
+  visitOutcome: 'COMPLETED',
+  cancellation: { allowed: false, reason: 'VISIT_RESOLVED' },
 }
 
 const UNDOCUMENTED_BOOKING: PatientBookingSummary = { ...DOCUMENTED_BOOKING, id: 'booking-undocumented' }
@@ -90,8 +92,8 @@ describe('MyBookings - clinic-rejected cancellation message (062-rejected-clinic
   it('explains a CLINIC_REJECTED cancellation and adds nothing to other cancellations', async () => {
     mockedListMyBookings.mockResolvedValueOnce({
       bookings: [
-        { ...DOCUMENTED_BOOKING, id: 'booking-rejected', status: 'CANCELLED', cancellationReason: 'CLINIC_REJECTED' },
-        { ...DOCUMENTED_BOOKING, id: 'booking-self-cancelled', status: 'CANCELLED', cancellationReason: 'FEELING_BETTER' },
+        { ...DOCUMENTED_BOOKING, id: 'booking-rejected', status: 'CANCELLED', cancellationReason: 'CLINIC_REJECTED', visitOutcome: 'CANCELLED' },
+        { ...DOCUMENTED_BOOKING, id: 'booking-self-cancelled', status: 'CANCELLED', cancellationReason: 'FEELING_BETTER', visitOutcome: 'CANCELLED' },
       ],
       page: 0,
       pageSize: 20,
@@ -106,3 +108,37 @@ describe('MyBookings - clinic-rejected cancellation message (062-rejected-clinic
     expect(screen.getAllByText('This clinic is no longer accepting appointments.')).toHaveLength(1)
   })
 })
+
+// 069-patient-visit-outcomes (live-audit findings 1-2): each booking is labelled with the
+// patient's own visit outcome - a no-show is never "Active" or "Visit complete".
+describe('MyBookings - visit outcome labels (069)', () => {
+  beforeEach(() => {
+    mockedListMyBookings.mockReset()
+    mockedGetClinicalRecordAvailability.mockReset()
+    mockedGetClinicalRecordAvailability.mockResolvedValue(new Set())
+    storePatientSession({ token: 'a.jwt.token', patientAccountId: 'patient-1', email: 'patient@example.com' })
+  })
+
+  it('labels each booking with its own outcome', async () => {
+    const outcomes: [PatientBookingSummary['visitOutcome'], string][] = [
+      ['SCHEDULED', 'Upcoming'],
+      ['CHECKED_IN', 'Checked in'],
+      ['COMPLETED', 'Visit complete'],
+      ['NO_SHOW', 'Missed appointment'],
+      ['NOT_RECORDED', 'Outcome not recorded'],
+    ]
+    mockedListMyBookings.mockResolvedValueOnce({
+      bookings: outcomes.map(([visitOutcome], index) => ({ ...DOCUMENTED_BOOKING, id: `booking-${index}`, visitOutcome })),
+      page: 0,
+      pageSize: 20,
+      totalCount: outcomes.length,
+    })
+    renderMyBookings()
+
+    for (const [, label] of outcomes) {
+      expect(await screen.findByText(label)).toBeInTheDocument()
+    }
+    expect(screen.queryByText('Active')).not.toBeInTheDocument()
+  })
+})
+

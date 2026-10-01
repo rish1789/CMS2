@@ -1,5 +1,7 @@
 package com.cms.booking.dto;
 
+import com.cms.booking.domain.VisitOutcome;
+
 import java.util.UUID;
 
 /**
@@ -14,4 +16,6 @@ public record PatientSessionLiveStatusResponse(
         String doctorName,
         Integer currentPatientOrdinal,
         String statusText,
-        Integer estimatedWaitMinutes) {}
+        Integer estimatedWaitMinutes,
+        /** 069 FR-004: the patient's own visit outcome - always present, even when not applicable. */
+        VisitOutcome visitOutcome) {}

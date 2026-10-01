@@ -42,7 +42,13 @@ import org.springframework.test.web.servlet.MockMvc;
  * (FR-002); and CLINIC_REJECTED is a system-only cancellation reason a patient can never submit.
  */
 @WebMvcTest(controllers = {PatientBookingController.class, PatientBookingCancellationController.class})
-@Import({BookingExceptionHandler.class, SecurityConfig.class, PatientAuthenticationEntryPoint.class, JwtService.class})
+@Import({
+    BookingExceptionHandler.class,
+    SecurityConfig.class,
+    PatientAuthenticationEntryPoint.class,
+    JwtService.class,
+    PatientVisitOutcomesTestConfig.class
+})
 @TestPropertySource(properties = "patient.jwt.secret=test-only-contract-test-secret-at-least-64-characters-long-ok")
 class ClinicNotAcceptingAppointmentsContractTest {
 

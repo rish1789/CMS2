@@ -9,15 +9,14 @@ import com.cms.booking.exception.WalkInNotSelfCancellableException;
 import com.cms.booking.exception.InvalidCancellationReasonException;
 import com.cms.booking.repository.BookingRepository;
 import com.cms.booking.service.BookingCancellationService;
+import com.cms.booking.service.PatientVisitOutcomes;
 
 
 import com.cms.booking.dto.BookingResponse;
 import com.cms.booking.dto.CancelBookingRequest;
 import com.cms.patient.account.config.SecurityConfig;
 import com.cms.scheduling.exception.NotAFixedTimeSessionException;
-import com.cms.scheduling.domain.ScheduleMode;
 import jakarta.validation.Valid;
-import java.time.LocalDateTime;
 import java.util.UUID;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,15 +28,17 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class PatientBookingCancellationController {
 
-    private static final int CUTOFF_HOURS = 2;
-
     private final BookingRepository bookingRepository;
     private final BookingCancellationService bookingCancellationService;
+    private final PatientVisitOutcomes patientVisitOutcomes;
 
     public PatientBookingCancellationController(
-            BookingRepository bookingRepository, BookingCancellationService bookingCancellationService) {
+            BookingRepository bookingRepository,
+            BookingCancellationService bookingCancellationService,
+            PatientVisitOutcomes patientVisitOutcomes) {
         this.bookingRepository = bookingRepository;
         this.bookingCancellationService = bookingCancellationService;
+        this.patientVisitOutcomes = patientVisitOutcomes;
     }
 
     /**
@@ -63,26 +64,19 @@ public class PatientBookingCancellationController {
 
         var slot = booking.getSlot();
 
-        // Checked before the cutoff computation below: a Queue-mode Slot's startTime is null
-        // (013/019), so combining it into a LocalDateTime would NPE if this ran first. Reuses
-        // 025/026/027's identical exception - FR-009 is Fixed-Time-only for both endpoints,
-        // BookingCancellationService.cancel enforces it too, but the cutoff check here needs
-        // it enforced earlier still.
-        if (slot.getSession().getMode() != ScheduleMode.FIXED_TIME) {
-            throw new NotAFixedTimeSessionException(slot.getSession().getId());
-        }
-
-        // 063-front-desk-walk-in: a walk-in has no scheduled time for the cutoff to apply to, and is
-        // physically at the clinic - staff remove walk-ins from the line (FR-015).
-        if (slot.isUntimed()) {
-            throw new WalkInNotSelfCancellableException(bookingId);
-        }
-
-        // FR-002/research.md R6: reuses 023's Session/Slot-time-combining technique. Only the
-        // patient path is cutoff-gated - staff (StaffBookingCancellationController) never checks this.
-        LocalDateTime scheduledAt = LocalDateTime.of(slot.getSession().getSessionDate(), slot.getStartTime());
-        if (scheduledAt.isBefore(LocalDateTime.now().plusHours(CUTOFF_HOURS))) {
-            throw new CancellationCutoffPassedException(bookingId);
+        // 069-patient-visit-outcomes FR-005: the same checks, in the same order, now shared with the
+        // eligibility shown to the patient - Queue-mode first (its startTime is null, so the cutoff
+        // must not run first), then an untimed walk-in (063 FR-015), then the 2-hour cutoff (028
+        // FR-002). Only the patient path is cutoff-gated; staff never are. Booking and slot state are
+        // still enforced by BookingCancellationService.cancel below.
+        var refusal = patientVisitOutcomes.requestRefusal(slot);
+        if (refusal.isPresent()) {
+            switch (refusal.get()) {
+                case QUEUE_BOOKING -> throw new NotAFixedTimeSessionException(slot.getSession().getId());
+                case WALK_IN -> throw new WalkInNotSelfCancellableException(bookingId);
+                case CUTOFF_PASSED -> throw new CancellationCutoffPassedException(bookingId);
+                default -> throw new IllegalStateException("Not a request-time refusal: " + refusal.get());
+            }
         }
 
         String rawReason = request == null ? null : request.reason();

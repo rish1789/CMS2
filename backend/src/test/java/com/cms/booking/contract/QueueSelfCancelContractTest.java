@@ -37,7 +37,13 @@ import org.springframework.test.web.servlet.MockMvc;
  * own Fixed-Time check stays in place.
  */
 @WebMvcTest(controllers = PatientBookingCancellationController.class)
-@Import({BookingExceptionHandler.class, SecurityConfig.class, PatientAuthenticationEntryPoint.class, JwtService.class})
+@Import({
+    BookingExceptionHandler.class,
+    SecurityConfig.class,
+    PatientAuthenticationEntryPoint.class,
+    JwtService.class,
+    PatientVisitOutcomesTestConfig.class
+})
 @TestPropertySource(properties = "patient.jwt.secret=test-only-contract-test-secret-at-least-64-characters-long-ok")
 class QueueSelfCancelContractTest {
 

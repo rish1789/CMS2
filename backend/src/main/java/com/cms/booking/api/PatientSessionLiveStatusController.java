@@ -1,6 +1,8 @@
 package com.cms.booking.api;
 
 import com.cms.booking.domain.Booking;
+import com.cms.booking.domain.VisitOutcome;
+import com.cms.booking.service.PatientVisitOutcomes;
 import com.cms.booking.dto.PatientSessionLiveStatusResponse;
 import com.cms.booking.exception.BookingNotFoundException;
 import com.cms.booking.repository.BookingRepository;
@@ -27,11 +29,15 @@ public class PatientSessionLiveStatusController {
 
     private final BookingRepository bookingRepository;
     private final SessionLiveStatusService sessionLiveStatusService;
+    private final PatientVisitOutcomes patientVisitOutcomes;
 
     public PatientSessionLiveStatusController(
-            BookingRepository bookingRepository, SessionLiveStatusService sessionLiveStatusService) {
+            BookingRepository bookingRepository,
+            SessionLiveStatusService sessionLiveStatusService,
+            PatientVisitOutcomes patientVisitOutcomes) {
         this.bookingRepository = bookingRepository;
         this.sessionLiveStatusService = sessionLiveStatusService;
+        this.patientVisitOutcomes = patientVisitOutcomes;
     }
 
     @GetMapping("/api/v1/patients/bookings/{bookingId}/live-status")
@@ -47,9 +53,10 @@ public class PatientSessionLiveStatusController {
         Slot patientSlot = booking.getSlot();
         Session session = patientSlot.getSession();
         SessionLiveStatusService.LiveStatus status = sessionLiveStatusService.liveStatusFor(session);
+        VisitOutcome visitOutcome = patientVisitOutcomes.outcome(booking);
 
         if (!status.applicable()) {
-            return new PatientSessionLiveStatusResponse(bookingId, false, null, null, null, null);
+            return new PatientSessionLiveStatusResponse(bookingId, false, null, null, null, null, visitOutcome);
         }
 
         String doctorName = session.getDoctorProfile().getAccount().getName();
@@ -59,19 +66,37 @@ public class PatientSessionLiveStatusController {
                 true,
                 doctorName,
                 status.currentPatientOrdinal(),
-                statusText(status),
-                estimatedWaitMinutes);
+                statusText(status, visitOutcome),
+                estimatedWaitMinutes,
+                visitOutcome);
     }
 
-    /** FR-004/FR-011: plain language only - never one of {@link SessionLiveStatusService.Status}'s raw codes. */
-    private String statusText(SessionLiveStatusService.LiveStatus status) {
+    /**
+     * FR-004/FR-011: plain language only - never one of {@link SessionLiveStatusService.Status}'s raw codes.
+     *
+     * <p>069-patient-visit-outcomes FR-004 (live-audit finding 1): once the patient's own visit is
+     * resolved, the text describes that visit, not the session. A session is "complete" when every
+     * slot is resolved - no-shows included - so it never established that this patient was seen.
+     */
+    private String statusText(SessionLiveStatusService.LiveStatus status, VisitOutcome visitOutcome) {
+        switch (visitOutcome) {
+            case COMPLETED:
+                return "Visit complete";
+            case NO_SHOW:
+                return "Missed appointment";
+            case CANCELLED:
+                return "Booking cancelled";
+            default:
+                break;
+        }
         Integer deviation = status.deviationMinutes();
         return switch (status.status()) {
             case NOT_STARTED -> "Not started yet";
             case ON_TIME -> "On time";
             case DELAYED -> deviation == null ? "Delayed" : deviation + " min delayed";
             case RUNNING_EARLY -> deviation == null ? "Running early" : "Running " + deviation + " min early";
-            case COMPLETED -> "Visit complete";
+            // The session finished but this patient's own visit is not recorded as resolved.
+            case COMPLETED -> "Session finished";
         };
     }
 }
