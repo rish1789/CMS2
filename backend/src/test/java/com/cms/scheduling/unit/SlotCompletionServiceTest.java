@@ -19,8 +19,7 @@ import com.cms.scheduling.exception.SlotNotFoundException;
 import com.cms.scheduling.repository.SlotRepository;
 import com.cms.scheduling.service.SessionDelayService;
 import com.cms.scheduling.service.SlotCompletionService;
-import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -83,8 +82,11 @@ class SlotCompletionServiceTest {
         when(doctorAccount.getId()).thenReturn(UUID.randomUUID()); // a different account than the caller, by default
         lenient().when(session.getMode()).thenReturn(ScheduleMode.FIXED_TIME);
         lenient().when(slot.getStatus()).thenReturn(status);
-        lenient().when(session.getSessionDate()).thenReturn(LocalDate.now());
-        lenient().when(slot.getStartTime()).thenReturn(LocalTime.now().minusHours(1));
+        // Date and time taken together from one instant an hour ago: LocalTime.now().minusHours(1)
+        // on today's date wrapped to 23:xx (later today, so "not yet started") between 00:00-01:00.
+        LocalDateTime anHourAgo = LocalDateTime.now().minusHours(1);
+        lenient().when(session.getSessionDate()).thenReturn(anHourAgo.toLocalDate());
+        lenient().when(slot.getStartTime()).thenReturn(anHourAgo.toLocalTime());
     }
 
     private void stubStaffRole(boolean isClinicAdmin, boolean isOperations) {

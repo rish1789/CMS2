@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FrontDeskWalkInPage } from '../../src/features/front-desk-walk-in/FrontDeskWalkInPage'
 import { registerWalkIn } from '../../src/features/front-desk-walk-in/api'
 import { getDaySheet, listSessions, type SessionSummary } from '../../src/features/day-sheet/api'
@@ -54,6 +54,16 @@ const mockedReadiness = vi.mocked(listDoctorBookingReadiness)
 const mockedLiveStatus = vi.mocked(getSessionLiveStatusAsStaff)
 const mockedSearch = vi.mocked(searchPatients)
 const mockedTypes = vi.mocked(listAppointmentTypes)
+
+// The fixtures below are HH:MM times relative to "now" on today's date, so near midnight they
+// wrapped (e.g. 3 hours before 01:44 became 22:44, i.e. later today) and an ended session read as
+// still running. Pin only Date to today's midday before any fixture is built - timers stay real,
+// so user-event keeps working - and restore it after this file.
+vi.useFakeTimers({ toFake: ['Date'] })
+vi.setSystemTime(new Date(new Date().setHours(12, 0, 0, 0)))
+afterAll(() => {
+  vi.useRealTimers()
+})
 
 function hoursFromNow(hours: number): string {
   const d = new Date(Date.now() + hours * 3600_000)

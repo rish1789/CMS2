@@ -120,7 +120,7 @@ npm ci && npx tsc -b && npm run lint && npx vitest run       # 441 tests
 1. **The Spring Boot 4 migration PR (branch `claude/spring-boot-4`) awaits the owner's review and merge.** After it merges:
    - confirm CI on `main`;
    - confirm the owner's Windows launch config (`.claude/launch.json`, now `./backend/gradlew.bat`) starts the backend. The wrapper downloads Gradle 8.14.3 on first use. This could not be tested on Windows from the cloud sandbox.
-2. **Fix the `SlotCompletionServiceTest` time bug.** It sets a slot's start to `LocalTime.now().minusHours(1)` on today's date, so between 00:00 and 01:00 in the JVM's clock it wraps to 23:xx, and 3 tests fail with `SlotNotYetStartedException`. This is pre-existing and independent of Spring Boot. Build the timestamp as `LocalDateTime.now().minusHours(1)` and use its date and time together.
+2. **Watch for the midnight-wrap test pattern.** Building `HH:MM` fixture times as `now ± N hours` on today's date wraps past midnight. Two instances were fixed in the Boot 4 PR: `SlotCompletionServiceTest` now takes date and time from one `LocalDateTime`, and `FrontDeskWalkInPage.test.tsx` pins `Date` to midday. Prefer the same approaches in new tests.
 3. Run convergence reviews for 065, 066 and 067 (`.claude/skills/speckit-converge/SKILL.md`). Investigate the historical partial-cancellation flake if it recurs.
 4. Consider a spec (068) for the gap between cancellation and 067's session lock, if the owner wants it closed.
 5. Leave SEC-03, PB-005 and the OWASP secret pending the owner's decisions. Do not merge or deploy on the owner's behalf.

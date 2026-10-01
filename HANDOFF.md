@@ -1592,13 +1592,14 @@ This was done on branch `claude/spring-boot-4` while the owner was away. **It is
 
 ### Found along the way (pre-existing, not Spring Boot)
 
-- **`SlotCompletionServiceTest` fails between 00:00 and 01:00 in the JVM's clock** (05:30–06:30 IST when the clock is UTC). It builds the slot start as `LocalTime.now().minusHours(1)` on today's date, which wraps to 23:xx. 3 tests then hit `SlotNotYetStartedException`. They pass outside that hour, and the fix is to use `LocalDateTime.now().minusHours(1)`. This is the same family of problem as the "today's 09:00 slots" fixtures.
+- **Two midnight-wrap test bugs, both fixed in this PR at the owner's instruction** ("fix the issues, make it green, then merge"). Each was reproduced red, then shown green at the failing clock time:
+  - **`SlotCompletionServiceTest`** failed between 00:00 and 01:00 in the JVM's clock. The slot start was `LocalTime.now().minusHours(1)` on today's date, which wraps to 23:xx, so 3 tests hit `SlotNotYetStartedException`. It now takes date and time from one `LocalDateTime.now().minusHours(1)`. Verified at a 00:02 JVM clock (8/8; it was 3 failed before), and at 02:03 and 07:33.
+  - **`FrontDeskWalkInPage.test.tsx`** failed between 00:00 and 03:00. The "ended" session's `endTime: hoursFromNow(-3)` wrapped to tonight, and it failed PR #28's first frontend CI run at 01:44 UTC. The file now pins only `Date` to today's midday before the fixtures are built (timers stay real). Verified 10/10 under clocks of 02:01, 07:31, 23:01 and 12:01; full frontend suite 441/441.
 
 ### Still open after this
 
 - Merge this PR and confirm CI on `main`.
 - Confirm the Windows launch configuration starts the backend.
-- Fix the `SlotCompletionServiceTest` midnight wrap.
 - Convergence passes for 065, 066 and 067.
 - 068 (cancellation vs. 067's session lock).
 - Owner decisions: SEC-03, PB-005, and the `NVD_API_KEY` secret.
