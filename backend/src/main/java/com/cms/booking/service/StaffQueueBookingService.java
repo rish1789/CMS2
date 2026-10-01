@@ -52,6 +52,7 @@ public class StaffQueueBookingService {
     private final FeeResolutionService feeResolutionService;
     private final AppointmentTypeRepository appointmentTypeRepository;
     private final PatientRepository patientRepository;
+    private final WalkInPatientRegistrar walkInPatientRegistrar;
     private final BookingRepository bookingRepository;
     private final IndianMobileNumberValidator mobileNumberValidator;
     private final SessionAvailabilityService sessionAvailabilityService;
@@ -74,6 +75,7 @@ public class StaffQueueBookingService {
         this.feeResolutionService = feeResolutionService;
         this.appointmentTypeRepository = appointmentTypeRepository;
         this.patientRepository = patientRepository;
+        this.walkInPatientRegistrar = new WalkInPatientRegistrar(patientRepository);
         this.bookingRepository = bookingRepository;
         this.mobileNumberValidator = mobileNumberValidator;
         this.sessionAvailabilityService = sessionAvailabilityService;
@@ -128,7 +130,8 @@ public class StaffQueueBookingService {
         if (!mobileNumberValidator.isValid(input.patientPhone())) {
             throw new InvalidMobileNumberException();
         }
-        return patientRepository.save(new Patient(session.getClinic(), null, input.patientName(), input.patientPhone()));
+        // 074-duplicate-patient-phone: flushed before the token is issued, so a refusal leaves no token.
+        return walkInPatientRegistrar.register(session.getClinic(), input.patientName(), input.patientPhone(), null);
     }
 
     /** FR-001: an active Operations or ClinicAdmin at this clinic - never the Doctor (mirrors 020). */

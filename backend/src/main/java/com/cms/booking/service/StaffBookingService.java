@@ -43,6 +43,7 @@ public class StaffBookingService {
     private final FeeResolutionService feeResolutionService;
     private final AppointmentTypeRepository appointmentTypeRepository;
     private final PatientRepository patientRepository;
+    private final WalkInPatientRegistrar walkInPatientRegistrar;
     private final BookingRepository bookingRepository;
     private final IndianMobileNumberValidator mobileNumberValidator;
     private final SessionAvailabilityService sessionAvailabilityService;
@@ -62,6 +63,7 @@ public class StaffBookingService {
         this.feeResolutionService = feeResolutionService;
         this.appointmentTypeRepository = appointmentTypeRepository;
         this.patientRepository = patientRepository;
+        this.walkInPatientRegistrar = new WalkInPatientRegistrar(patientRepository);
         this.bookingRepository = bookingRepository;
         this.mobileNumberValidator = mobileNumberValidator;
     }
@@ -133,8 +135,9 @@ public class StaffBookingService {
         if (!mobileNumberValidator.isValid(input.patientPhone())) {
             throw new InvalidMobileNumberException();
         }
-        return patientRepository.save(
-                new Patient(slot.getSession().getClinic(), null, input.patientName(), input.patientPhone()));
+        // 074-duplicate-patient-phone: flushed here, before the booking, so a phone collision is
+        // reported as itself - not caught below as a lost slot race.
+        return walkInPatientRegistrar.register(slot.getSession().getClinic(), input.patientName(), input.patientPhone(), null);
     }
 
     /** FR-001/FR-002: an active Operations or ClinicAdmin at this clinic - never the Doctor (spec Scope Decisions). */

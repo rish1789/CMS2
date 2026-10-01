@@ -33,7 +33,8 @@ Added after the plan was written. The original text below is preserved as writte
   - the full backend suite passes 1,146/0/0, run on the 072 head, which has the same backend code.
 
   Each PR's own CI is the merge gate.
-- **Next package:** 2B (staff-side duplicate-patient phone handling).
+- **2B: done.** Spec 074; PB-001 and PB-002 are fixed. All three staff paths answer a same-clinic phone collision with 409 `PATIENT_PHONE_ALREADY_REGISTERED`, naming the existing unlinked patient when known. Staff choose to book that patient; nothing is merged.
+- **Next:** the Phase 3 decision record (3C and 3D are still open; 3A and 3B are done).
 
 ## Current position
 

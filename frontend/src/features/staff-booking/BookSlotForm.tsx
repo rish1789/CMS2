@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from 'react'
-import { bookSlot, type BookSlotErrorBody, type BookingResponse } from './api'
+import { bookSlot, type BookSlotErrorBody, type BookSlotRequest, type BookingResponse } from './api'
 import { ApiError } from '../../lib/apiClient'
 import { loadStaffSession, storeStaffSession } from '../staff-login/token'
 import { AppointmentTypeSelect } from '../appointment-types/AppointmentTypeSelect'
 import { PatientPicker } from '../patient-search/PatientPicker'
 import { FormField } from '../../components/FormField'
+import { DuplicatePhoneConflict } from '../patient-search/DuplicatePhoneConflict'
+import { duplicatePhoneConflictOf, type DuplicatePhoneConflictBody } from '../patient-search/duplicatePhoneConflict'
 
 type PatientMode = 'existing' | 'new'
 
@@ -42,6 +44,7 @@ export function BookSlotForm({ clinicId, slotId, doctorProfileId }: BookSlotForm
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<BookingResponse | null>(null)
+  const [phoneConflict, setPhoneConflict] = useState<DuplicatePhoneConflictBody | null>(null)
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -66,24 +69,32 @@ export function BookSlotForm({ clinicId, slotId, doctorProfileId }: BookSlotForm
       return
     }
 
+    await submitBooking(
+      form.patientMode === 'existing'
+        ? { patientId: form.patientId, appointmentTypeId: form.appointmentTypeId }
+        : {
+            patientName: form.patientName,
+            patientPhone: form.patientPhone.trim() === '' ? undefined : form.patientPhone,
+            appointmentTypeId: form.appointmentTypeId,
+          },
+    )
+  }
+
+  async function submitBooking(request: BookSlotRequest) {
+    if (!session) return
     setSubmitting(true)
+    setFormError(null)
+    setPhoneConflict(null)
 
     try {
-      const response = await bookSlot(
-        clinicId,
-        slotId,
-        form.patientMode === 'existing'
-          ? { patientId: form.patientId, appointmentTypeId: form.appointmentTypeId }
-          : {
-              patientName: form.patientName,
-              patientPhone: form.patientPhone.trim() === '' ? undefined : form.patientPhone,
-              appointmentTypeId: form.appointmentTypeId,
-            },
-        session.token,
-      )
+      const response = await bookSlot(clinicId, slotId, request, session.token)
       setResult(response)
     } catch (err) {
-      if (err instanceof ApiError) {
+      // 074-duplicate-patient-phone: the typed values stay; staff choose what to do next.
+      const conflict = err instanceof ApiError ? duplicatePhoneConflictOf(err.body) : null
+      if (conflict) {
+        setPhoneConflict(conflict)
+      } else if (err instanceof ApiError) {
         const body = err.body as BookSlotErrorBody | undefined
         if (body?.error === 'UNAUTHORIZED') {
           storeStaffSession(null)
@@ -129,6 +140,17 @@ export function BookSlotForm({ clinicId, slotId, doctorProfileId }: BookSlotForm
         <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">
           {formError}
         </p>
+      )}
+
+      {phoneConflict && (
+        <DuplicatePhoneConflict
+          conflict={phoneConflict}
+          busy={submitting}
+          actionLabel={(name) => `Book ${name} instead`}
+          onUseExisting={(existing) =>
+            void submitBooking({ patientId: existing.id, appointmentTypeId: form.appointmentTypeId })
+          }
+        />
       )}
 
       <fieldset>

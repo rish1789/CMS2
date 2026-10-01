@@ -1,6 +1,7 @@
 // Client for POST /api/v1/clinics/{clinicId}/sessions/{sessionId}/queue-bookings
 // See specs/022-queue-token-booking/contracts/queue-booking.md
 
+import type { DuplicatePhoneConflictBody } from '../patient-search/duplicatePhoneConflict'
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
 
 export interface QueueBookSlotRequest {
@@ -32,6 +33,8 @@ export type QueueBookSlotErrorBody =
   | { error: 'INVALID_MOBILE_NUMBER'; message?: string }
   | { error: 'TOKEN_ISSUANCE_FAILED'; message?: string }
   | { error: 'UNAUTHORIZED'; message?: string }
+  // 074-duplicate-patient-phone
+  | DuplicatePhoneConflictBody
 
 export class QueueBookSlotApiError extends Error {
   readonly body: QueueBookSlotErrorBody
@@ -65,6 +68,8 @@ function defaultMessageFor(body: QueueBookSlotErrorBody): string {
       return 'Your session has expired. Please sign in again.'
     case 'CLINIC_NOT_ACCEPTING_APPOINTMENTS':
       return 'This clinic is not accepting appointments.'
+    case 'PATIENT_PHONE_ALREADY_REGISTERED':
+      return 'A patient with this phone number is already registered at this clinic.'
     default:
       return 'Something went wrong. Please try again.'
   }
