@@ -12,6 +12,12 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+  # Spring Boot 4 serializes with Jackson 3, whose defaults differ from Jackson 2's (e.g.
+  # FAIL_ON_NULL_FOR_PRIMITIVES is now on, so a request body omitting a primitive field such as
+  # FrontDeskWalkInRequest.confirmDuplicate became a 400). Keep the API's JSON behaviour exactly
+  # as it was under Boot 3; moving to Jackson 3's own defaults is a separate, deliberate change.
+  jackson:
+    use-jackson2-defaults: true
 
 server:
   port: ${PORT:8080}

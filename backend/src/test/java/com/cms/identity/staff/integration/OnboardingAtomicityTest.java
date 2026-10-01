@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfileRepository;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -22,7 +22,7 @@ import org.springframework.http.MediaType;
  */
 class OnboardingAtomicityTest extends AbstractStaffIntegrationTest {
 
-    @MockBean
+    @MockitoBean
     private DoctorProfileRepository doctorProfileRepositoryOverride;
 
     @Test

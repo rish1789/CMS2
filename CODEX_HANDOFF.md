@@ -1,10 +1,10 @@
-# Handoff for Codex — CMS2 (as of 2026-09-30 late evening, `main` `8df853b`)
+# Handoff for Codex — CMS2 (as of 2026-10-01, Spring Boot 4 migration on branch `claude/spring-boot-4`)
 
-This note is self-contained. It assumes no prior conversation. For full history, see `HANDOFF.md` (Parts 13–15 cover the most recent work).
+This note is self-contained. It assumes no prior conversation. For full history, see `HANDOFF.md` (Parts 13–16 cover the most recent work).
 
 ## 1. What this project is
 
-CMS2 is a multi-tenant clinic management system: a Spring Boot 3.3 / Java 21 backend and a React + TypeScript (Vite, Tailwind v4) frontend. There are three roles:
+CMS2 is a multi-tenant clinic management system: a Spring Boot 4.1 / Java 21 backend (Gradle 8.14.3 wrapper) and a React + TypeScript (Vite, Tailwind v4) frontend. There are three roles:
 
 - patients, who book and manage appointments;
 - clinic staff (ClinicAdmin, Doctor, Operations), who handle scheduling, walk-ins, queues, cancellations and clinical notes;
@@ -82,7 +82,7 @@ npm ci && npx tsc -b && npm run lint && npx vitest run       # 441 tests
 - **`main` is at `8df853b`.** There are **no open PRs**: every Dependabot PR is merged or closed.
 - **CI on `main`:**
   - The last completed run is on `d025e65`, after the react-router 7 merge: [run 36745328664](https://github.com/rish1789/CMS2/actions/runs/36745328664), success.
-  - The run on `8df853b` (TypeScript 7), [run 36753530061](https://github.com/rish1789/CMS2/actions/runs/36753530061), was **still in progress** when this note was written. Check its result first.
+  - The run on `8df853b` (TypeScript 7), [run 36753530061](https://github.com/rish1789/CMS2/actions/runs/36753530061): **success**.
 - **Last counted baseline:** `363cd73` ([run 36694968509](https://github.com/rish1789/CMS2/actions/runs/36694968509)).
   - Backend: **1,071 passed, 0 failed**. Frontend: **441 passed across 78 files**.
   - Backend OWASP scanning is skipped because the `NVD_API_KEY` repository secret is not configured. It is the owner's decision whether to add it.
@@ -99,7 +99,16 @@ npm ci && npx tsc -b && npm run lint && npx vitest run       # 441 tests
   - `tsc -b` reports 0 errors, and a planted type error was correctly reported (TS2322);
   - lint is clean, 441/441 tests pass, the production build succeeds, and there are 0 high-severity audit findings.
   - Nothing in the project uses the removed TypeScript JS API.
-- **Spring Boot 4 (#1) was closed without merging** ([comment](https://github.com/rish1789/CMS2/pull/1#issuecomment-5916579809)). It needs a planned migration; see §6.
+- **Spring Boot 4 (#1) was closed without merging** ([comment](https://github.com/rish1789/CMS2/pull/1#issuecomment-5916579809)) and replaced by a planned migration on branch `claude/spring-boot-4` (2026-10-01). It targets Boot **4.1.1** and is **owner-merged only**:
+  - **Build:** Gradle wrapper 8.10 → **8.14.3**. Starters changed: `starter-web` → `starter-webmvc`, `flyway-core` → **`starter-flyway`** (without it, migrations stop running), springdoc 2.6.0 → **3.1.1**, and added the `starter-webmvc-test` and `starter-security-test` test starters.
+  - **Code:** one import (`ApiErrorController` now uses `org.springframework.boot.webmvc.error.ErrorController`). Tests: `@MockBean` → `@MockitoBean` (`org.springframework.test.context.bean.override.mockito`), and the `@WebMvcTest`/`@AutoConfigureMockMvc` imports moved to `org.springframework.boot.webmvc.test.autoconfigure` (47 files).
+  - **`spring.jackson.use-jackson2-defaults: true`.** Boot 4 serializes with Jackson 3, whose `FAIL_ON_NULL_FOR_PRIMITIVES` default turned a request omitting a primitive field (for example `FrontDeskWalkInRequest.confirmDuplicate`) into a 400. The setting keeps JSON behaviour identical to Boot 3. Moving to Jackson 3 defaults would be a separate, deliberate change.
+  - **`.claude/launch.json`** now runs `./backend/gradlew.bat` instead of a standalone Gradle 8.10, which Boot 4 rejects.
+  - **Verified:**
+    - full backend suite **1,070 passed, 0 failed, 1 skipped** (the skip is a test that by design only runs between 02:30 and 21:00);
+    - runtime on Postgres 16: Flyway applied V1–V41 to an empty database, Hibernate `validate` passed, 0 ERROR log lines;
+    - patient, staff and Super Admin logins each reach a protected endpoint (200);
+    - cross-realm and no-token requests return 401; CORS preflights return 403 for a foreign origin and 200 for an allowed one; `/actuator/env` returns 403.
 - **Remaining limitations:**
   - Cancellation does not take the session lock used by 067, so token issuance concurrent with cancellation is out of scope.
   - `PartialSessionCancellationRangeTest` passed in the baseline, but its historical intermittency is not proven fixed.
@@ -108,14 +117,10 @@ npm ci && npx tsc -b && npm run lint && npx vitest run       # 441 tests
 
 ## 6. Suggested next work, in priority order
 
-1. Confirm that CI run 36753530061 on `8df853b` is green. If it is red, investigate it before anything else.
-2. **The Spring Boot 3.3 → 4.1 migration,** on its own branch; not a version bump. The scope was measured in a scratch copy on 2026-09-30 (details are in PR #1's closing comment):
-   - Gradle wrapper 8.10 → 8.14+. The Boot 4 plugin refuses to apply on 8.10.
-   - Production code: after the wrapper bump, only **1 file, 4 errors**. `common/ApiErrorController.java` imports `org.springframework.boot.web.servlet.error`, which moved in the module split. The first compile may have stopped early, so expect more errors once these are fixed.
-   - Tests, about 45 files: `@MockBean`/`@SpyBean` were removed (26 files) → `@MockitoBean`/`@MockitoSpyBean`; the `@WebMvcTest`/`@AutoConfigureMockMvc` imports moved (45 files). The test sources were not compiled yet.
-   - **Flyway:** auto-configuration moved to its own starter. With only `flyway-core`, migrations could **silently stop running**, so verify at startup that Flyway reports V41.
-   - springdoc 2.6.0 → its Boot 4 line. `RateLimitingFilter` uses a Jackson 2 `ObjectMapper`, but Boot 4 defaults to Jackson 3.
-   - **Security:** 6 filter chains and 3 JWT realms. Run the full backend suite, plus a runtime login smoke test for patient, staff and Super Admin, before proposing the merge.
+1. **The Spring Boot 4 migration PR (branch `claude/spring-boot-4`) awaits the owner's review and merge.** After it merges:
+   - confirm CI on `main`;
+   - confirm the owner's Windows launch config (`.claude/launch.json`, now `./backend/gradlew.bat`) starts the backend. The wrapper downloads Gradle 8.14.3 on first use. This could not be tested on Windows from the cloud sandbox.
+2. **Watch for the midnight-wrap test pattern.** Building `HH:MM` fixture times as `now ± N hours` on today's date wraps past midnight. Two instances were fixed in the Boot 4 PR: `SlotCompletionServiceTest` now takes date and time from one `LocalDateTime`, and `FrontDeskWalkInPage.test.tsx` pins `Date` to midday. Prefer the same approaches in new tests.
 3. Run convergence reviews for 065, 066 and 067 (`.claude/skills/speckit-converge/SKILL.md`). Investigate the historical partial-cancellation flake if it recurs.
 4. Consider a spec (068) for the gap between cancellation and 067's session lock, if the owner wants it closed.
 5. Leave SEC-03, PB-005 and the OWASP secret pending the owner's decisions. Do not merge or deploy on the owner's behalf.

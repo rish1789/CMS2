@@ -8,7 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.cms.identity.account.repository.RoleAssignmentRepository;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 
@@ -22,7 +22,7 @@ import org.springframework.http.MediaType;
  */
 class RegisterClinicRollbackTest extends AbstractIntegrationTest {
 
-    @MockBean
+    @MockitoBean
     private RoleAssignmentRepository roleAssignmentRepositoryOverride;
 
     @Test

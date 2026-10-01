@@ -24,8 +24,8 @@ import java.util.UUID;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -41,17 +41,17 @@ class PatientAccountContractTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private PatientAccountService patientAccountService;
 
     // SecurityConfig.patientFilterChain declares JwtService/PatientAuthenticationEntryPoint
     // parameters - unrelated to the signup/login endpoints under test (both are permitAll),
     // but both beans must still exist for the filter chain to be constructed at all in this
     // slice (Spring eagerly builds every @Bean in a @Configuration class).
-    @MockBean
+    @MockitoBean
     private JwtService jwtService;
 
-    @MockBean
+    @MockitoBean
     private PatientAuthenticationEntryPoint patientAuthenticationEntryPoint;
 
     private static final String VALID_SIGNUP =

@@ -22,8 +22,8 @@ import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -56,14 +56,14 @@ class SuperAdminProtectionSettingControllerContractTest {
     @Autowired
     private SuperAdminJwtService superAdminJwtService;
 
-    @MockBean
+    @MockitoBean
     private ProtectionSettingService protectionSettingService;
 
     /**
      * SuperAdminSecurityConfig's superAdminUserDetailsService bean needs a real PasswordEncoder
      * at context-startup time (normally provided app-wide by identity.account.config
      * .SecurityConfig, not imported here to keep this test's context minimal) - a plain
-     * {@code @MockBean} returns null from {@code encode(...)}, which that bean setup can't
+     * {@code @MockitoBean} returns null from {@code encode(...)}, which that bean setup can't
      * tolerate, so a real (if test-only) encoder is provided instead.
      */
     @TestConfiguration
