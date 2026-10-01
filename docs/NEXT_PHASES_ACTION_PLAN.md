@@ -26,8 +26,14 @@ Added after the plan was written. The original text below is preserved as writte
 - **2R.1: done.** Spec 069 (#34); live-audit findings 1–3 are fixed.
 - **2R.2: done.** Spec 070 (#36); finding 4 is fixed.
 - **2R.3: done.** Spec 071 (#37); finding 5 and the signup fallback gap are fixed.
-- **2R.4: done.** Spec 072; finding 6 is fixed.
-- **Next package:** 2R.5.
+- **2R.4: done.** Spec 072 (#38); finding 6 is fixed.
+- **2R.5: done.** Spec 073; finding 7 is fixed.
+- **Repair-wave exit:** all seven findings have regression tests and browser checks (specs 069–073). On the combined head (073, stacked on 072 and 071):
+  - the frontend gates pass, with Vitest 522/522;
+  - the full backend suite passes 1,146/0/0, run on the 072 head, which has the same backend code.
+
+  Each PR's own CI is the merge gate.
+- **Next package:** 2B (staff-side duplicate-patient phone handling).
 
 ## Current position
 

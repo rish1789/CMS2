@@ -17,6 +17,7 @@ import {
   WalkInIcon,
 } from '../../components/staffIcons'
 import type { StaffRole } from '../../components/RoleBadge'
+import { CLINIC_TOOL_ROLES, primaryRole, type ClinicRolesStatus } from './clinicRoles'
 
 // A generously large page size, not "no limit" - listMyClinics is a real paginated endpoint
 // (pagination-unification-2026-09-10), but this breadcrumb lookup wants every clinic membership
@@ -43,7 +44,7 @@ function buildNavItems(clinicId: string): SidebarNavItem[] {
       to: `/staff/clinics/${clinicId}/walk-in`,
       label: 'Walk-in',
       icon: <WalkInIcon />,
-      roles: ['ClinicAdmin', 'Operations'],
+      roles: CLINIC_TOOL_ROLES.walkIn,
     },
     { to: `/staff/clinics/${clinicId}/doctors`, label: 'Doctors', icon: <StethoscopeIcon /> },
     { to: `/staff/clinics/${clinicId}/staff`, label: 'Staff', icon: <TeamIcon /> },
@@ -52,7 +53,7 @@ function buildNavItems(clinicId: string): SidebarNavItem[] {
       to: `/staff/clinics/${clinicId}/onboard`,
       label: 'Onboard staff',
       icon: <UserPlusIcon />,
-      roles: ['ClinicAdmin'],
+      roles: CLINIC_TOOL_ROLES.onboard,
     },
     { to: `/staff/clinics/${clinicId}/inbox`, label: 'Inbox', icon: <InboxIcon /> },
     { to: `/staff/clinics/${clinicId}/waitlist/join`, label: 'Join waitlist', icon: <ClockIcon /> },
@@ -60,7 +61,7 @@ function buildNavItems(clinicId: string): SidebarNavItem[] {
       to: `/staff/clinics/${clinicId}/protection`,
       label: 'Booking protection',
       icon: <ShieldIcon />,
-      roles: ['ClinicAdmin'],
+      roles: CLINIC_TOOL_ROLES.protection,
     },
   ]
 }
@@ -72,7 +73,14 @@ export function ClinicShell() {
   // switch to - defaults to true (shown) until the fetch below resolves, since hiding it
   // pre-emptively would flash for the common multi-clinic case.
   const [hasMultipleClinics, setHasMultipleClinics] = useState(true)
-  const [role, setRole] = useState<StaffRole | undefined>(undefined)
+  // 073-role-aware-clinic-tools: every role at this clinic (one membership row per role), keyed
+  // by the clinic it was resolved for - a different clinic in the URL reads as still loading
+  // until its own lookup finishes, so one clinic's rights never show at another.
+  const [resolvedRoles, setResolvedRoles] = useState<{
+    clinicId: string
+    roles: StaffRole[]
+    status: Exclude<ClinicRolesStatus, 'loading'>
+  } | null>(null)
 
   useEffect(() => {
     const session = loadStaffSession()
@@ -81,18 +89,24 @@ export function ClinicShell() {
     listMyClinics(session.token, { size: ALL_MEMBERSHIPS_PAGE_SIZE })
       .then((result) => {
         if (cancelled) return
-        const membership = result.clinics.find((c) => c.clinicId === clinicId)
-        setClinicName(membership?.name ?? null)
-        setRole(membership?.role)
+        const atThisClinic = result.clinics.filter((c) => c.clinicId === clinicId)
+        setClinicName(atThisClinic[0]?.name ?? null)
+        setResolvedRoles({ clinicId, roles: atThisClinic.map((c) => c.role), status: 'ready' })
         setHasMultipleClinics(result.totalCount > 1)
       })
       .catch(() => {
-        // Best-effort only - the id fallback below still keeps the breadcrumb usable.
+        // The id fallback below still keeps the breadcrumb usable; restricted tools stay closed.
+        if (!cancelled) setResolvedRoles({ clinicId, roles: [], status: 'failed' })
       })
     return () => {
       cancelled = true
     }
   }, [clinicId])
+
+  const current = resolvedRoles?.clinicId === clinicId ? resolvedRoles : null
+  const roles = current?.roles ?? []
+  const rolesStatus: ClinicRolesStatus = current?.status ?? 'loading'
+  const role = primaryRole(roles)
 
   return (
     <div className="flex gap-6">
@@ -103,7 +117,7 @@ export function ClinicShell() {
           forcing this column to match the (often much taller) content column's height. */}
       <div className="sm:sticky sm:top-0 sm:self-start">
         <SidebarDrawer>
-          <Sidebar items={buildNavItems(clinicId ?? '')} activeRole={role} />
+          <Sidebar items={buildNavItems(clinicId ?? '')} activeRoles={roles} />
         </SidebarDrawer>
       </div>
       {/* max-w-4xl per DESIGN.md's documented content-area convention, applied once here -
@@ -133,12 +147,16 @@ export function ClinicShell() {
         {/* 057-day-sheet-status-overhaul: first per-page role plumbing in this codebase -
             role was already resolved above for the sidebar's own activeRole filtering, but
             never reached routed child pages until now (research.md Decision 6). */}
-        <Outlet context={{ role } satisfies ClinicShellOutletContext} />
+        <Outlet context={{ role, roles, rolesStatus } satisfies ClinicShellOutletContext} />
       </div>
     </div>
   )
 }
 
 export interface ClinicShellOutletContext {
+  /** The highest role held here (ClinicAdmin, then Doctor, then Operations) - kept for single-role consumers. */
   role: StaffRole | undefined
+  /** 073-role-aware-clinic-tools: every role held at this clinic. */
+  roles: StaffRole[]
+  rolesStatus: ClinicRolesStatus
 }

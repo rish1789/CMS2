@@ -7,7 +7,7 @@ export interface SidebarNavItem {
   label: string
   icon: ReactNode
   /** Omit to show to every role. `end` opts into NavLink's exact-match (for a shell's own index/"home" route). */
-  roles?: StaffRole[]
+  roles?: readonly StaffRole[]
   end?: boolean
 }
 
@@ -15,12 +15,15 @@ export interface SidebarProps {
   items: SidebarNavItem[]
   /** The signed-in staff member's role at the current clinic - omit when the shell has only one role (Admin). */
   activeRole?: StaffRole
+  /** 073-role-aware-clinic-tools: every role held at the current clinic - an item shows when any of them is allowed. */
+  activeRoles?: readonly StaffRole[]
 }
 
 // 050-sidebar-navigation T001: react-router's own NavLink gives correct active-state matching
 // (including exact-vs-prefix via `end`) for free - no hand-rolled useLocation comparison.
-export function Sidebar({ items, activeRole }: SidebarProps) {
-  const visibleItems = items.filter((item) => !item.roles || (activeRole && item.roles.includes(activeRole)))
+export function Sidebar({ items, activeRole, activeRoles }: SidebarProps) {
+  const held = activeRoles ?? (activeRole ? [activeRole] : [])
+  const visibleItems = items.filter((item) => !item.roles || item.roles.some((role) => held.includes(role)))
 
   return (
     <nav aria-label="Primary" className="flex w-56 shrink-0 flex-col gap-1 p-3">
