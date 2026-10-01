@@ -1,5 +1,7 @@
 package com.cms;
 
+import java.time.ZoneId;
+import java.util.TimeZone;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -16,7 +18,22 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class CmsApplication {
 
+    /**
+     * PB-005 (owner decision 2026-10-01): the product serves Indian clinics, so every time rule
+     * runs in IST. Those rules read the JVM default zone (LocalDateTime.now(),
+     * Clock.systemDefaultZone()), and the PostgreSQL driver sets each connection's session zone -
+     * which SQL CURRENT_DATE uses - from that same default. Pinning it here, before Spring
+     * starts, makes all of them IST whatever zone the host runs in (a UTC server otherwise
+     * shifts no-show marking, the 2 h cancellation cutoff and "not yet started" by 5 h 30 min).
+     */
+    static final ZoneId ZONE = ZoneId.of("Asia/Kolkata");
+
     public static void main(String[] args) {
+        pinTimeZone();
         SpringApplication.run(CmsApplication.class, args);
+    }
+
+    static void pinTimeZone() {
+        TimeZone.setDefault(TimeZone.getTimeZone(ZONE));
     }
 }

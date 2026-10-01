@@ -64,6 +64,9 @@ dependencyManagement {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // PB-005: tests run in the same zone CmsApplication pins in production (IST), whatever
+    // zone the machine running them (e.g. a UTC CI runner) uses.
+    systemProperty 'user.timezone', 'Asia/Kolkata'
     testLogging {
         events "passed", "skipped", "failed"
         exceptionFormat "full"
