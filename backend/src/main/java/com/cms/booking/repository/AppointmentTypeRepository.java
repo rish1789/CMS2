@@ -24,17 +24,4 @@ public interface AppointmentTypeRepository extends JpaRepository<AppointmentType
      */
     @Query("SELECT DISTINCT a.doctorProfile.id FROM AppointmentType a WHERE a.doctorProfile.id IN :doctorProfileIds")
     List<UUID> findDoctorProfileIdsWithAppointmentTypes(@Param("doctorProfileIds") Collection<UUID> doctorProfileIds);
-
-    /**
-     * real-bug-fix 2026-09-17: found live testing the warning above - flagging every doctor with
-     * no default fee set (including one whose every AppointmentType already carries its own
-     * feeOverride, like Gauresh Kumar) was a false positive: FeeResolutionService never needs
-     * the default fee for a type that already has an override, so that doctor is fully bookable
-     * despite having no default fee. This narrows "not bookable" to only a doctor with at least
-     * one AppointmentType that has neither its own override NOR a default fee to fall back on.
-     */
-    @Query("SELECT DISTINCT a.doctorProfile.id FROM AppointmentType a "
-            + "WHERE a.doctorProfile.id IN :doctorProfileIds AND a.feeOverride IS NULL")
-    List<UUID> findDoctorProfileIdsWithAnAppointmentTypeMissingFeeOverride(
-            @Param("doctorProfileIds") Collection<UUID> doctorProfileIds);
 }

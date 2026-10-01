@@ -8,10 +8,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.cms.booking.domain.AppointmentType;
+import com.cms.booking.domain.ClinicDoctorFee;
 import com.cms.identity.account.domain.Account;
 import com.cms.identity.account.domain.RoleAssignment;
 import com.cms.identity.clinic.Clinic;
 import com.cms.identity.doctor.DoctorProfile;
+import java.math.BigDecimal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -120,6 +122,31 @@ class ClinicFeeAuthorizationTest extends AbstractBookingIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.defaultFee").isEmpty())
                 .andExpect(jsonPath("$.appointmentTypes[0].effectiveFee").isEmpty());
+    }
+
+    /** 068 FR-006 (T033): the doctor concerned can always read their own prices, even after leaving the clinic - but not change them. */
+    @Test
+    void theDoctorCanReadTheirOwnPricesAtAClinicTheyNoLongerWorkAt() throws Exception {
+        Clinic formerClinic = saveClinic();
+        linkDoctorToClinic(doctor, formerClinic, false);
+        clinicDoctorFeeRepository.save(new ClinicDoctorFee(formerClinic, doctor, new BigDecimal("450.00"), null));
+
+        mockMvc.perform(get(FEES, formerClinic.getId(), doctor.getId())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + doctorToken(doctor)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.defaultFee").value(450.00));
+        putDefault(doctorToken(doctor), formerClinic, doctor).andExpect(status().isForbidden());
+    }
+
+    /** The doctor-concerned allowance is for their own prices only, never another doctor's. */
+    @Test
+    void aDoctorCannotReadAnotherDoctorsPricesAtAClinicWhereTheyAreNotStaff() throws Exception {
+        Clinic otherClinic = saveClinic();
+        DoctorProfile otherDoctor = saveDoctorStaffedAt(otherClinic);
+
+        mockMvc.perform(get(FEES, otherClinic.getId(), otherDoctor.getId())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + doctorToken(doctor)))
+                .andExpect(status().isForbidden());
     }
 
     @Test
