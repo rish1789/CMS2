@@ -33,7 +33,8 @@ class WaitlistClaimTest extends AbstractWaitlistIntegrationTest {
         WaitlistEntry entry = saveOfferedWaitlistEntry(
                 clinic, patientAccount, doctor, null, slot, Instant.now(), Instant.now().plusSeconds(1800));
         AppointmentType appointmentType =
-                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+                clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
 
         Booking booking = waitlistClaimService.claim(
                 entry.getId(), patientAccount.getId(), new ClaimWaitlistRequest(appointmentType.getId(), "Claimant"));
@@ -54,7 +55,8 @@ class WaitlistClaimTest extends AbstractWaitlistIntegrationTest {
                 clinic, savePatientAccount(), doctor, null, slot, Instant.now(), Instant.now().plusSeconds(1800));
         PatientAccount someoneElse = savePatientAccount();
         AppointmentType appointmentType =
-                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+                clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
 
         assertThatThrownBy(() -> waitlistClaimService.claim(
                         entry.getId(),
@@ -70,7 +72,8 @@ class WaitlistClaimTest extends AbstractWaitlistIntegrationTest {
         PatientAccount patientAccount = savePatientAccount();
         WaitlistEntry entry = saveWaitlistEntry(clinic, patientAccount, doctor, null, Instant.now());
         AppointmentType appointmentType =
-                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+                clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
 
         assertThatThrownBy(() -> waitlistClaimService.claim(
                         entry.getId(),
@@ -95,7 +98,8 @@ class WaitlistClaimTest extends AbstractWaitlistIntegrationTest {
                 Instant.now().minusSeconds(2000),
                 Instant.now().minusSeconds(200));
         AppointmentType appointmentType =
-                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+                clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
 
         assertThatThrownBy(() -> waitlistClaimService.claim(
                         entry.getId(),
@@ -117,7 +121,8 @@ class WaitlistClaimTest extends AbstractWaitlistIntegrationTest {
         WaitlistEntry anotherEligible =
                 saveWaitlistEntry(clinic, savePatientAccount(), doctor, null, Instant.now());
         AppointmentType appointmentType =
-                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+                clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
 
         // Someone else books this exact Slot ordinarily before the claim happens.
         bookSlot(clinic, doctor, slot, savePatientAccount());

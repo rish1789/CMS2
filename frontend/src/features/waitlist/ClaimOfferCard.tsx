@@ -8,6 +8,8 @@ import { CheckIcon } from '../../components/adminIcons'
 
 export interface ClaimOfferCardProps {
   entryId: string
+  // 068-per-clinic-fees: the offer's clinic - prices are that clinic's own.
+  clinicId: string
   // _diagnostics [MEDIUM] - [WAITLIST_CLAIM] - [NO_EXPIRY_VISIBILITY]: now sourced from
   // WaitlistEntryResponse.offerExpiresAt (previously never serialized to any patient-facing client).
   offerExpiresAt?: string | null
@@ -38,6 +40,7 @@ function useCountdown(deadline?: string | null): string | null {
 
 export function ClaimOfferCard({
   entryId,
+  clinicId,
   offerExpiresAt,
   offeredDoctorProfileId,
   onClaimed,
@@ -59,7 +62,7 @@ export function ClaimOfferCard({
   useEffect(() => {
     if (!session || !offeredDoctorProfileId) return
     let cancelled = false
-    listPatientAppointmentTypes(offeredDoctorProfileId, session.token)
+    listPatientAppointmentTypes(clinicId, offeredDoctorProfileId, session.token)
       .then((response) => {
         if (!cancelled) setTypes(response)
       })
@@ -69,7 +72,7 @@ export function ClaimOfferCard({
     return () => {
       cancelled = true
     }
-  }, [offeredDoctorProfileId, session])
+  }, [clinicId, offeredDoctorProfileId, session])
 
   const selectedType = types?.find((type) => type.id === appointmentTypeId)
 
@@ -169,6 +172,7 @@ export function ClaimOfferCard({
           <PatientAppointmentTypeSelect
             id="appointmentTypeId"
             required
+            clinicId={clinicId}
             doctorProfileId={offeredDoctorProfileId}
             token={session.token}
             value={appointmentTypeId}
@@ -179,9 +183,9 @@ export function ClaimOfferCard({
             Could not determine the doctor for this offer. Please refresh and try again.
           </p>
         )}
-        {selectedType?.feeOverride != null && (
+        {selectedType?.fee != null && (
           <p className="mt-1.5 text-sm text-gray-600">
-            Fee: <span className="font-semibold text-gray-900 tabular-nums">₹{selectedType.feeOverride.toFixed(2)}</span>
+            Fee: <span className="font-semibold text-gray-900 tabular-nums">₹{selectedType.fee.toFixed(2)}</span>
           </p>
         )}
       </div>

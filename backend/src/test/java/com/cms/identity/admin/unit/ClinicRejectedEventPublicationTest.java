@@ -6,8 +6,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.cms.booking.repository.BookingAttemptLogRepository;
+import com.cms.booking.repository.ClinicAppointmentTypePriceRepository;
 import com.cms.booking.repository.ClinicBookingLimitOverrideChangeLogRepository;
 import com.cms.booking.repository.ClinicBookingLimitOverrideRepository;
+import com.cms.booking.repository.ClinicDoctorFeeRepository;
 import com.cms.identity.account.repository.AccountRepository;
 import com.cms.identity.account.repository.RoleAssignmentRepository;
 import com.cms.identity.account.service.PasswordPolicyValidator;
@@ -64,6 +66,12 @@ class ClinicRejectedEventPublicationTest {
 
     private ClinicVerificationService service;
 
+    @Mock
+    private ClinicDoctorFeeRepository clinicDoctorFeeRepository;
+
+    @Mock
+    private ClinicAppointmentTypePriceRepository clinicAppointmentTypePriceRepository;
+
     @BeforeEach
     void setUp() {
         service = new ClinicVerificationService(
@@ -82,7 +90,9 @@ class ClinicRejectedEventPublicationTest {
                 overrideRepository,
                 overrideChangeLogRepository,
                 bookingAttemptLogRepository,
-                suspiciousActivityFlagRepository);
+                suspiciousActivityFlagRepository,
+                clinicDoctorFeeRepository,
+                clinicAppointmentTypePriceRepository);
     }
 
     private Clinic pendingClinic() {

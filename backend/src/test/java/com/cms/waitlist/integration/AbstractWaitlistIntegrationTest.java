@@ -1,5 +1,6 @@
 package com.cms.waitlist.integration;
 
+import com.cms.booking.integration.ClinicPriceFixtures;
 import com.cms.booking.domain.AppointmentType;
 import com.cms.booking.repository.AppointmentTypeRepository;
 import com.cms.booking.domain.Booking;
@@ -88,6 +89,11 @@ public abstract class AbstractWaitlistIntegrationTest {
 
     @Autowired
     protected MockMvc mockMvc;
+
+
+    @Autowired
+
+    protected ClinicPriceFixtures clinicPriceFixtures;
 
     @Autowired
     protected ClinicRepository clinicRepository;
@@ -181,6 +187,7 @@ public abstract class AbstractWaitlistIntegrationTest {
         bookingRepository.deleteAll();
         patientRepository.deleteAll();
         patientAccountRepository.deleteAll();
+        clinicPriceFixtures.deleteAll(); // 068: price rows reference clinic, doctor and type
         appointmentTypeRepository.deleteAll();
         slotRepository.deleteAll();
         // 065-phase1-stabilization: cancellation records reference session and account (no cascade).
@@ -335,7 +342,8 @@ public abstract class AbstractWaitlistIntegrationTest {
     /** Books the given already-generated Slot: creates an AppointmentType/fee, a Patient linked to patientAccount, a Booking, and flips the Slot BOOKED. */
     protected Booking bookSlot(Clinic clinic, DoctorProfile doctor, Slot slot, PatientAccount patientAccount) {
         AppointmentType appointmentType =
-                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+                clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
         Patient patient =
                 patientRepository.save(new Patient(clinic, patientAccount, "Test Patient " + UUID.randomUUID(), null));
         Booking booking = bookingRepository.saveAndFlush(

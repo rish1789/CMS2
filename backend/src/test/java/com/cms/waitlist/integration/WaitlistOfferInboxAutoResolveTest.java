@@ -63,7 +63,8 @@ class WaitlistOfferInboxAutoResolveTest extends AbstractWaitlistIntegrationTest 
         WaitlistEntry[] entryHolder = new WaitlistEntry[1];
         sessionWithOfferedEntry(clinic, doctor, entryHolder);
         WaitlistEntry entry = entryHolder[0];
-        appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+        clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
         AppointmentType appointmentType = appointmentTypeRepository.findAll().get(0);
         PatientAccount patientAccount = entry.getPatientAccount();
 

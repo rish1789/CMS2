@@ -61,7 +61,8 @@ class RestoredClinicResumesTest extends AbstractDeVerificationCascadeIntegration
                 .isGreaterThan(sessionsBefore.size());
 
         // FR-005/SC-003: a patient booking succeeds with no extra admin step.
-        AppointmentType type = appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+        AppointmentType type = clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
         PatientAccount patient = savePatientAccount();
         Slot bookable = firstSlotOn(sessionRepository.findBySchedule_Id(any.getSchedule().getId()), LocalDate.now().plusDays(2));
         mockMvc.perform(post("/api/v1/patients/clinics/{clinicId}/slots/{slotId}/book", clinic.getId(), bookable.getId())

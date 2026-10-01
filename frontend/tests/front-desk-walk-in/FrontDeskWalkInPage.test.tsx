@@ -138,7 +138,7 @@ beforeEach(() => {
     operationalDay: TODAY,
   })
   mockedSearch.mockResolvedValue({ patients: [], page: 0, pageSize: 8, totalCount: 0 })
-  mockedTypes.mockResolvedValue([{ id: 'type-1', doctorProfileId: 'doctor-rao', name: 'Consultation', feeOverride: null }])
+  mockedTypes.mockResolvedValue([{ id: 'type-1', doctorProfileId: 'doctor-rao', name: 'Consultation', fee: null }])
 })
 
 async function fillNewPatientAndReason(user: ReturnType<typeof userEvent.setup>, reason = 'Pain') {
@@ -270,7 +270,7 @@ describe('FrontDeskWalkInPage (063-front-desk-walk-in US1)', () => {
   })
 
   it('shows only the token for a Queue walk-in', async () => {
-    mockedTypes.mockResolvedValue([{ id: 'type-1', doctorProfileId: 'doctor-mehta', name: 'Consultation', feeOverride: null }])
+    mockedTypes.mockResolvedValue([{ id: 'type-1', doctorProfileId: 'doctor-mehta', name: 'Consultation', fee: null }])
     mockedRegister.mockResolvedValue({
       bookingId: 'booking-2',
       slotId: 'slot-2',

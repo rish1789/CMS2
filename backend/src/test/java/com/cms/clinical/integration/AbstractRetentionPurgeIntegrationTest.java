@@ -1,5 +1,6 @@
 package com.cms.clinical.integration;
 
+import com.cms.booking.integration.ClinicPriceFixtures;
 import com.cms.booking.domain.AppointmentType;
 import com.cms.booking.repository.AppointmentTypeRepository;
 import com.cms.booking.domain.Booking;
@@ -78,6 +79,11 @@ public abstract class AbstractRetentionPurgeIntegrationTest {
 
     @Autowired
     protected MockMvc mockMvc;
+
+
+    @Autowired
+
+    protected ClinicPriceFixtures clinicPriceFixtures;
 
     @Autowired
     protected ClinicRepository clinicRepository;
@@ -164,6 +170,7 @@ public abstract class AbstractRetentionPurgeIntegrationTest {
         bookingRepository.deleteAll();
         patientRepository.deleteAll();
         patientAccountRepository.deleteAll();
+        clinicPriceFixtures.deleteAll(); // 068: price rows reference clinic, doctor and type
         appointmentTypeRepository.deleteAll();
         slotRepository.deleteAll();
         sessionRepository.deleteAll();
@@ -210,7 +217,8 @@ public abstract class AbstractRetentionPurgeIntegrationTest {
     /** Books the given already-generated Slot for the given Patient, then backdates the Booking's {@code created_at} directly via SQL - no API path exists to create a 3-year-old booking, so this is the test-only device for it (mirrors AbstractPrescriptionIntegrationTest's own use of JdbcTemplate). */
     protected Booking bookSlotWithCreatedAt(DoctorProfile doctor, Slot slot, Patient patient, Instant createdAt) {
         AppointmentType appointmentType =
-                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+                clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
         Booking booking = bookingRepository.saveAndFlush(
                 new Booking(slot, patient, appointmentType, new BigDecimal("300.00"), doctor.getAccount().getId()));
         // The visit has taken place: a still-BOOKED timed slot counts as a pending future booking

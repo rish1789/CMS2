@@ -1,5 +1,6 @@
 package com.cms.patient.record.integration;
 
+import com.cms.booking.integration.ClinicPriceFixtures;
 import com.cms.booking.domain.AppointmentType;
 import com.cms.booking.repository.AppointmentTypeRepository;
 import com.cms.booking.domain.Booking;
@@ -69,6 +70,11 @@ public abstract class AbstractPatientAnonymizationIntegrationTest {
     @Autowired
     protected MockMvc mockMvc;
 
+
+    @Autowired
+
+    protected ClinicPriceFixtures clinicPriceFixtures;
+
     @Autowired
     protected ClinicRepository clinicRepository;
 
@@ -133,6 +139,7 @@ public abstract class AbstractPatientAnonymizationIntegrationTest {
         bookingRepository.deleteAll();
         patientRepository.deleteAll();
         patientAccountRepository.deleteAll();
+        clinicPriceFixtures.deleteAll(); // 068: price rows reference clinic, doctor and type
         appointmentTypeRepository.deleteAll();
         slotRepository.deleteAll();
         sessionRepository.deleteAll();
@@ -220,7 +227,8 @@ public abstract class AbstractPatientAnonymizationIntegrationTest {
     /** Books the given already-generated Slot for the given Patient, creating an AppointmentType/fee, and flips the Slot BOOKED. */
     protected Booking bookSlotForPatient(DoctorProfile doctor, Slot slot, Patient patient) {
         AppointmentType appointmentType =
-                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+                clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
         Booking booking = bookingRepository.saveAndFlush(
                 new Booking(slot, patient, appointmentType, new BigDecimal("300.00"), doctor.getAccount().getId()));
         slot.setStatus(SlotStatus.BOOKED);

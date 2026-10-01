@@ -49,6 +49,18 @@ public class BookingExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of("NO_FEE_CONFIGURED", e.getMessage()));
     }
 
+    // 068-per-clinic-fees (contracts/clinic-fees-api.md).
+    @ExceptionHandler(InvalidFeeAmountException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidFeeAmount(InvalidFeeAmountException e) {
+        return ResponseEntity.badRequest().body(ErrorResponse.of("INVALID_FEE_AMOUNT", e.getMessage()));
+    }
+
+    @ExceptionHandler(FeeMovedToClinicException.class)
+    public ResponseEntity<ErrorResponse> handleFeeMovedToClinic(FeeMovedToClinicException e) {
+        HttpStatus status = e.isGone() ? HttpStatus.GONE : HttpStatus.BAD_REQUEST;
+        return ResponseEntity.status(status).body(ErrorResponse.of("FEE_MOVED_TO_CLINIC", e.getMessage()));
+    }
+
     // 063-front-desk-walk-in (contract section 1): front-desk walk-in registration errors.
     @ExceptionHandler(VisitReasonRequiredException.class)
     public ResponseEntity<ErrorResponse> handleVisitReasonRequired(VisitReasonRequiredException e) {

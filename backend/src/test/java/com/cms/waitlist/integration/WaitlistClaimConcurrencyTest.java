@@ -34,7 +34,8 @@ class WaitlistClaimConcurrencyTest extends AbstractWaitlistIntegrationTest {
         WaitlistEntry entry = saveOfferedWaitlistEntry(
                 clinic, patientAccount, doctor, null, slot, Instant.now(), Instant.now().plusSeconds(1800));
         AppointmentType appointmentType =
-                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+                clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
@@ -96,7 +97,8 @@ class WaitlistClaimConcurrencyTest extends AbstractWaitlistIntegrationTest {
                 Instant.now().minusSeconds(2000),
                 Instant.now().minusSeconds(200));
         AppointmentType appointmentType =
-                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+                clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {

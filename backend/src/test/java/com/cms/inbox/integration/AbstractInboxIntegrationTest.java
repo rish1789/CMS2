@@ -1,5 +1,6 @@
 package com.cms.inbox.integration;
 
+import com.cms.booking.integration.ClinicPriceFixtures;
 import com.cms.booking.domain.AppointmentType;
 import com.cms.booking.repository.AppointmentTypeRepository;
 import com.cms.booking.domain.Booking;
@@ -80,6 +81,11 @@ public abstract class AbstractInboxIntegrationTest {
     @Autowired
     protected MockMvc mockMvc;
 
+
+    @Autowired
+
+    protected ClinicPriceFixtures clinicPriceFixtures;
+
     @Autowired
     protected ClinicRepository clinicRepository;
 
@@ -156,6 +162,7 @@ public abstract class AbstractInboxIntegrationTest {
         bookingRepository.deleteAll();
         patientRepository.deleteAll();
         patientAccountRepository.deleteAll();
+        clinicPriceFixtures.deleteAll(); // 068: price rows reference clinic, doctor and type
         appointmentTypeRepository.deleteAll();
         slotRepository.deleteAll();
         sessionRepository.deleteAll();
@@ -269,7 +276,8 @@ public abstract class AbstractInboxIntegrationTest {
     }
 
     protected AppointmentType saveAppointmentType(DoctorProfile doctor) {
-        return appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+        return clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
     }
 
     /**

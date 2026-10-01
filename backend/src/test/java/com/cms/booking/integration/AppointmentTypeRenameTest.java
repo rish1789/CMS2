@@ -7,20 +7,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.cms.booking.domain.AppointmentType;
 import com.cms.identity.doctor.DoctorProfile;
-import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
 /**
- * 053: real-bug-fix - create/list previously had no way to correct a mistyped name or fee
- * override afterward. Mirrors AppointmentTypeConfigAuthorizationTest's own authorization matrix,
+ * 053: real-bug-fix - create/list previously had no way to correct a mistyped name afterward
+ * (068: the fee is no longer part of the type - see ClinicFeeAuthorizationTest). Mirrors AppointmentTypeConfigAuthorizationTest's own authorization matrix,
  * applied to the new PUT rename endpoint.
  */
 class AppointmentTypeRenameTest extends AbstractBookingIntegrationTest {
 
     private static final String RENAME_BODY = """
-            { "name": "General Consultation", "feeOverride": 250.00 }
+            { "name": "General Consultation" }
             """;
 
     @Test
@@ -35,12 +34,29 @@ class AppointmentTypeRenameTest extends AbstractBookingIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(RENAME_BODY))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("General Consultation"))
-                .andExpect(jsonPath("$.feeOverride").value(250.00));
+                .andExpect(jsonPath("$.name").value("General Consultation"));
 
         AppointmentType persisted = appointmentTypeRepository.findById(type.getId()).orElseThrow();
         assertThat(persisted.getName()).isEqualTo("General Consultation");
-        assertThat(persisted.getFeeOverride()).isEqualByComparingTo(new BigDecimal("250.00"));
+    }
+
+    /** 068 FR-012: a price is no longer part of the doctor-wide type - it is set per clinic. */
+    @Test
+    void renamingWithAFeeIsRejectedBecauseFeesMovedToTheClinic() throws Exception {
+        var clinic = saveClinic();
+        DoctorProfile doctor = saveDoctorStaffedAt(clinic);
+        AppointmentType type = appointmentTypeService.create(doctor.getAccount().getId(), doctor.getId(), "Typo Name", null);
+
+        mockMvc.perform(put("/api/v1/doctors/{doctorId}/appointment-types/{typeId}", doctor.getId(), type.getId())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + doctorToken(doctor))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "name": "General Consultation", "feeOverride": 250.00 }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("FEE_MOVED_TO_CLINIC"));
+
+        assertThat(appointmentTypeRepository.findById(type.getId()).orElseThrow().getName()).isEqualTo("Typo Name");
     }
 
     @Test

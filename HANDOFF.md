@@ -1604,6 +1604,42 @@ This was done on branch `claude/spring-boot-4` while the owner was away. **It is
 - 068 (cancellation vs. 067's session lock).
 - Owner decisions: SEC-03, PB-005, and the `NVD_API_KEY` secret.
 
+## Part 17 — IST time-zone pin merged; 068 per-clinic fees (2026-10-01, cloud sandbox)
+
+### PB-005: IST pin (rish1789/CMS2#29, merged by the owner)
+
+- The owner's decision was "Time zone - IST". `CmsApplication.main` calls `TimeZone.setDefault(Asia/Kolkata)` before Spring starts. The test JVM runs with `-Duser.timezone=Asia/Kolkata`. `ServerTimeZoneTest` was added.
+- Full backend suite: 1,074 passed, 0 failed. CI green.
+
+### SEC-03: 068-per-clinic-fees (owner decision B; branch `claude/068-per-clinic-fees`)
+
+- **Owner answers:** only the clinic's admin edits prices; migration copies today's prices to every clinic where the doctor is actively staffed.
+- **Schema:**
+  - V42 creates `clinic_doctor_fee` and `clinic_appointment_type_price`.
+  - V43 is the insert-only copy. `updated_by_account_id IS NULL` marks a copied row.
+  - `doctor_default_fee` and `appointment_type.fee_override` are kept but no longer read.
+- **Resolution:** a booking's clinic type price, else its clinic default, else 409 `NO_FEE_CONFIGURED`. It never uses another clinic's price.
+- **API:**
+  - `GET/PUT/DELETE /api/v1/clinics/{c}/doctors/{d}/fees[/default|/appointment-types/{t}]`. Writes need an active ClinicAdmin of `c`, and the doctor must be staffed at `c`. Reads are open to any staff member of `c`.
+  - The retired `PUT /api/v1/doctors/{d}/default-fee` returns 410, and creating or renaming a type with `feeOverride` returns 400 `FEE_MOVED_TO_CLINIC`.
+  - New patient listing: `GET /api/v1/patients/clinics/{c}/doctors/{d}/appointment-types`.
+  - `AppointmentTypeResponse.feeOverride` is now `fee`, the effective price in clinic context; it is null without one.
+- **Frontend:** the appointment-types page edits the current clinic's prices and is read-only for non-admins. The patient booking and waitlist claim forms show the clinic's fee.
+- **Test fixtures:** `ClinicPriceFixtures` (a test bean) seeds clinic prices the way V43 does. Every integration cleanup deletes price rows first.
+- **Verification:**
+  - full backend suite 1,108/0/0, `spotlessCheck` green;
+  - frontend `tsc`, lint and Vitest 445/445;
+  - runtime V41 → V43 upgrade on a fresh Postgres, plus every quickstart step (see `specs/068-per-clinic-fees/tasks.md`, "Observed results").
+- **Honest notes:**
+  - The US2–US4 tests were written first but were not observed red. A mutation check (removing the admin check fails 3 tests) stands in for that.
+  - The upgrade test re-runs V43's SQL rather than rewinding Flyway.
+- **Numbering:** the earlier "068 (cancellation vs. 067's session lock)" idea is now **069**, if the owner wants it.
+
+### Still open
+
+- Review and merge the 068 PR (owner).
+- Convergence passes for 065–068; the `NVD_API_KEY` decision; confirm the Windows launch config.
+
 ## Reference
 
 Memory files at `C:\Users\risha\.claude\projects\C--Users-risha-OneDrive-Documents-CMS2\memory\`

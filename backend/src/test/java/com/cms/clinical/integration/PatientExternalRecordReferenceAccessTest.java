@@ -46,7 +46,8 @@ class PatientExternalRecordReferenceAccessTest extends AbstractExternalRecordRef
 
     private Booking bookSlotForPatientAccount(Clinic clinic, DoctorProfile doctor, Slot slot, PatientAccount patientAccount) {
         AppointmentType appointmentType =
-                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+                clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
         Patient patient = patientRepository.save(new Patient(clinic, patientAccount, "Self-Service Patient", null));
         Booking booking = bookingRepository.saveAndFlush(
                 new Booking(slot, patient, appointmentType, new BigDecimal("300.00"), doctor.getAccount().getId()));

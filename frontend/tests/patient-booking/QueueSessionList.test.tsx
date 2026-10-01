@@ -27,7 +27,7 @@ const ONE_SESSION_RESULT = {
       sessionDate: todayIsoDate(),
       startTime: '16:00:00',
       endTime: '18:00:00',
-      appointmentTypes: [{ id: 'type-1', doctorProfileId: 'doc-1', name: 'General Consultation', feeOverride: null }],
+      appointmentTypes: [{ id: 'type-1', doctorProfileId: 'doc-1', name: 'General Consultation', fee: null }],
     },
   ],
   page: 0,

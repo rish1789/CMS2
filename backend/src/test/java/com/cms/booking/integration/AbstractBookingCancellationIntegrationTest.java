@@ -76,6 +76,11 @@ public abstract class AbstractBookingCancellationIntegrationTest {
     @Autowired
     protected MockMvc mockMvc;
 
+
+    @Autowired
+
+    protected ClinicPriceFixtures clinicPriceFixtures;
+
     @Autowired
     protected ClinicRepository clinicRepository;
 
@@ -134,6 +139,7 @@ public abstract class AbstractBookingCancellationIntegrationTest {
         patientRepository.deleteAll();
         patientAccountRepository.deleteAll();
         doctorDefaultFeeRepository.deleteAll();
+        clinicPriceFixtures.deleteAll(); // 068: price rows reference clinic, doctor and type
         appointmentTypeRepository.deleteAll();
         slotRepository.deleteAll();
         sessionRepository.deleteAll();
@@ -225,7 +231,8 @@ public abstract class AbstractBookingCancellationIntegrationTest {
     /** A confirmed (BOOKED Slot, ACTIVE Booking) Fixed-Time appointment at the given scheduled time relative to now - for cutoff testing. */
     protected Booking saveConfirmedBookingAt(Clinic clinic, DoctorProfile doctor, PatientAccount patientAccount, LocalTime scheduledTime) {
         Slot slot = saveFixedTimeSlotAt(clinic, doctor, scheduledTime);
-        AppointmentType appointmentType = appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+        AppointmentType appointmentType = clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
         Patient patient = patientRepository.save(new Patient(clinic, patientAccount, "Test Patient " + UUID.randomUUID(), null));
         Booking booking = bookingRepository.saveAndFlush(
                 new Booking(slot, patient, appointmentType, new BigDecimal("300.00"), doctor.getAccount().getId()));

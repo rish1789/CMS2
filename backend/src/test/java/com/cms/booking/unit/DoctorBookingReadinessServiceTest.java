@@ -7,7 +7,8 @@ import static org.mockito.Mockito.when;
 
 import com.cms.booking.dto.DoctorBookingReadinessResponse;
 import com.cms.booking.repository.AppointmentTypeRepository;
-import com.cms.booking.repository.DoctorDefaultFeeRepository;
+import com.cms.booking.repository.ClinicAppointmentTypePriceRepository;
+import com.cms.booking.repository.ClinicDoctorFeeRepository;
 import com.cms.booking.service.DoctorBookingReadinessService;
 import com.cms.identity.doctor.DoctorProfile;
 import com.cms.identity.doctor.DoctorProfileRepository;
@@ -24,7 +25,8 @@ import org.springframework.data.domain.PageImpl;
  * real-bug-fix 2026-09-17: pure Mockito, no Spring context - proves both the original scenario
  * found live (Kamlesh Rawat: zero AppointmentTypes, no default fee) and the false-positive it
  * was initially catching too (Gauresh Kumar: AppointmentTypes present, each with its own
- * feeOverride, no default fee needed or set) are both handled correctly.
+ * feeOverride, no default fee needed or set) are both handled correctly. 068-per-clinic-fees:
+ * both checks now read the clinic's own prices (FR-010).
  */
 @ExtendWith(MockitoExtension.class)
 class DoctorBookingReadinessServiceTest {
@@ -36,14 +38,18 @@ class DoctorBookingReadinessServiceTest {
     private AppointmentTypeRepository appointmentTypeRepository;
 
     @Mock
-    private DoctorDefaultFeeRepository doctorDefaultFeeRepository;
+    private ClinicDoctorFeeRepository clinicDoctorFeeRepository;
+
+    @Mock
+    private ClinicAppointmentTypePriceRepository clinicAppointmentTypePriceRepository;
 
     private final UUID clinicId = UUID.randomUUID();
     private final UUID readyDoctorId = UUID.randomUUID();
     private final UUID incompleteDoctorId = UUID.randomUUID();
 
     private DoctorBookingReadinessService newService() {
-        return new DoctorBookingReadinessService(doctorProfileRepository, appointmentTypeRepository, doctorDefaultFeeRepository);
+        return new DoctorBookingReadinessService(
+                doctorProfileRepository, appointmentTypeRepository, clinicDoctorFeeRepository, clinicAppointmentTypePriceRepository);
     }
 
     private DoctorProfile mockDoctor(UUID id) {
@@ -58,10 +64,10 @@ class DoctorBookingReadinessServiceTest {
         when(doctorProfileRepository.findByClinicStaffed(any(), any(), any())).thenReturn(page);
         when(appointmentTypeRepository.findDoctorProfileIdsWithAppointmentTypes(List.of(readyDoctorId, incompleteDoctorId)))
                 .thenReturn(List.of(readyDoctorId));
-        when(doctorDefaultFeeRepository.findDoctorProfileIdsWithDefaultFee(List.of(readyDoctorId, incompleteDoctorId)))
+        when(clinicDoctorFeeRepository.findDoctorProfileIdsWithDefaultFeeAtClinic(clinicId, List.of(readyDoctorId, incompleteDoctorId)))
                 .thenReturn(List.of(readyDoctorId));
-        when(appointmentTypeRepository.findDoctorProfileIdsWithAnAppointmentTypeMissingFeeOverride(
-                        List.of(readyDoctorId, incompleteDoctorId)))
+        when(clinicAppointmentTypePriceRepository.findDoctorProfileIdsWithAnAppointmentTypeUnpricedAtClinic(
+                        clinicId, List.of(readyDoctorId, incompleteDoctorId)))
                 .thenReturn(List.of());
 
         List<DoctorBookingReadinessResponse> result = newService().forClinic(clinicId);
@@ -86,10 +92,10 @@ class DoctorBookingReadinessServiceTest {
         when(doctorProfileRepository.findByClinicStaffed(any(), any(), any())).thenReturn(page);
         when(appointmentTypeRepository.findDoctorProfileIdsWithAppointmentTypes(List.of(incompleteDoctorId)))
                 .thenReturn(List.of(incompleteDoctorId));
-        when(doctorDefaultFeeRepository.findDoctorProfileIdsWithDefaultFee(List.of(incompleteDoctorId)))
+        when(clinicDoctorFeeRepository.findDoctorProfileIdsWithDefaultFeeAtClinic(clinicId, List.of(incompleteDoctorId)))
                 .thenReturn(List.of());
-        when(appointmentTypeRepository.findDoctorProfileIdsWithAnAppointmentTypeMissingFeeOverride(
-                        List.of(incompleteDoctorId)))
+        when(clinicAppointmentTypePriceRepository.findDoctorProfileIdsWithAnAppointmentTypeUnpricedAtClinic(
+                        clinicId, List.of(incompleteDoctorId)))
                 .thenReturn(List.of(incompleteDoctorId));
 
         List<DoctorBookingReadinessResponse> result = newService().forClinic(clinicId);
@@ -111,9 +117,10 @@ class DoctorBookingReadinessServiceTest {
         when(doctorProfileRepository.findByClinicStaffed(any(), any(), any())).thenReturn(page);
         when(appointmentTypeRepository.findDoctorProfileIdsWithAppointmentTypes(List.of(readyDoctorId)))
                 .thenReturn(List.of(readyDoctorId));
-        when(doctorDefaultFeeRepository.findDoctorProfileIdsWithDefaultFee(List.of(readyDoctorId)))
+        when(clinicDoctorFeeRepository.findDoctorProfileIdsWithDefaultFeeAtClinic(clinicId, List.of(readyDoctorId)))
                 .thenReturn(List.of());
-        when(appointmentTypeRepository.findDoctorProfileIdsWithAnAppointmentTypeMissingFeeOverride(List.of(readyDoctorId)))
+        when(clinicAppointmentTypePriceRepository.findDoctorProfileIdsWithAnAppointmentTypeUnpricedAtClinic(
+                        clinicId, List.of(readyDoctorId)))
                 .thenReturn(List.of());
 
         List<DoctorBookingReadinessResponse> result = newService().forClinic(clinicId);

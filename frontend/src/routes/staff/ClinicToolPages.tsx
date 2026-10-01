@@ -36,10 +36,18 @@ export function DefineSchedulePage() {
   return <DoctorScheduleManager clinicId={clinicId} doctorProfileId={doctorProfileId} />
 }
 
+// 068-per-clinic-fees: prices are this clinic's own, and only its admin can change them.
 export function AppointmentTypesPage() {
-  const { doctorProfileId } = useParams<{ doctorProfileId: string }>()
-  if (!doctorProfileId) return null
-  return <AppointmentTypeConfigForm doctorProfileId={doctorProfileId} />
+  const { clinicId, doctorProfileId } = useParams<{ clinicId: string; doctorProfileId: string }>()
+  const { role } = useOutletContext<ClinicShellOutletContext>()
+  if (!clinicId || !doctorProfileId) return null
+  return (
+    <AppointmentTypeConfigForm
+      clinicId={clinicId}
+      doctorProfileId={doctorProfileId}
+      canEditPrices={role === 'ClinicAdmin'}
+    />
+  )
 }
 
 export function BookSlotPage() {

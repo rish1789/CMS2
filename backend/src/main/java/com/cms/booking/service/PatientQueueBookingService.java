@@ -117,7 +117,7 @@ public class PatientQueueBookingService {
 
         UUID doctorProfileId = session.getDoctorProfile().getId();
 
-        BigDecimal lockedFee = feeResolutionService.resolve(doctorProfileId, input.appointmentTypeId());
+        BigDecimal lockedFee = feeResolutionService.resolve(clinicId, doctorProfileId, input.appointmentTypeId());
         AppointmentType appointmentType = appointmentTypeRepository
                 .findById(input.appointmentTypeId())
                 .orElseThrow(() -> new AppointmentTypeNotFoundException(input.appointmentTypeId()));

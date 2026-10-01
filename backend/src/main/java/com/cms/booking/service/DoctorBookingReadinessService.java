@@ -2,7 +2,8 @@ package com.cms.booking.service;
 
 import com.cms.booking.dto.DoctorBookingReadinessResponse;
 import com.cms.booking.repository.AppointmentTypeRepository;
-import com.cms.booking.repository.DoctorDefaultFeeRepository;
+import com.cms.booking.repository.ClinicAppointmentTypePriceRepository;
+import com.cms.booking.repository.ClinicDoctorFeeRepository;
 import com.cms.identity.doctor.DoctorProfile;
 import com.cms.identity.doctor.DoctorProfileRepository;
 import java.util.HashSet;
@@ -24,15 +25,18 @@ public class DoctorBookingReadinessService {
 
     private final DoctorProfileRepository doctorProfileRepository;
     private final AppointmentTypeRepository appointmentTypeRepository;
-    private final DoctorDefaultFeeRepository doctorDefaultFeeRepository;
+    private final ClinicDoctorFeeRepository clinicDoctorFeeRepository;
+    private final ClinicAppointmentTypePriceRepository clinicAppointmentTypePriceRepository;
 
     public DoctorBookingReadinessService(
             DoctorProfileRepository doctorProfileRepository,
             AppointmentTypeRepository appointmentTypeRepository,
-            DoctorDefaultFeeRepository doctorDefaultFeeRepository) {
+            ClinicDoctorFeeRepository clinicDoctorFeeRepository,
+            ClinicAppointmentTypePriceRepository clinicAppointmentTypePriceRepository) {
         this.doctorProfileRepository = doctorProfileRepository;
         this.appointmentTypeRepository = appointmentTypeRepository;
-        this.doctorDefaultFeeRepository = doctorDefaultFeeRepository;
+        this.clinicDoctorFeeRepository = clinicDoctorFeeRepository;
+        this.clinicAppointmentTypePriceRepository = clinicAppointmentTypePriceRepository;
     }
 
     @Transactional(readOnly = true)
@@ -46,10 +50,11 @@ public class DoctorBookingReadinessService {
 
         Set<UUID> withAppointmentTypes =
                 new HashSet<>(appointmentTypeRepository.findDoctorProfileIdsWithAppointmentTypes(doctorProfileIds));
-        Set<UUID> withDefaultFee =
-                new HashSet<>(doctorDefaultFeeRepository.findDoctorProfileIdsWithDefaultFee(doctorProfileIds));
-        Set<UUID> withMissingOverride = new HashSet<>(
-                appointmentTypeRepository.findDoctorProfileIdsWithAnAppointmentTypeMissingFeeOverride(doctorProfileIds));
+        // 068-per-clinic-fees FR-010: fees are this clinic's own - a doctor priced only elsewhere is not ready here.
+        Set<UUID> withDefaultFee = new HashSet<>(
+                clinicDoctorFeeRepository.findDoctorProfileIdsWithDefaultFeeAtClinic(clinicId, doctorProfileIds));
+        Set<UUID> withMissingOverride = new HashSet<>(clinicAppointmentTypePriceRepository
+                .findDoctorProfileIdsWithAnAppointmentTypeUnpricedAtClinic(clinicId, doctorProfileIds));
 
         return doctorProfileIds.stream()
                 .map(id -> new DoctorBookingReadinessResponse(

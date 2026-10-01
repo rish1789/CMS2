@@ -49,7 +49,8 @@ class QueueSendInCompleteTest extends AbstractDeVerificationCascadeIntegrationTe
     void queueTokensAreWaitingAndCanBeSentInCompletedAndCancelled() throws Exception {
         Clinic clinic = saveClinic();
         DoctorProfile doctor = saveDoctorStaffedAt(clinic);
-        AppointmentType type = appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+        AppointmentType type = clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
         Session any = saveQueueSession(clinic, doctor);
         Session today = sessionRepository.findBySchedule_Id(any.getSchedule().getId()).stream()
                 .filter(s -> s.getSessionDate().equals(LocalDate.now()))

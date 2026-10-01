@@ -64,6 +64,11 @@ public abstract class AbstractStaffBookingIntegrationTest {
     @Autowired
     protected MockMvc mockMvc;
 
+
+    @Autowired
+
+    protected ClinicPriceFixtures clinicPriceFixtures;
+
     @Autowired
     protected ClinicRepository clinicRepository;
 
@@ -121,6 +126,7 @@ public abstract class AbstractStaffBookingIntegrationTest {
         bookingRepository.deleteAll();
         patientRepository.deleteAll();
         doctorDefaultFeeRepository.deleteAll();
+        clinicPriceFixtures.deleteAll(); // 068: price rows reference clinic, doctor and type
         appointmentTypeRepository.deleteAll();
         slotRepository.deleteAll();
         sessionRepository.deleteAll();
@@ -217,7 +223,8 @@ public abstract class AbstractStaffBookingIntegrationTest {
     }
 
     protected AppointmentType saveAppointmentTypeWithOverride(DoctorProfile doctor, BigDecimal feeOverride) {
-        return appointmentTypeRepository.save(new AppointmentType(doctor, "Follow-up", feeOverride));
+        return clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Follow-up", null)), feeOverride);
     }
 
     protected AppointmentType saveAppointmentTypeWithNoOverride(DoctorProfile doctor) {

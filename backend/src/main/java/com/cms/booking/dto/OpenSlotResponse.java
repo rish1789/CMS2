@@ -6,7 +6,10 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
-/** 021-patient-self-service-booking: one entry in the patient-facing open-Slots listing (research.md - omits resolved fee amounts). */
+/**
+ * 021-patient-self-service-booking: one entry in the patient-facing open-Slots listing.
+ * 068-per-clinic-fees FR-011: each appointment type carries its effective fee at this clinic.
+ */
 public record OpenSlotResponse(
         UUID slotId,
         UUID doctorProfileId,

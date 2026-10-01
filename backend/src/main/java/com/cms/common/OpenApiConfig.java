@@ -23,7 +23,7 @@ import org.springframework.context.annotation.Configuration;
                                         + "Super Admin clinic/doctor verification. Endpoints are grouped by path "
                                         + "prefix: /api/v1/patients/** (patient-authenticated), /api/v1/clinics/** "
                                         + "(staff-authenticated, clinic-scoped), /api/v1/staff/** (staff login), "
-                                        + "/api/v1/admin/** (Super Admin), /api/v1/discovery/** and "
-                                        + "/api/v1/doctors/** (public).",
+                                        + "/api/v1/admin/** (Super Admin), /api/v1/doctors/** (staff-authenticated: "
+                                        + "the doctor or their clinic's admin) and /api/v1/discovery/** (public).",
                         license = @License(name = "MIT")))
 public class OpenApiConfig {}

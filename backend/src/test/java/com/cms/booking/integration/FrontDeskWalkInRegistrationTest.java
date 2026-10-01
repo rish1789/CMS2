@@ -69,7 +69,8 @@ class FrontDeskWalkInRegistrationTest extends AbstractDeVerificationCascadeInteg
     void fixedTimeWalkInsJoinTheWalkInLineWithoutTouchingTimedSlots() throws Exception {
         Clinic clinic = saveClinic();
         DoctorProfile doctor = saveDoctorStaffedAt(clinic);
-        AppointmentType type = appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+        AppointmentType type = clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
         Session session = today(saveFixedTimeSessionWithSlots(clinic, doctor));
         List<Slot> timedBefore = slotRepository.findBySession_Id(session.getId()).stream()
                 .sorted(Comparator.comparing(Slot::getStartTime))
@@ -106,7 +107,8 @@ class FrontDeskWalkInRegistrationTest extends AbstractDeVerificationCascadeInteg
     void aQueueWalkInTakesTheNextTokenAndADuplicateNeedsConfirming() throws Exception {
         Clinic clinic = saveClinic();
         DoctorProfile doctor = saveDoctorStaffedAt(clinic);
-        AppointmentType type = appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+        AppointmentType type = clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
         Session queue = today(saveQueueSession(clinic, doctor));
         bookSlot(clinic, doctor, addQueueSlot(queue, 1));
         String token = clinicAdminToken(clinic);

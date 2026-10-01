@@ -103,6 +103,13 @@ public class PatientBookingController {
         return patientBookingService.listAppointmentTypes(doctorProfileId);
     }
 
+    /** 068-per-clinic-fees FR-011: the clinic-scoped listing - each type's effective fee at this clinic. */
+    @GetMapping("/api/v1/patients/clinics/{clinicId}/doctors/{doctorProfileId}/appointment-types")
+    public List<AppointmentTypeResponse> listAppointmentTypesAtClinic(
+            @PathVariable UUID clinicId, @PathVariable UUID doctorProfileId) {
+        return patientBookingService.listAppointmentTypes(clinicId, doctorProfileId);
+    }
+
     @PostMapping("/api/v1/patients/clinics/{clinicId}/slots/{slotId}/book")
     public ResponseEntity<BookingResponse> book(
             @PathVariable UUID clinicId,
