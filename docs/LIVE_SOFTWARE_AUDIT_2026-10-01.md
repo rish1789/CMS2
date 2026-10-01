@@ -12,8 +12,8 @@ No application code, bookings, clinical records, accounts, or clinic settings we
 | 2. A no-show stays "Your next visit" and shows as "Active" | **Fixed** | Spec 069 (#34): the server derives `visitOutcome`, and the next visit is chosen from upcoming outcomes only. |
 | 3. Cancel is offered for ineligible appointments | **Fixed** | Spec 069 (#34): the server derives cancellation eligibility with a reason, and the endpoint still re-checks. |
 | 4. Login loses the selected clinic and doctor | **Fixed** | Spec 070 (#36): the validated return path is carried through login and signup. |
-| 5. A 429 is unreadable in the browser (CORS) | **Fixed** | Spec 071 (this PR): CORS runs before the limiter on throttled paths, `Retry-After` is exposed, and signup shows rate-limit, unknown and network errors. |
-| 6. Discovery stops after 20 results | Open | Phase 2R.4 |
+| 5. A 429 is unreadable in the browser (CORS) | **Fixed** | Spec 071 (#37): CORS runs before the limiter on throttled paths, `Retry-After` is exposed, and signup shows rate-limit, unknown and network errors. |
+| 6. Discovery stops after 20 results | **Fixed** | Spec 072 (this PR): paging controls, an `X-Total-Count` header and a unique tie-break sort. |
 | 7. A doctor sees admin-only tools | Open | Phase 2R.5 |
 
 The original observations below are preserved unchanged.
