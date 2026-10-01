@@ -1635,10 +1635,21 @@ This was done on branch `claude/spring-boot-4` while the owner was away. **It is
   - The upgrade test re-runs V43's SQL rather than rewinding Flyway.
 - **Numbering:** the earlier "068 (cancellation vs. 067's session lock)" idea is now **069**, if the owner wants it.
 
+### Closed later the same day
+
+- **068 merged:** rish1789/CMS2#30. CI was green on the head; the owner merged it.
+- **Windows launch confirmed:** the owner started the backend on their Windows machine with the wrapper (`.\backend\gradlew.bat -p backend bootRun`, after loading `.env`), and started the frontend with `npm --prefix frontend run dev`. Both ran.
+- **`NVD_API_KEY`, owner decision (2026-10-01): defer, but required before launch.**
+  - The app is not live with real patient data yet, and Dependabot covers dependency updates meanwhile.
+  - **Before the first deployment with real patient data:** the owner requests a free key at https://nvd.nist.gov/developers/request-an-api-key and adds it as the repository secret `NVD_API_KEY`.
+  - In the same change, raise the backend job's `timeout-minutes` (45 → about 90): the first NVD download adds about 20 minutes.
+  - Run one full scan, fix any serious findings, and keep the scan on from then on.
+
 ### Still open
 
-- Review and merge the 068 PR (owner).
-- Convergence passes for 065–068; the `NVD_API_KEY` decision; confirm the Windows launch config.
+- Convergence passes for 065–068.
+- The pre-launch `NVD_API_KEY` step above.
+- Optional 069: the gap between cancellation and 067's session lock.
 
 ## Reference
 

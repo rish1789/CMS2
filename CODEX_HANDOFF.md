@@ -1,4 +1,4 @@
-# Handoff for Codex — CMS2 (as of 2026-10-01, Spring Boot 4 migration on branch `claude/spring-boot-4`)
+# Handoff for Codex — CMS2 (as of 2026-10-01: Spring Boot 4, IST time-zone pin and 068 per-clinic fees merged)
 
 This note is self-contained. It assumes no prior conversation. For full history, see `HANDOFF.md` (Parts 13–16 cover the most recent work).
 
@@ -114,18 +114,17 @@ npm ci && npx tsc -b && npm run lint && npx vitest run       # 441 tests
   - `PartialSessionCancellationRangeTest` passed in the baseline, but its historical intermittency is not proven fixed.
 - **Time-of-day fixtures:** use future-dated sessions for new tests. Many fixtures generate *today's* 09:00–13:00 session, so an assertion that needs a bookable slot fails for any run after 09:00. Disabling sweeps does not fix that.
 - **PB-005 resolved:** the JVM is pinned to IST (`Asia/Kolkata`), in rish1789/CMS2#29, merged 2026-10-01.
-- **SEC-03 resolved in code:** 068-per-clinic-fees. Prices are per clinic, and only that clinic's admin edits them. V42 creates the tables and V43 copies the old prices. The PR is on branch `claude/068-per-clinic-fees` and awaits the owner's review. Since 068, `AppointmentTypeResponse` carries `fee` (clinic context), not `feeOverride`. Seed test prices with the `ClinicPriceFixtures` bean, never with `new AppointmentType(…, fee)`.
-- **Owner decision pending:** the `NVD_API_KEY` secret.
+- **SEC-03 resolved in code:** 068-per-clinic-fees. Prices are per clinic, and only that clinic's admin edits them. V42 creates the tables and V43 copies the old prices. Merged in rish1789/CMS2#30. Since 068, `AppointmentTypeResponse` carries `fee` (clinic context), not `feeOverride`. Seed test prices with the `ClinicPriceFixtures` bean, never with `new AppointmentType(…, fee)`.
+- **`NVD_API_KEY`: deferred by the owner, required before launch.** Before the first deployment with real patient data, the owner adds the secret; in the same change, raise the backend job's `timeout-minutes` from 45 to about 90, because the first NVD download is slow. Run one full scan and fix any serious findings.
+- **Windows launch confirmed** by the owner (2026-10-01): `.claude/launch.json`'s wrapper-based backend config and `npm --prefix frontend run dev` both run.
 
 ## 6. Suggested next work, in priority order
 
-1. **The Spring Boot 4 migration PR (branch `claude/spring-boot-4`) awaits the owner's review and merge.** After it merges:
-   - confirm CI on `main`;
-   - confirm the owner's Windows launch config (`.claude/launch.json`, now `./backend/gradlew.bat`) starts the backend. The wrapper downloads Gradle 8.14.3 on first use. This could not be tested on Windows from the cloud sandbox.
+1. **Spring Boot 4 is merged and confirmed** (CI green; Windows launch confirmed by the owner). Nothing is pending here.
 2. **Watch for the midnight-wrap test pattern.** Building `HH:MM` fixture times as `now ± N hours` on today's date wraps past midnight. Two instances were fixed in the Boot 4 PR: `SlotCompletionServiceTest` now takes date and time from one `LocalDateTime`, and `FrontDeskWalkInPage.test.tsx` pins `Date` to midday. Prefer the same approaches in new tests.
-3. Run convergence reviews for 065, 066 and 067 (`.claude/skills/speckit-converge/SKILL.md`). Investigate the historical partial-cancellation flake if it recurs.
+3. Run convergence reviews for 065, 066, 067 and 068 (`.claude/skills/speckit-converge/SKILL.md`). Investigate the historical partial-cancellation flake if it recurs.
 4. Consider a spec (**069**) for the gap between cancellation and 067's session lock, if the owner wants it closed.
-5. Leave the OWASP secret pending the owner's decision. Do not merge or deploy on the owner's behalf.
+5. Before launch only: the `NVD_API_KEY` step above (owner adds the secret; you raise the CI timeout). Do not merge or deploy on the owner's behalf.
 
 ## 7. Working with the owner
 
