@@ -34,7 +34,10 @@ Added after the plan was written. The original text below is preserved as writte
 
   Each PR's own CI is the merge gate.
 - **2B: done.** Spec 074; PB-001 and PB-002 are fixed. All three staff paths answer a same-clinic phone collision with 409 `PATIENT_PHONE_ALREADY_REGISTERED`, naming the existing unlinked patient when known. Staff choose to book that patient; nothing is merged.
-- **Next:** the Phase 3 decision record (3C and 3D are still open; 3A and 3B are done).
+- **Phase 3 decisions: 3C and 3D approved** (2026-10-01). See [PHASE_3_DECISION_RECORD.md](PHASE_3_DECISION_RECORD.md).
+  - **3C:** deactivated staff with no active clinic lose their sessions and their login; one generic login error; 5 failed attempts lock an identifier for 15 minutes.
+  - **3D:** while de-verified, a clinic or doctor takes no new bookings and is hidden from search; re-verifying restores both.
+- **Next:** spec 075 (3C), then spec 076 (3D).
 
 ## Current position
 
