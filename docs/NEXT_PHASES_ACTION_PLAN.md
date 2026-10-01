@@ -24,8 +24,9 @@ Added after the plan was written. The original text below is preserved as writte
 - **Phase 3B, fee ownership (SEC-03): decided and done.** Fees are clinic-owned; see spec 068 (#30 and #32).
 - **Numbering:** 068 is taken, so the next spec is **069**.
 - **2R.1: done.** Spec 069 (#34); live-audit findings 1–3 are fixed.
-- **2R.2: done.** Spec 070; finding 4 is fixed.
-- **Next package:** 2R.3.
+- **2R.2: done.** Spec 070 (#36); finding 4 is fixed.
+- **2R.3: done.** Spec 071; finding 5 and the signup fallback gap are fixed.
+- **Next package:** 2R.4.
 
 ## Current position
 

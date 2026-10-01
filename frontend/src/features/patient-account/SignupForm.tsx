@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { signupPatient, SignupPatientApiError, type SignupPatientResponse } from './api'
 import { FormField } from '../../components/FormField'
+import { formatRetryAfter } from '../../lib/rateLimitMessage'
 import { withReturnTo } from './returnTo'
 
 interface FormState {
@@ -57,6 +58,16 @@ export function SignupForm({ returnTo }: SignupFormProps = {}) {
       case 'SIGNUP_FAILED':
         setFormError(body.message ?? 'Signup failed. Please try again.')
         break
+      case 'RATE_LIMIT_EXCEEDED':
+        setFormError(
+          error.retryAfterSeconds == null
+            ? 'Too many signup attempts from this network. Please wait a little and try again.'
+            : `Too many signup attempts from this network. Try again in ${formatRetryAfter(error.retryAfterSeconds)}.`,
+        )
+        break
+      default:
+        // 071-readable-rate-limit: a code this form does not know yet must still show something.
+        setFormError((body as { message?: string }).message ?? 'Signup failed. Please try again.')
     }
   }
 
@@ -76,6 +87,9 @@ export function SignupForm({ returnTo }: SignupFormProps = {}) {
     } catch (err) {
       if (err instanceof SignupPatientApiError) {
         applyApiError(err)
+      } else if (err instanceof TypeError) {
+        // fetch rejects with a TypeError when the request never got a readable response.
+        setFormError('Could not reach the server. Check your connection and try again.')
       } else {
         setFormError('Something went wrong. Please try again.')
       }
