@@ -75,6 +75,38 @@ public interface DiscoveryResultRepository extends JpaRepository<RoleAssignment,
             @Param("minExperienceYears") Integer minExperienceYears,
             Pageable pageable);
 
+    /**
+     * 072-discovery-pagination FR-002: the number of matches across all pages, for the
+     * {@code X-Total-Count} header. The predicate MUST stay identical to {@link #search}'s, and the
+     * caller passes the same normalized values.
+     */
+    @Query(
+            """
+            SELECT COUNT(ra)
+            FROM RoleAssignment ra
+            JOIN ra.account a
+            JOIN ra.clinic c
+            JOIN DoctorProfile dp ON dp.account = a
+            WHERE ra.active = true
+              AND ra.role = com.cms.identity.account.domain.RoleAssignment.Role.Doctor
+              AND c.verified = true
+              AND dp.licenseVerified = true
+              AND dp.visible = true
+              AND (:searchPattern IS NULL
+                   OR LOWER(dp.specialization) LIKE :searchPattern
+                   OR LOWER(a.name) LIKE :searchPattern
+                   OR LOWER(c.name) LIKE :searchPattern
+                   OR LOWER(c.address) LIKE :searchPattern)
+              AND (:city IS NULL OR LOWER(c.city) = :city)
+              AND (:specialization IS NULL OR LOWER(dp.specialization) = :specialization)
+              AND (:minExperienceYears IS NULL OR dp.experienceYears >= :minExperienceYears)
+            """)
+    long countMatches(
+            @Param("searchPattern") String searchPattern,
+            @Param("city") String city,
+            @Param("specialization") String specialization,
+            @Param("minExperienceYears") Integer minExperienceYears);
+
     /** patient-search-advanced-filtering: drives the City filter dropdown - only cities that actually have at least one eligible doctor right now, so picking one never dead-ends into an empty result. */
     @Query(
             """

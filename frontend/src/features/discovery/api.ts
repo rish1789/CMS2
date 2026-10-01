@@ -25,9 +25,18 @@ export interface SearchDiscoveryParams {
   minExperienceYears?: number
   sort?: DiscoverySortField
   direction?: SortDirection
+  // 072-discovery-pagination: 0-indexed, like the server; the server caps size at 50.
+  page?: number
+  size?: number
 }
 
-export async function searchDiscovery(params: SearchDiscoveryParams = {}): Promise<DiscoveryResult[]> {
+export interface DiscoveryPage {
+  results: DiscoveryResult[]
+  // Matches across all pages, from the X-Total-Count response header.
+  totalCount: number
+}
+
+export async function searchDiscovery(params: SearchDiscoveryParams = {}): Promise<DiscoveryPage> {
   const url = new URL(`${API_BASE_URL}/api/v1/discovery/search`)
   if (params.q && params.q.trim() !== '') url.searchParams.set('q', params.q.trim())
   if (params.city) url.searchParams.set('city', params.city)
@@ -37,6 +46,8 @@ export async function searchDiscovery(params: SearchDiscoveryParams = {}): Promi
   }
   if (params.sort) url.searchParams.set('sort', params.sort)
   if (params.direction) url.searchParams.set('direction', params.direction)
+  if (params.page !== undefined) url.searchParams.set('page', String(params.page))
+  if (params.size !== undefined) url.searchParams.set('size', String(params.size))
 
   const response = await fetch(url.toString())
 
@@ -44,7 +55,11 @@ export async function searchDiscovery(params: SearchDiscoveryParams = {}): Promi
     throw new Error('Discovery search failed. Please try again.')
   }
 
-  return (await response.json()) as DiscoveryResult[]
+  const results = (await response.json()) as DiscoveryResult[]
+  const header = Number.parseInt(response.headers.get('X-Total-Count') ?? '', 10)
+  // Without a readable total, count only what has been seen, so no page past it is offered.
+  const seen = (params.page ?? 0) * (params.size ?? results.length) + results.length
+  return { results, totalCount: Number.isFinite(header) && header >= 0 ? header : seen }
 }
 
 // Drives the City filter dropdown - only cities with at least one eligible doctor right now.

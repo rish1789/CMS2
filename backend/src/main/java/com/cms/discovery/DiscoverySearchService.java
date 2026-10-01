@@ -54,6 +54,12 @@ public class DiscoverySearchService {
         return repository.search(searchPattern, normalizedCity, normalizedSpecialization, minExperienceYears, pageable);
     }
 
+    /** 072-discovery-pagination FR-002: total matches for the same filters, normalized exactly as {@link #search} does. */
+    public long count(String q, String city, String specialization, Integer minExperienceYears) {
+        return repository.countMatches(
+                normalizeToLikePattern(q), normalizeToLowercase(city), normalizeToLowercase(specialization), minExperienceYears);
+    }
+
     private Pageable resolvePageable(Integer page, Integer size, Sort sort) {
         int resolvedPage = (page == null || page < 0) ? 0 : page;
         int resolvedSize = (size == null || size < 1) ? DEFAULT_PAGE_SIZE : Math.min(size, MAX_PAGE_SIZE);
@@ -96,6 +102,8 @@ public class DiscoverySearchService {
                     default -> "a.name";
                 };
         Sort.Direction direction = "desc".equalsIgnoreCase(sortDirection) ? Sort.Direction.DESC : Sort.Direction.ASC;
-        return Sort.by(direction, property);
+        // 072-discovery-pagination FR-001: (doctor profile, clinic) is unique per result row, so
+        // ties on the chosen field still have one fixed order and pages never skip or repeat rows.
+        return Sort.by(direction, property).and(Sort.by(Sort.Direction.ASC, "dp.id", "c.id"));
     }
 }

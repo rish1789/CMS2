@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   listDiscoveryCities,
@@ -10,9 +10,12 @@ import {
 } from './api'
 import { FilterSelect } from '../../components/FilterSelect'
 import { ListSkeleton } from '../../components/ListSkeleton'
+import { PaginationControls } from '../../components/PaginationControls'
 import { IconBadge, DoctorIcon, ArrowIcon } from '../../components/adminIcons'
 
 const DEBOUNCE_MS = 300
+// 072-discovery-pagination: the server's default page size, sent explicitly.
+const PAGE_SIZE = 20
 
 const EXPERIENCE_OPTIONS = [
   { label: 'Any experience', value: '' },
@@ -48,9 +51,31 @@ export function DiscoverySearch() {
   const [cities, setCities] = useState<string[]>([])
   const [specializations, setSpecializations] = useState<string[]>([])
 
+  const [page, setPage] = useState(0)
   const [results, setResults] = useState<DiscoveryResult[]>([])
+  const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
+
+  // 072-discovery-pagination FR-006: only the newest request may update the results.
+  const latestRequest = useRef(0)
+  const resultsHeading = useRef<HTMLHeadingElement>(null)
+  const focusResultsAfterLoad = useRef(false)
+
+  // FR-005: a new search text, filter or sort starts again from the first page, in the same
+  // update, so no request ever pairs the new filters with the old page.
+  function changeFilter(set: (value: string) => void) {
+    return (value: string) => {
+      set(value)
+      setPage(0)
+    }
+  }
+
+  function changePage(next: number) {
+    focusResultsAfterLoad.current = true
+    setPage(next)
+  }
 
   useEffect(() => {
     listDiscoveryCities().then(setCities).catch(() => setCities([]))
@@ -58,12 +83,18 @@ export function DiscoverySearch() {
   }, [])
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedQuery(query), DEBOUNCE_MS)
+    const timer = window.setTimeout(() => {
+      setDebouncedQuery((previous) => {
+        if (previous !== query) setPage(0)
+        return query
+      })
+    }, DEBOUNCE_MS)
     return () => window.clearTimeout(timer)
   }, [query])
 
   useEffect(() => {
-    let cancelled = false
+    const request = ++latestRequest.current
+    const isLatest = () => request === latestRequest.current
     setLoading(true)
     setError(null)
 
@@ -76,21 +107,29 @@ export function DiscoverySearch() {
       minExperienceYears: minExperienceYears ? Number(minExperienceYears) : undefined,
       sort: sortField,
       direction: sortDirection,
+      page,
+      size: PAGE_SIZE,
     })
       .then((data) => {
-        if (!cancelled) setResults(data)
+        if (!isLatest()) return
+        setResults(data.results)
+        setTotalCount(data.totalCount)
       })
       .catch(() => {
-        if (!cancelled) setError('Something went wrong. Please try again.')
+        if (isLatest()) setError('Something went wrong. Please try again.')
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
+        if (isLatest()) setLoading(false)
       })
+  }, [debouncedQuery, city, specialization, minExperienceYears, sortKey, page, attempt])
 
-    return () => {
-      cancelled = true
+  // After a page change, move focus to the top of the new results for keyboard and screen-reader users.
+  useEffect(() => {
+    if (!loading && focusResultsAfterLoad.current) {
+      focusResultsAfterLoad.current = false
+      resultsHeading.current?.focus()
     }
-  }, [debouncedQuery, city, specialization, minExperienceYears, sortKey])
+  }, [loading])
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
@@ -116,7 +155,7 @@ export function DiscoverySearch() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <FilterSelect value={city} onChange={setCity} ariaLabel="Filter by city">
+        <FilterSelect value={city} onChange={changeFilter(setCity)} ariaLabel="Filter by city">
           <option value="">All cities</option>
           {cities.map((c) => (
             <option key={c} value={c}>
@@ -125,7 +164,7 @@ export function DiscoverySearch() {
           ))}
         </FilterSelect>
 
-        <FilterSelect value={specialization} onChange={setSpecialization} ariaLabel="Filter by specialization">
+        <FilterSelect value={specialization} onChange={changeFilter(setSpecialization)} ariaLabel="Filter by specialization">
           <option value="">All specializations</option>
           {specializations.map((s) => (
             <option key={s} value={s}>
@@ -134,7 +173,7 @@ export function DiscoverySearch() {
           ))}
         </FilterSelect>
 
-        <FilterSelect value={minExperienceYears} onChange={setMinExperienceYears} ariaLabel="Filter by experience">
+        <FilterSelect value={minExperienceYears} onChange={changeFilter(setMinExperienceYears)} ariaLabel="Filter by experience">
           {EXPERIENCE_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
@@ -142,7 +181,7 @@ export function DiscoverySearch() {
           ))}
         </FilterSelect>
 
-        <FilterSelect value={sortKey} onChange={setSortKey} ariaLabel="Sort results">
+        <FilterSelect value={sortKey} onChange={changeFilter(setSortKey)} ariaLabel="Sort results">
           {SORT_OPTIONS.map((option) => (
             <option key={sortKeyOf(option.field, option.direction)} value={sortKeyOf(option.field, option.direction)}>
               {option.label}
@@ -151,10 +190,21 @@ export function DiscoverySearch() {
         </FilterSelect>
       </div>
 
+      <h2 ref={resultsHeading} tabIndex={-1} className="sr-only">
+        Search results
+      </h2>
+
       {error && (
-        <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">
-          {error}
-        </p>
+        <div role="alert" className="flex items-center justify-between gap-3 rounded-md bg-red-50 p-3 text-sm text-red-700">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => setAttempt((n) => n + 1)}
+            className="rounded-lg border border-red-200 bg-white px-3 py-1.5 font-medium text-red-700 transition-colors duration-150 hover:bg-red-50"
+          >
+            Try again
+          </button>
+        </div>
       )}
 
       {!error && loading && <ListSkeleton rows={4} />}
@@ -192,6 +242,10 @@ export function DiscoverySearch() {
             </li>
           ))}
         </ul>
+      )}
+
+      {!error && !loading && totalCount > 0 && (
+        <PaginationControls page={page} pageSize={PAGE_SIZE} totalCount={totalCount} onPageChange={changePage} itemLabel="doctors" />
       )}
     </div>
   )

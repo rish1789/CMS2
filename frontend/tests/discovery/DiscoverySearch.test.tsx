@@ -44,7 +44,7 @@ describe('DiscoverySearch', () => {
   })
 
   it('renders the fetched eligible-only result list with no login prompt anywhere', async () => {
-    mockedSearchDiscovery.mockResolvedValue([ELIGIBLE_RESULT])
+    mockedSearchDiscovery.mockResolvedValue({ results: [ELIGIBLE_RESULT], totalCount: 1 })
 
     renderSearch()
 
@@ -59,12 +59,12 @@ describe('DiscoverySearch', () => {
   })
 
   it('narrows the rendered list as the user types a search term', async () => {
-    mockedSearchDiscovery.mockResolvedValueOnce([ELIGIBLE_RESULT])
+    mockedSearchDiscovery.mockResolvedValueOnce({ results: [ELIGIBLE_RESULT], totalCount: 1 })
     renderSearch()
     await waitFor(() => expect(mockedSearchDiscovery).toHaveBeenCalledTimes(1))
     await screen.findByText('Dr. Asha Rao')
 
-    mockedSearchDiscovery.mockResolvedValueOnce([ELIGIBLE_RESULT])
+    mockedSearchDiscovery.mockResolvedValueOnce({ results: [ELIGIBLE_RESULT], totalCount: 1 })
     const input = screen.getByLabelText(/search by doctor or clinic name/i)
     await userEvent.type(input, 'Cardiology')
 
@@ -74,11 +74,11 @@ describe('DiscoverySearch', () => {
   })
 
   it('shows an empty state when a search term matches nothing', async () => {
-    mockedSearchDiscovery.mockResolvedValueOnce([ELIGIBLE_RESULT])
+    mockedSearchDiscovery.mockResolvedValueOnce({ results: [ELIGIBLE_RESULT], totalCount: 1 })
     renderSearch()
     await screen.findByText('Dr. Asha Rao')
 
-    mockedSearchDiscovery.mockResolvedValueOnce([])
+    mockedSearchDiscovery.mockResolvedValueOnce({ results: [], totalCount: 0 })
     const input = screen.getByLabelText(/search by doctor or clinic name/i)
     await userEvent.type(input, 'doesnotmatchanything')
 
@@ -86,7 +86,7 @@ describe('DiscoverySearch', () => {
   })
 
   it('sends the selected city as a filter param, scoping results to it', async () => {
-    mockedSearchDiscovery.mockResolvedValue([ELIGIBLE_RESULT])
+    mockedSearchDiscovery.mockResolvedValue({ results: [ELIGIBLE_RESULT], totalCount: 1 })
     renderSearch()
     await waitFor(() => expect(mockedListCities).toHaveBeenCalled())
     await screen.findByText('Dr. Asha Rao')
@@ -97,7 +97,7 @@ describe('DiscoverySearch', () => {
   })
 
   it('sends the selected sort option', async () => {
-    mockedSearchDiscovery.mockResolvedValue([ELIGIBLE_RESULT])
+    mockedSearchDiscovery.mockResolvedValue({ results: [ELIGIBLE_RESULT], totalCount: 1 })
     renderSearch()
     await screen.findByText('Dr. Asha Rao')
 
@@ -111,7 +111,7 @@ describe('DiscoverySearch', () => {
   })
 
   it('sends the selected minimum experience as a filter param', async () => {
-    mockedSearchDiscovery.mockResolvedValue([ELIGIBLE_RESULT])
+    mockedSearchDiscovery.mockResolvedValue({ results: [ELIGIBLE_RESULT], totalCount: 1 })
     renderSearch()
     await screen.findByText('Dr. Asha Rao')
 

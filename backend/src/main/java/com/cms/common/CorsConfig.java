@@ -30,7 +30,8 @@ public class CorsConfig {
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
         // 071-readable-rate-limit: lets the page read how long a throttled caller must wait.
-        configuration.setExposedHeaders(List.of("Retry-After"));
+        // 072-discovery-pagination: and the discovery search's total across pages.
+        configuration.setExposedHeaders(List.of("Retry-After", "X-Total-Count"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", configuration);
