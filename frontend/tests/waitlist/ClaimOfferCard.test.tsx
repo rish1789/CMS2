@@ -41,8 +41,8 @@ describe('ClaimOfferCard', () => {
     mockedDeclineOffer.mockReset()
     mockedListPatientAppointmentTypes.mockReset()
     mockedListPatientAppointmentTypes.mockResolvedValue([
-      { id: 'apt-1', doctorProfileId: DOCTOR_ID, name: 'General Consultation', feeOverride: 500 },
-      { id: 'apt-2', doctorProfileId: DOCTOR_ID, name: 'Follow-up', feeOverride: 300 },
+      { id: 'apt-1', doctorProfileId: DOCTOR_ID, name: 'General Consultation', fee: 500 },
+      { id: 'apt-2', doctorProfileId: DOCTOR_ID, name: 'Follow-up', fee: 300 },
     ])
     storePatientSession({ token: 'a.jwt.token', patientAccountId: 'patient-1', email: 'patient@example.com' })
   })
@@ -62,7 +62,7 @@ describe('ClaimOfferCard', () => {
       createdAt: '2026-09-04T10:00:00Z',
     })
 
-    render(<ClaimOfferCard entryId={ENTRY_ID} offeredDoctorProfileId={DOCTOR_ID} />)
+    render(<ClaimOfferCard entryId={ENTRY_ID} clinicId="clinic-1" offeredDoctorProfileId={DOCTOR_ID} />)
 
     await user.type(screen.getByLabelText(/your name/i), 'Claimant')
     await screen.findByRole('option', { name: 'General Consultation' })
@@ -82,12 +82,14 @@ describe('ClaimOfferCard', () => {
   // appointment-type pickers.
   it('shows the fee for the selected appointment type', async () => {
     const user = userEvent.setup()
-    render(<ClaimOfferCard entryId={ENTRY_ID} offeredDoctorProfileId={DOCTOR_ID} />)
+    render(<ClaimOfferCard entryId={ENTRY_ID} clinicId="clinic-1" offeredDoctorProfileId={DOCTOR_ID} />)
 
     await screen.findByRole('option', { name: 'Follow-up' })
     await user.selectOptions(screen.getByLabelText(/appointment type/i), 'apt-2')
 
     expect(await screen.findByText('₹300.00')).toBeInTheDocument()
+    // 068-per-clinic-fees: the fee shown is the offer's clinic's own price.
+    expect(mockedListPatientAppointmentTypes).toHaveBeenCalledWith('clinic-1', DOCTOR_ID, 'a.jwt.token')
   })
 
   it('declines the offer', async () => {
@@ -104,7 +106,7 @@ describe('ClaimOfferCard', () => {
       offeredDoctorProfileId: null,
     })
 
-    render(<ClaimOfferCard entryId={ENTRY_ID} offeredDoctorProfileId={DOCTOR_ID} />)
+    render(<ClaimOfferCard entryId={ENTRY_ID} clinicId="clinic-1" offeredDoctorProfileId={DOCTOR_ID} />)
 
     await user.click(screen.getByRole('button', { name: /decline/i }))
 
@@ -118,7 +120,7 @@ describe('ClaimOfferCard', () => {
       new ApiError(409, 'This offer is no longer available to claim.', { error: 'WAITLIST_OFFER_NOT_CLAIMABLE' }),
     )
 
-    render(<ClaimOfferCard entryId={ENTRY_ID} offeredDoctorProfileId={DOCTOR_ID} />)
+    render(<ClaimOfferCard entryId={ENTRY_ID} clinicId="clinic-1" offeredDoctorProfileId={DOCTOR_ID} />)
 
     await user.type(screen.getByLabelText(/your name/i), 'Claimant')
     await screen.findByRole('option', { name: 'General Consultation' })
@@ -134,7 +136,7 @@ describe('ClaimOfferCard', () => {
       new ApiError(409, 'This slot was just booked by someone else.', { error: 'SLOT_ALREADY_BOOKED' }),
     )
 
-    render(<ClaimOfferCard entryId={ENTRY_ID} offeredDoctorProfileId={DOCTOR_ID} />)
+    render(<ClaimOfferCard entryId={ENTRY_ID} clinicId="clinic-1" offeredDoctorProfileId={DOCTOR_ID} />)
 
     await user.type(screen.getByLabelText(/your name/i), 'Claimant')
     await screen.findByRole('option', { name: 'General Consultation' })
@@ -152,7 +154,7 @@ describe('ClaimOfferCard', () => {
       new ApiError(409, 'Someone else claimed this offer 2 seconds ago.', { error: 'WAITLIST_OFFER_NOT_CLAIMABLE' }),
     )
 
-    render(<ClaimOfferCard entryId={ENTRY_ID} offeredDoctorProfileId={DOCTOR_ID} />)
+    render(<ClaimOfferCard entryId={ENTRY_ID} clinicId="clinic-1" offeredDoctorProfileId={DOCTOR_ID} />)
 
     await user.type(screen.getByLabelText(/your name/i), 'Claimant')
     await screen.findByRole('option', { name: 'General Consultation' })
@@ -163,7 +165,7 @@ describe('ClaimOfferCard', () => {
   })
 
   it('shows a fallback message when the matched doctor is unknown', () => {
-    render(<ClaimOfferCard entryId={ENTRY_ID} offeredDoctorProfileId={null} />)
+    render(<ClaimOfferCard entryId={ENTRY_ID} clinicId="clinic-1" offeredDoctorProfileId={null} />)
 
     expect(screen.getByText(/could not determine the doctor for this offer/i)).toBeInTheDocument()
   })

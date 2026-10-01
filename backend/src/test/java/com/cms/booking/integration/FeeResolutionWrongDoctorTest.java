@@ -3,6 +3,7 @@ package com.cms.booking.integration;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.cms.booking.domain.AppointmentType;
+import com.cms.booking.domain.ClinicAppointmentTypePrice;
 import com.cms.booking.exception.AppointmentTypeNotFoundException;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
@@ -12,12 +13,14 @@ class FeeResolutionWrongDoctorTest extends AbstractBookingIntegrationTest {
 
     @Test
     void resolvingAgainstADifferentDoctorThrowsNotFound() {
-        var doctorA = saveDoctorProfile();
-        var doctorB = saveDoctorProfile();
-        AppointmentType typeForA = appointmentTypeRepository.save(
-                new AppointmentType(doctorA, "Follow-up", new BigDecimal("300.00")));
+        var clinic = saveClinic();
+        var doctorA = saveDoctorStaffedAt(clinic);
+        var doctorB = saveDoctorStaffedAt(clinic);
+        AppointmentType typeForA = appointmentTypeRepository.save(new AppointmentType(doctorA, "Follow-up", null));
+        clinicAppointmentTypePriceRepository.save(
+                new ClinicAppointmentTypePrice(clinic, typeForA, new BigDecimal("300.00"), null));
 
-        assertThatThrownBy(() -> feeResolutionService.resolve(doctorB.getId(), typeForA.getId()))
+        assertThatThrownBy(() -> feeResolutionService.resolve(clinic.getId(), doctorB.getId(), typeForA.getId()))
                 .isInstanceOf(AppointmentTypeNotFoundException.class);
     }
 }

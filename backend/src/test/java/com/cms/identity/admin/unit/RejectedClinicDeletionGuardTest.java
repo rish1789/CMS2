@@ -7,8 +7,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.cms.booking.repository.BookingAttemptLogRepository;
+import com.cms.booking.repository.ClinicAppointmentTypePriceRepository;
 import com.cms.booking.repository.ClinicBookingLimitOverrideChangeLogRepository;
 import com.cms.booking.repository.ClinicBookingLimitOverrideRepository;
+import com.cms.booking.repository.ClinicDoctorFeeRepository;
 import com.cms.identity.account.repository.AccountRepository;
 import com.cms.identity.account.repository.RoleAssignmentRepository;
 import com.cms.identity.account.service.PasswordPolicyValidator;
@@ -67,6 +69,12 @@ class RejectedClinicDeletionGuardTest {
     private Clinic clinic;
     private UUID clinicId;
 
+    @Mock
+    private ClinicDoctorFeeRepository clinicDoctorFeeRepository;
+
+    @Mock
+    private ClinicAppointmentTypePriceRepository clinicAppointmentTypePriceRepository;
+
     @BeforeEach
     void setUp() {
         service = new ClinicVerificationService(
@@ -85,7 +93,9 @@ class RejectedClinicDeletionGuardTest {
                 overrideRepository,
                 overrideChangeLogRepository,
                 bookingAttemptLogRepository,
-                suspiciousActivityFlagRepository);
+                suspiciousActivityFlagRepository,
+                clinicDoctorFeeRepository,
+                clinicAppointmentTypePriceRepository);
         clinic = new Clinic("Sunrise Test Clinic", "1 Main St", "sunrise@example.com", "9999900000");
         clinicId = UUID.randomUUID();
         ReflectionTestUtils.setField(clinic, "id", clinicId);
@@ -102,6 +112,18 @@ class RejectedClinicDeletionGuardTest {
         InOrder order = inOrder(overrideChangeLogRepository, overrideRepository, clinicRepository);
         order.verify(overrideChangeLogRepository).deleteByClinic_Id(clinicId);
         order.verify(overrideRepository).deleteByClinic_Id(clinicId);
+        order.verify(clinicRepository).delete(clinic);
+    }
+
+    /** 068-per-clinic-fees: the clinic's own prices are configuration, cleared before the clinic. */
+    @Test
+    void theClinicsPricesAreClearedBeforeTheClinicIsDeleted() {
+        BulkDeleteResponse result = service.deleteBulk(List.of(clinicId));
+
+        assertThat(result.succeeded()).containsExactly(clinicId);
+        InOrder order = inOrder(clinicAppointmentTypePriceRepository, clinicDoctorFeeRepository, clinicRepository);
+        order.verify(clinicAppointmentTypePriceRepository).deleteByClinic_Id(clinicId);
+        order.verify(clinicDoctorFeeRepository).deleteByClinic_Id(clinicId);
         order.verify(clinicRepository).delete(clinic);
     }
 

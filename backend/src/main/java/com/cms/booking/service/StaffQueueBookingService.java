@@ -104,7 +104,7 @@ public class StaffQueueBookingService {
         UUID doctorProfileId = session.getDoctorProfile().getId();
 
         // FR-005: the first real write-gate - nothing is written before this succeeds.
-        BigDecimal lockedFee = feeResolutionService.resolve(doctorProfileId, input.appointmentTypeId());
+        BigDecimal lockedFee = feeResolutionService.resolve(clinicId, doctorProfileId, input.appointmentTypeId());
         AppointmentType appointmentType = appointmentTypeRepository
                 .findById(input.appointmentTypeId())
                 .orElseThrow(() -> new AppointmentTypeNotFoundException(input.appointmentTypeId()));

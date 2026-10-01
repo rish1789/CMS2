@@ -191,9 +191,9 @@ export function QueueBookSlotForm({
                   </option>
                 ))}
               </select>
-              {selectedType?.feeOverride != null && (
+              {selectedType?.fee != null && (
                 <p className="mt-1.5 text-sm text-gray-600">
-                  Fee: <span className="font-semibold text-gray-900 tabular-nums">₹{selectedType.feeOverride.toFixed(2)}</span>
+                  Fee: <span className="font-semibold text-gray-900 tabular-nums">₹{selectedType.fee.toFixed(2)}</span>
                 </p>
               )}
             </div>

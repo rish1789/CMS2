@@ -12,7 +12,8 @@ export interface AppointmentTypeOption {
   id: string
   doctorProfileId: string
   name: string
-  feeOverride: number | null
+  // 068-per-clinic-fees: the effective price at this clinic; null when not bookable here.
+  fee: number | null
 }
 
 export interface OpenSlot {

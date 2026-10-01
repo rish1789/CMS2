@@ -63,7 +63,7 @@ describe('BookSlotForm', () => {
     mockedBookSlot.mockReset()
     mockedListAppointmentTypes.mockReset()
     mockedListAppointmentTypes.mockResolvedValue([
-      { id: 'type-1', doctorProfileId: DOCTOR_PROFILE_ID, name: 'General consult', feeOverride: null },
+      { id: 'type-1', doctorProfileId: DOCTOR_PROFILE_ID, name: 'General consult', fee: null },
     ])
     mockedSearchPatients.mockReset()
     mockedSearchPatients.mockResolvedValue({

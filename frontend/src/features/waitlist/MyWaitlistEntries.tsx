@@ -124,6 +124,7 @@ export function MyWaitlistEntries() {
                 <div className="mt-3 border-t border-gray-100 pt-3">
                   <ClaimOfferCard
                     entryId={entry.id}
+                    clinicId={entry.clinicId}
                     offerExpiresAt={entry.offerExpiresAt}
                     offeredDoctorProfileId={entry.offeredDoctorProfileId}
                     onClaimed={(booking) => handleClaimed(entry.id, booking)}

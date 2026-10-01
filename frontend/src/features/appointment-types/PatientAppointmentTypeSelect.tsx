@@ -4,6 +4,7 @@ import { listPatientAppointmentTypes, type AppointmentTypeResponse } from './api
 // Patient-facing analog of AppointmentTypeSelect - backs ClaimOfferCard's picker, replacing the
 // raw free-text "Appointment Type ID" input a patient had no way to fill in correctly.
 export interface PatientAppointmentTypeSelectProps {
+  clinicId: string
   doctorProfileId: string
   token: string
   value: string
@@ -13,6 +14,7 @@ export interface PatientAppointmentTypeSelectProps {
 }
 
 export function PatientAppointmentTypeSelect({
+  clinicId,
   doctorProfileId,
   token,
   value,
@@ -24,7 +26,7 @@ export function PatientAppointmentTypeSelect({
 
   useEffect(() => {
     let cancelled = false
-    listPatientAppointmentTypes(doctorProfileId, token)
+    listPatientAppointmentTypes(clinicId, doctorProfileId, token)
       .then((response) => {
         if (!cancelled) setTypes(response)
       })
@@ -34,7 +36,7 @@ export function PatientAppointmentTypeSelect({
     return () => {
       cancelled = true
     }
-  }, [doctorProfileId, token])
+  }, [clinicId, doctorProfileId, token])
 
   if (types !== null && types.length === 0) {
     return (

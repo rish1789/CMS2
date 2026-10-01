@@ -24,7 +24,7 @@ const CLINIC_ID = 'clinic-1'
 const SESSION_ID = 'session-1'
 
 const APPOINTMENT_TYPES: AppointmentTypeOption[] = [
-  { id: 'type-1', doctorProfileId: 'doctor-1', name: 'General consultation', feeOverride: null },
+  { id: 'type-1', doctorProfileId: 'doctor-1', name: 'General consultation', fee: null },
 ]
 
 describe('QueueBookSlotForm (patient)', () => {

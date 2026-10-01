@@ -1,5 +1,6 @@
 package com.cms.scheduling.integration;
 
+import com.cms.booking.integration.ClinicPriceFixtures;
 import com.cms.booking.domain.AppointmentType;
 import com.cms.booking.repository.AppointmentTypeRepository;
 import com.cms.booking.domain.Booking;
@@ -33,6 +34,11 @@ public abstract class AbstractNoShowDetectionIntegrationTest extends AbstractSlo
     @Autowired
     protected NoShowDetectionService noShowDetectionService;
 
+
+    @Autowired
+
+    protected ClinicPriceFixtures clinicPriceFixtures;
+
     @Autowired
     protected AppointmentTypeRepository appointmentTypeRepository;
 
@@ -51,6 +57,7 @@ public abstract class AbstractNoShowDetectionIntegrationTest extends AbstractSlo
         bookingAttemptLogRepository.deleteAll();
         bookingRepository.deleteAll();
         patientRepository.deleteAll();
+        clinicPriceFixtures.deleteAll(); // 068: price rows reference clinic, doctor and type
         appointmentTypeRepository.deleteAll();
     }
 
@@ -78,7 +85,8 @@ public abstract class AbstractNoShowDetectionIntegrationTest extends AbstractSlo
 
     /** A Booking against the given Slot, under a freshly-created Patient, for asserting the sweep leaves it untouched. */
     protected Booking saveBookingFor(Clinic clinic, DoctorProfile doctor, Slot slot) {
-        AppointmentType appointmentType = appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+        AppointmentType appointmentType = clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
         Patient patient = patientRepository.save(new Patient(clinic, null, "Test Patient " + UUID.randomUUID(), null));
         // booked_by_account_id is a foreign key to account, so it must be a real account;
         // the doctor's own account is enough here - no test inspects who booked.

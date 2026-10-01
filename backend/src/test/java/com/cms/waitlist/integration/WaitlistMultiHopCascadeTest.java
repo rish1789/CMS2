@@ -54,7 +54,8 @@ class WaitlistMultiHopCascadeTest extends AbstractWaitlistIntegrationTest {
 
         // Hop 3: third successfully claims.
         AppointmentType appointmentType =
-                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+                clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
         Booking booking = waitlistClaimService.claim(
                 third.getId(), thirdPatient.getId(), new ClaimWaitlistRequest(appointmentType.getId(), "Claimant"));
 

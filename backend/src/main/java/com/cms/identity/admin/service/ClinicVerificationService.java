@@ -16,7 +16,9 @@ import com.cms.identity.admin.exception.MissingRejectionReasonException;
 
 import com.cms.booking.repository.BookingAttemptLogRepository;
 import com.cms.booking.repository.ClinicBookingLimitOverrideChangeLogRepository;
+import com.cms.booking.repository.ClinicAppointmentTypePriceRepository;
 import com.cms.booking.repository.ClinicBookingLimitOverrideRepository;
+import com.cms.booking.repository.ClinicDoctorFeeRepository;
 import com.cms.identity.account.domain.Account;
 import com.cms.identity.account.domain.RoleAssignment;
 import com.cms.identity.account.repository.AccountRepository;
@@ -79,6 +81,8 @@ public class ClinicVerificationService {
     private final PasswordPolicyValidator passwordPolicyValidator;
     private final PasswordEncoder passwordEncoder;
     private final ClinicBookingLimitOverrideRepository clinicBookingLimitOverrideRepository;
+    private final ClinicDoctorFeeRepository clinicDoctorFeeRepository;
+    private final ClinicAppointmentTypePriceRepository clinicAppointmentTypePriceRepository;
     private final ClinicBookingLimitOverrideChangeLogRepository clinicBookingLimitOverrideChangeLogRepository;
     private final BookingAttemptLogRepository bookingAttemptLogRepository;
     private final SuspiciousActivityFlagRepository suspiciousActivityFlagRepository;
@@ -99,7 +103,9 @@ public class ClinicVerificationService {
             ClinicBookingLimitOverrideRepository clinicBookingLimitOverrideRepository,
             ClinicBookingLimitOverrideChangeLogRepository clinicBookingLimitOverrideChangeLogRepository,
             BookingAttemptLogRepository bookingAttemptLogRepository,
-            SuspiciousActivityFlagRepository suspiciousActivityFlagRepository) {
+            SuspiciousActivityFlagRepository suspiciousActivityFlagRepository,
+            ClinicDoctorFeeRepository clinicDoctorFeeRepository,
+            ClinicAppointmentTypePriceRepository clinicAppointmentTypePriceRepository) {
         this.clinicRepository = clinicRepository;
         this.roleAssignmentRepository = roleAssignmentRepository;
         this.inboxItemRepository = inboxItemRepository;
@@ -113,6 +119,8 @@ public class ClinicVerificationService {
         this.passwordPolicyValidator = passwordPolicyValidator;
         this.passwordEncoder = passwordEncoder;
         this.clinicBookingLimitOverrideRepository = clinicBookingLimitOverrideRepository;
+        this.clinicDoctorFeeRepository = clinicDoctorFeeRepository;
+        this.clinicAppointmentTypePriceRepository = clinicAppointmentTypePriceRepository;
         this.clinicBookingLimitOverrideChangeLogRepository = clinicBookingLimitOverrideChangeLogRepository;
         this.bookingAttemptLogRepository = bookingAttemptLogRepository;
         this.suspiciousActivityFlagRepository = suspiciousActivityFlagRepository;
@@ -374,6 +382,9 @@ public class ClinicVerificationService {
         // activity - cleared like role assignments, history first.
         clinicBookingLimitOverrideChangeLogRepository.deleteByClinic_Id(clinicId);
         clinicBookingLimitOverrideRepository.deleteByClinic_Id(clinicId);
+        // 068-per-clinic-fees: the clinic's own prices are configuration too.
+        clinicAppointmentTypePriceRepository.deleteByClinic_Id(clinicId);
+        clinicDoctorFeeRepository.deleteByClinic_Id(clinicId);
         waitlistEntryRepository.deleteByClinic_Id(clinicId);
         inboxItemRepository.deleteByClinic_Id(clinicId);
         roleAssignmentRepository.deleteByClinic_Id(clinicId);

@@ -14,14 +14,14 @@ import org.springframework.http.MediaType;
 class AppointmentTypeConfigAuthorizationTest extends AbstractBookingIntegrationTest {
 
     private static final String CREATE_BODY = """
-            { "name": "Follow-up", "feeOverride": 300.00 }
+            { "name": "Follow-up" }
             """;
     private static final String DEFAULT_FEE_BODY = """
             { "amount": 500.00 }
             """;
 
     @Test
-    void doctorsOwnTokenSucceedsOnCreateListAndSetDefaultFee() throws Exception {
+    void doctorsOwnTokenSucceedsOnCreateAndListAndTheRetiredDefaultFeeIsGone() throws Exception {
         var clinic = saveClinic();
         var doctor = saveDoctorStaffedAt(clinic);
         String token = doctorToken(doctor);
@@ -37,11 +37,13 @@ class AppointmentTypeConfigAuthorizationTest extends AbstractBookingIntegrationT
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(1)));
 
+        // 068 FR-012: the doctor-wide default fee is retired - prices are set per clinic.
         mockMvc.perform(put("/api/v1/doctors/{id}/default-fee", doctor.getId())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(DEFAULT_FEE_BODY))
-                .andExpect(status().isOk());
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.error").value("FEE_MOVED_TO_CLINIC"));
     }
 
     @Test
@@ -56,15 +58,17 @@ class AppointmentTypeConfigAuthorizationTest extends AbstractBookingIntegrationT
                         .content(CREATE_BODY))
                 .andExpect(status().isCreated());
 
+        // 068 FR-012: the doctor-wide default fee is retired - prices are set per clinic.
         mockMvc.perform(put("/api/v1/doctors/{id}/default-fee", doctor.getId())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(DEFAULT_FEE_BODY))
-                .andExpect(status().isOk());
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.error").value("FEE_MOVED_TO_CLINIC"));
     }
 
     @Test
-    void unrelatedStaffMemberIsForbiddenOnAllThreeEndpoints() throws Exception {
+    void unrelatedStaffMemberIsForbiddenOnCreateAndList() throws Exception {
         var clinic = saveClinic();
         var doctor = saveDoctorStaffedAt(clinic);
         String token = unrelatedStaffToken();
@@ -84,6 +88,24 @@ class AppointmentTypeConfigAuthorizationTest extends AbstractBookingIntegrationT
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(DEFAULT_FEE_BODY))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isGone()); // 068: retired for every caller
+    }
+
+    /** 068 FR-012: creating a type with a doctor-wide fee is refused - the type is created unpriced, then priced per clinic. */
+    @Test
+    void creatingATypeWithAFeeIsRejectedBecauseFeesMovedToTheClinic() throws Exception {
+        var clinic = saveClinic();
+        var doctor = saveDoctorStaffedAt(clinic);
+
+        mockMvc.perform(post("/api/v1/doctors/{id}/appointment-types", doctor.getId())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + doctorToken(doctor))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "name": "Follow-up", "feeOverride": 300.00 }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("FEE_MOVED_TO_CLINIC"));
+
+        org.assertj.core.api.Assertions.assertThat(appointmentTypeRepository.findByDoctorProfile_Id(doctor.getId())).isEmpty();
     }
 }

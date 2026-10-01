@@ -100,7 +100,8 @@ class WalkInConcurrentRegistrationTest extends AbstractDeVerificationCascadeInte
     }
 
     private AppointmentType saveType(DoctorProfile doctor) {
-        return appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+        return clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
     }
 
     private Session tomorrow(Session anySessionOfSchedule) {

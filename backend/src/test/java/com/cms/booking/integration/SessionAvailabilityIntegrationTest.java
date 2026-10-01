@@ -97,7 +97,8 @@ class SessionAvailabilityIntegrationTest extends AbstractDeVerificationCascadeIn
     }
 
     private AppointmentType appointmentTypeOf(DoctorProfile doctor) {
-        return appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+        return clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
     }
 
     /** A today-dated Fixed-Time session built by hand, with one slot already started and one still ahead. */

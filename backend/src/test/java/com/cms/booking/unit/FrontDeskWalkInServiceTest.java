@@ -114,7 +114,8 @@ class FrontDeskWalkInServiceTest {
         appointmentType = mock(AppointmentType.class);
         when(appointmentType.getId()).thenReturn(appointmentTypeId);
         when(appointmentTypeRepository.findById(appointmentTypeId)).thenReturn(Optional.of(appointmentType));
-        when(feeResolutionService.resolve(any(), eq(appointmentTypeId))).thenReturn(new BigDecimal("450.00"));
+        // 068: the walk-in resolves at its own clinic.
+        when(feeResolutionService.resolve(eq(clinicId), any(), eq(appointmentTypeId))).thenReturn(new BigDecimal("450.00"));
         when(mobileNumberValidator.isValid(any())).thenReturn(true);
         when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
         when(bookingRepository.saveAndFlush(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));

@@ -29,7 +29,7 @@ const ONE_SLOT_RESULT = {
       sessionDate: '2026-09-10',
       startTime: '09:00:00',
       endTime: '09:15:00',
-      appointmentTypes: [{ id: 'type-1', doctorProfileId: 'doc-1', name: 'General Consultation', feeOverride: null }],
+      appointmentTypes: [{ id: 'type-1', doctorProfileId: 'doc-1', name: 'General Consultation', fee: null }],
     },
   ],
   page: 0,

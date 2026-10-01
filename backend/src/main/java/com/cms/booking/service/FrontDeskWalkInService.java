@@ -133,7 +133,7 @@ public class FrontDeskWalkInService {
         }
 
         // The fee is the first real write-gate (015): nothing is written before it resolves.
-        BigDecimal lockedFee = feeResolutionService.resolve(session.getDoctorProfile().getId(), input.appointmentTypeId());
+        BigDecimal lockedFee = feeResolutionService.resolve(clinicId, session.getDoctorProfile().getId(), input.appointmentTypeId());
         AppointmentType appointmentType = appointmentTypeRepository
                 .findById(input.appointmentTypeId())
                 .orElseThrow(() -> new AppointmentTypeNotFoundException(input.appointmentTypeId()));

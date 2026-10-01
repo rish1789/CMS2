@@ -56,7 +56,7 @@
 |---|---|---|---|---|---|---|
 | B-01 | Fail-open filter chains; 7 endpoints fall through | SEC-01, BUG-001 | security config | — | Make `/clinics/**` and `/patients/**` deny or authenticate by default, with an explicit public list (register, login, signup); add an allowlist test (H-03) | A future endpoint ships public |
 | B-02 | Secrets in the tracked `.claude/launch.json` working copy | SEC-02 | repo hygiene | — | Keep secrets out of tracked files (env or an untracked local file) **before** the next commit; rotate if ever pushed | Credential and JWT-key disclosure |
-| B-03 | Cross-clinic fee and appointment-type writes | SEC-03, DM-09 | booking config | product decision | Decide whether fees are per clinic-doctor; if so, scope the data and the authorization by clinic | One tenant alters another's pricing |
+| B-03 | Cross-clinic fee and appointment-type writes | SEC-03, DM-09 | booking config | product decision | **Done in 068** (owner chose per-clinic pricing, 2026-10-01): data and authorization scoped by clinic | One tenant alters another's pricing |
 | B-04 | Ex-staff doctor clinical access; documents on non-visits | SEC-06, PB-008 | clinical | C-02 | Require an active role plus an eligible visit state | Clinical record integrity and privacy |
 | B-05 | Account enumeration at login | SEC-07 | auth | product decision (it was deliberately split) | Re-evaluate the trade-off; if kept, add per-account throttling | Targeted credential attacks |
 | B-06 | Rate limiter: in-memory, per IP, no eviction | SEC-05, PB-006 | common | F-03 | Bounded storage, proxy-aware client key, per-account limits on login | Memory growth; shared-IP lockouts |

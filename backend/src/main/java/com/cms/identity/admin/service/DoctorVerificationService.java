@@ -13,6 +13,7 @@ import com.cms.identity.admin.exception.MissingRejectionReasonException;
 
 
 import com.cms.booking.repository.AppointmentTypeRepository;
+import com.cms.booking.repository.ClinicDoctorFeeRepository;
 import com.cms.booking.repository.DoctorDefaultFeeRepository;
 import com.cms.identity.admin.dto.BulkDeleteResponse;
 import com.cms.identity.admin.dto.BulkRejectResponse;
@@ -61,6 +62,7 @@ public class DoctorVerificationService {
     private final SessionRepository sessionRepository;
     private final AppointmentTypeRepository appointmentTypeRepository;
     private final DoctorDefaultFeeRepository doctorDefaultFeeRepository;
+    private final ClinicDoctorFeeRepository clinicDoctorFeeRepository;
     private final WaitlistEntryRepository waitlistEntryRepository;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -70,6 +72,7 @@ public class DoctorVerificationService {
             SessionRepository sessionRepository,
             AppointmentTypeRepository appointmentTypeRepository,
             DoctorDefaultFeeRepository doctorDefaultFeeRepository,
+            ClinicDoctorFeeRepository clinicDoctorFeeRepository,
             WaitlistEntryRepository waitlistEntryRepository,
             ApplicationEventPublisher eventPublisher) {
         this.doctorProfileRepository = doctorProfileRepository;
@@ -77,6 +80,7 @@ public class DoctorVerificationService {
         this.sessionRepository = sessionRepository;
         this.appointmentTypeRepository = appointmentTypeRepository;
         this.doctorDefaultFeeRepository = doctorDefaultFeeRepository;
+        this.clinicDoctorFeeRepository = clinicDoctorFeeRepository;
         this.waitlistEntryRepository = waitlistEntryRepository;
         this.eventPublisher = eventPublisher;
     }
@@ -329,7 +333,10 @@ public class DoctorVerificationService {
         long scheduleCount = scheduleRepository.countByDoctorProfile_Id(doctorProfileId);
         long sessionCount = sessionRepository.countByDoctorProfile_Id(doctorProfileId);
         long appointmentTypeCount = appointmentTypeRepository.countByDoctorProfile_Id(doctorProfileId);
-        boolean hasDefaultFee = doctorDefaultFeeRepository.existsByDoctorProfile_Id(doctorProfileId);
+        // 068-per-clinic-fees: a clinic's default fee for the doctor is real setup too. A clinic
+        // price for one of the doctor's types needs no check - the type itself already blocks.
+        boolean hasDefaultFee = doctorDefaultFeeRepository.existsByDoctorProfile_Id(doctorProfileId)
+                || clinicDoctorFeeRepository.existsByDoctorProfile_Id(doctorProfileId);
         long waitlistCount = waitlistEntryRepository.countByDoctorProfile_Id(doctorProfileId);
         if (scheduleCount > 0 || sessionCount > 0 || appointmentTypeCount > 0 || hasDefaultFee || waitlistCount > 0) {
             throw new DeletionBlockedException(String.format(

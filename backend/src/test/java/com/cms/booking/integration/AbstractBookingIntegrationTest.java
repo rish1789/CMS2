@@ -1,6 +1,8 @@
 package com.cms.booking.integration;
 
 import com.cms.booking.repository.AppointmentTypeRepository;
+import com.cms.booking.repository.ClinicAppointmentTypePriceRepository;
+import com.cms.booking.repository.ClinicDoctorFeeRepository;
 import com.cms.booking.service.AppointmentTypeService;
 import com.cms.booking.repository.DoctorDefaultFeeRepository;
 import com.cms.booking.service.FeeResolutionService;
@@ -66,6 +68,12 @@ public abstract class AbstractBookingIntegrationTest {
     protected DoctorDefaultFeeRepository doctorDefaultFeeRepository;
 
     @Autowired
+    protected ClinicDoctorFeeRepository clinicDoctorFeeRepository;
+
+    @Autowired
+    protected ClinicAppointmentTypePriceRepository clinicAppointmentTypePriceRepository;
+
+    @Autowired
     protected FeeResolutionService feeResolutionService;
 
     @Autowired
@@ -81,6 +89,9 @@ public abstract class AbstractBookingIntegrationTest {
 
     @AfterEach
     void cleanDatabase() {
+        // 068-per-clinic-fees: clinic price rows reference clinic, doctor and appointment type.
+        clinicAppointmentTypePriceRepository.deleteAll();
+        clinicDoctorFeeRepository.deleteAll();
         doctorDefaultFeeRepository.deleteAll();
         appointmentTypeRepository.deleteAll();
         doctorProfileRepository.deleteAll();

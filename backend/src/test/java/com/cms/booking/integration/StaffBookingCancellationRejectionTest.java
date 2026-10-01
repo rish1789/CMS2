@@ -101,7 +101,8 @@ class StaffBookingCancellationRejectionTest extends AbstractBookingCancellationI
         Slot slot = slotRepository.save(new Slot(session, 1));
         slot.setStatus(SlotStatus.BOOKED);
         slot = slotRepository.save(slot);
-        AppointmentType appointmentType = appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+        AppointmentType appointmentType = clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
         Patient patient = patientRepository.save(new Patient(clinic, null, "Queue Patient " + UUID.randomUUID(), null));
         return bookingRepository.saveAndFlush(
                 new Booking(slot, patient, appointmentType, new BigDecimal("300.00"), doctor.getAccount().getId()));

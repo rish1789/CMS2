@@ -1,16 +1,14 @@
 package com.cms.booking.api;
 
 import com.cms.booking.domain.AppointmentType;
-import com.cms.booking.domain.DoctorDefaultFee;
 import com.cms.booking.service.AppointmentTypeService;
 
 
 import com.cms.booking.dto.AppointmentTypeResponse;
 import com.cms.booking.dto.CreateAppointmentTypeRequest;
-import com.cms.booking.dto.SetDefaultFeeRequest;
+import com.cms.booking.exception.FeeMovedToClinicException;
 import com.cms.identity.account.config.SecurityConfig;
 import jakarta.validation.Valid;
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -65,16 +63,9 @@ public class BookingController {
         return AppointmentTypeResponse.of(appointmentType);
     }
 
+    /** 068-per-clinic-fees FR-012: retired - a default fee is set per clinic by that clinic's admin. */
     @PutMapping("/default-fee")
-    public SetDefaultFeeResponse setDefaultFee(
-            @PathVariable UUID doctorProfileId,
-            @Valid @RequestBody SetDefaultFeeRequest request,
-            Authentication authentication) {
-        UUID callerAccountId = SecurityConfig.currentAccountId(authentication);
-        DoctorDefaultFee doctorDefaultFee =
-                appointmentTypeService.setDefaultFee(callerAccountId, doctorProfileId, request.amount());
-        return new SetDefaultFeeResponse(doctorDefaultFee.getDoctorProfile().getId(), doctorDefaultFee.getAmount());
+    public void setDefaultFee(@PathVariable UUID doctorProfileId) {
+        throw FeeMovedToClinicException.endpointRetired();
     }
-
-    public record SetDefaultFeeResponse(UUID doctorProfileId, BigDecimal amount) {}
 }

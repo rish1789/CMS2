@@ -120,8 +120,18 @@ public class PatientBookingService {
                 .toList();
     }
 
+    /** 068-per-clinic-fees FR-011: the same listing with each type's effective fee at this clinic. */
+    @Transactional(readOnly = true)
+    public List<AppointmentTypeResponse> listAppointmentTypes(UUID clinicId, UUID doctorProfileId) {
+        Map<UUID, BigDecimal> fees = feeResolutionService.effectiveFees(clinicId, doctorProfileId);
+        return appointmentTypeRepository.findByDoctorProfile_Id(doctorProfileId).stream()
+                .map(type -> AppointmentTypeResponse.of(type, fees.get(type.getId())))
+                .toList();
+    }
+
     /**
-     * FR-011/FR-012: only currently-OPEN Fixed-Time Slots; no resolved fee amounts (research.md).
+     * FR-011/FR-012: only currently-OPEN Fixed-Time Slots. 068-per-clinic-fees: each embedded
+     * appointment type carries its effective fee at this clinic.
      * patient-slot-booking-date-logic: {@code date}, when given, narrows to exactly that day (the
      * date-strip picker) - the present-day-or-later floor is enforced unconditionally in both
      * repository query variants regardless of whether {@code date} is set. The null/non-null
@@ -145,9 +155,7 @@ public class PatientBookingService {
             UUID doctorId = slot.getSession().getDoctorProfile().getId();
             List<AppointmentTypeResponse> appointmentTypes = appointmentTypesByDoctor.computeIfAbsent(
                     doctorId,
-                    id -> appointmentTypeRepository.findByDoctorProfile_Id(id).stream()
-                            .map(AppointmentTypeResponse::of)
-                            .toList());
+                    id -> listAppointmentTypes(clinicId, id));
             String doctorName = slot.getSession().getDoctorProfile().getAccount().getName();
             return OpenSlotResponse.of(slot, doctorName, appointmentTypes);
         });
@@ -171,9 +179,7 @@ public class PatientBookingService {
             UUID doctorId = session.getDoctorProfile().getId();
             List<AppointmentTypeResponse> appointmentTypes = appointmentTypesByDoctor.computeIfAbsent(
                     doctorId,
-                    id -> appointmentTypeRepository.findByDoctorProfile_Id(id).stream()
-                            .map(AppointmentTypeResponse::of)
-                            .toList());
+                    id -> listAppointmentTypes(clinicId, id));
             String doctorName = session.getDoctorProfile().getAccount().getName();
             return QueueSessionResponse.of(session, doctorName, appointmentTypes);
         });
@@ -229,7 +235,7 @@ public class PatientBookingService {
         UUID doctorProfileId = slot.getSession().getDoctorProfile().getId();
 
         // FR-003: the first real write-gate - nothing is written before this succeeds.
-        BigDecimal lockedFee = feeResolutionService.resolve(doctorProfileId, input.appointmentTypeId());
+        BigDecimal lockedFee = feeResolutionService.resolve(clinicId, doctorProfileId, input.appointmentTypeId());
         // Already proven to exist and belong to this doctor by the successful resolve() call above.
         AppointmentType appointmentType = appointmentTypeRepository
                 .findById(input.appointmentTypeId())

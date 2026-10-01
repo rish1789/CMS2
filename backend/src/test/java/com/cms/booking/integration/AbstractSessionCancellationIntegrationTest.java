@@ -77,6 +77,11 @@ public abstract class AbstractSessionCancellationIntegrationTest {
     @Autowired
     protected MockMvc mockMvc;
 
+
+    @Autowired
+
+    protected ClinicPriceFixtures clinicPriceFixtures;
+
     @Autowired
     protected ClinicRepository clinicRepository;
 
@@ -145,6 +150,7 @@ public abstract class AbstractSessionCancellationIntegrationTest {
         patientRepository.deleteAll();
         patientAccountRepository.deleteAll();
         doctorDefaultFeeRepository.deleteAll();
+        clinicPriceFixtures.deleteAll(); // 068: price rows reference clinic, doctor and type
         appointmentTypeRepository.deleteAll();
         slotRepository.deleteAll();
         // 065-phase1-stabilization: cancellation records reference session and account (no cascade).
@@ -243,7 +249,8 @@ public abstract class AbstractSessionCancellationIntegrationTest {
 
     /** Books the given already-generated Slot: creates an AppointmentType/fee, a Patient (linked to patientAccount if given, else a walk-in), a Booking, and flips the Slot BOOKED. */
     protected Booking bookSlot(Clinic clinic, DoctorProfile doctor, Slot slot, PatientAccount patientAccountOrNull) {
-        AppointmentType appointmentType = appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+        AppointmentType appointmentType = clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
         Patient patient = patientRepository.save(
                 new Patient(clinic, patientAccountOrNull, "Test Patient " + UUID.randomUUID(), null));
         Booking booking = bookingRepository.saveAndFlush(

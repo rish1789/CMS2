@@ -97,7 +97,7 @@ public class StaffBookingService {
         UUID doctorProfileId = slot.getSession().getDoctorProfile().getId();
 
         // FR-004: the first real write-gate - nothing is written before this succeeds.
-        BigDecimal lockedFee = feeResolutionService.resolve(doctorProfileId, input.appointmentTypeId());
+        BigDecimal lockedFee = feeResolutionService.resolve(clinicId, doctorProfileId, input.appointmentTypeId());
         // Already proven to exist and belong to this doctor by the successful resolve() call above.
         AppointmentType appointmentType = appointmentTypeRepository
                 .findById(input.appointmentTypeId())

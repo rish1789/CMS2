@@ -1,5 +1,6 @@
 package com.cms.clinical.integration;
 
+import com.cms.booking.integration.ClinicPriceFixtures;
 import com.cms.booking.domain.AppointmentType;
 import com.cms.booking.repository.AppointmentTypeRepository;
 import com.cms.booking.domain.Booking;
@@ -68,6 +69,11 @@ public abstract class AbstractConsultationNoteIntegrationTest {
     @Autowired
     protected MockMvc mockMvc;
 
+
+    @Autowired
+
+    protected ClinicPriceFixtures clinicPriceFixtures;
+
     @Autowired
     protected ClinicRepository clinicRepository;
 
@@ -130,6 +136,7 @@ public abstract class AbstractConsultationNoteIntegrationTest {
         patientRepository.deleteAll();
         // Subclasses create patient accounts; they must go after the patients that reference them.
         patientAccountRepository.deleteAll();
+        clinicPriceFixtures.deleteAll(); // 068: price rows reference clinic, doctor and type
         appointmentTypeRepository.deleteAll();
         slotRepository.deleteAll();
         sessionRepository.deleteAll();
@@ -196,7 +203,8 @@ public abstract class AbstractConsultationNoteIntegrationTest {
     /** Books the given already-generated Slot: creates an AppointmentType/fee, a walk-in Patient, a Booking, and flips the Slot BOOKED. */
     protected Booking bookSlot(Clinic clinic, DoctorProfile doctor, Slot slot) {
         AppointmentType appointmentType =
-                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", new BigDecimal("300.00")));
+                clinicPriceFixtures.priceAtStaffedClinics(
+                appointmentTypeRepository.save(new AppointmentType(doctor, "Consultation", null)), new BigDecimal("300.00"));
         Patient patient = patientRepository.save(new Patient(clinic, null, "Test Patient " + UUID.randomUUID(), null));
         Booking booking = bookingRepository.saveAndFlush(
                 new Booking(slot, patient, appointmentType, new BigDecimal("300.00"), doctor.getAccount().getId()));
