@@ -205,6 +205,16 @@ The minimum complete delivery is **US1 + US2 + US3**: correct money, correct per
 
 ## Phase 8: Convergence
 
-- [ ] T033 Let the doctor concerned read their own prices at a clinic even when they are not (or are no longer) active staff there: `ClinicFeeService.get` allows the caller if they are active staff of the clinic **or** the account of `doctorProfileId`; cover it in `ClinicFeeAuthorizationTest` per FR-006 (partial)
-- [ ] T034 Remove the now-unused doctor-wide readiness queries `AppointmentTypeRepository.findDoctorProfileIdsWithAnAppointmentTypeMissingFeeOverride` and `DoctorDefaultFeeRepository.findDoctorProfileIdsWithDefaultFee`, and update the javadoc in `ClinicAppointmentTypePriceRepository` that cites the first, per FR-012 / Constitution II (unrequested)
+- [X] T033 Let the doctor concerned read their own prices at a clinic even when they are not (or are no longer) active staff there: `ClinicFeeService.get` allows the caller if they are active staff of the clinic **or** the account of `doctorProfileId`; cover it in `ClinicFeeAuthorizationTest` per FR-006 (partial)
+- [X] T034 Remove the now-unused doctor-wide readiness queries `AppointmentTypeRepository.findDoctorProfileIdsWithAnAppointmentTypeMissingFeeOverride` and `DoctorDefaultFeeRepository.findDoctorProfileIdsWithDefaultFee`, and update the javadoc in `ClinicAppointmentTypePriceRepository` that cites the first, per FR-012 / Constitution II (unrequested)
+
+### Convergence results (2026-10-01, IST)
+
+- **065, 066 and 067 converged** with no findings. Checked: every FR and SC, plus the named tests and touch-points.
+- **T033:** `theDoctorCanReadTheirOwnPricesAtAClinicTheyNoLongerWorkAt` was red (403), then green. The doctor concerned can read their own prices, but writes stay 403.
+  - `aDoctorCannotReadAnotherDoctorsPricesAtAClinicWhereTheyAreNotStaff` guards the boundary.
+  - The access check still runs before "doctor not found", so an outsider cannot probe which doctor ids exist.
+  - The contract doc is updated.
+- **T034:** removed `AppointmentTypeRepository.findDoctorProfileIdsWithAnAppointmentTypeMissingFeeOverride`, `DoctorDefaultFeeRepository.findDoctorProfileIdsWithDefaultFee` and `DoctorDefaultFeeRepository.findByDoctorProfile_Id`, which became dead once the retired `setDefaultFee` was removed. Nothing referenced them.
+- Targeted set: 63/63 passed. Full backend suite: **1,113 passed, 0 failed, 0 skipped**, with `spotlessCheck` green.
 

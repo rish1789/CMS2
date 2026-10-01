@@ -20,6 +20,7 @@ import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -57,10 +58,18 @@ public class ClinicFeeService {
 
     @Transactional(readOnly = true)
     public ClinicDoctorFeesResponse get(UUID callerAccountId, UUID clinicId, UUID doctorProfileId) {
-        if (!roleAssignmentRepository.existsByAccount_IdAndClinic_IdAndActiveTrue(callerAccountId, clinicId)) {
+        // FR-006: this clinic's active staff, or the doctor concerned (their own prices, even after
+        // their role at this clinic was deactivated - reading never changes anything). The access
+        // check comes before "not found", so an outsider cannot probe which doctor ids exist.
+        Optional<DoctorProfile> doctorProfile = doctorProfileRepository.findById(doctorProfileId);
+        boolean isDoctorConcerned = doctorProfile
+                .map(profile -> profile.getAccount().getId().equals(callerAccountId))
+                .orElse(false);
+        if (!isDoctorConcerned
+                && !roleAssignmentRepository.existsByAccount_IdAndClinic_IdAndActiveTrue(callerAccountId, clinicId)) {
             throw new ForbiddenException("Only staff of this clinic can see its prices");
         }
-        loadDoctorProfile(doctorProfileId);
+        doctorProfile.orElseThrow(() -> new DoctorProfileNotFoundException(doctorProfileId));
         return view(clinicId, doctorProfileId);
     }
 

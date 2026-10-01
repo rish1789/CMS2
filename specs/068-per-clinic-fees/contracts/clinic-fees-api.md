@@ -9,7 +9,7 @@ All endpoints sit on the **staff** chain (`/api/v1/clinics/**`) and need a staff
 
 ## GET `/api/v1/clinics/{clinicId}/doctors/{doctorProfileId}/fees`
 
-**Access:** any active staff member of `clinicId` (FR-006).
+**Access:** any active staff member of `clinicId`, or the doctor concerned reading their own prices (FR-006, convergence T033).
 
 ```json
 200 {

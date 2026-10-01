@@ -43,8 +43,8 @@ public interface ClinicAppointmentTypePriceRepository extends JpaRepository<Clin
 
     /**
      * FR-010: doctors (among the given ones) with at least one appointment type that has no price
-     * at this clinic - the per-clinic counterpart of
-     * {@code AppointmentTypeRepository.findDoctorProfileIdsWithAnAppointmentTypeMissingFeeOverride}.
+     * at this clinic - the per-clinic replacement for the retired doctor-wide "type missing its fee
+     * override" readiness query.
      */
     @Query("SELECT DISTINCT t.doctorProfile.id FROM AppointmentType t "
             + "WHERE t.doctorProfile.id IN :doctorProfileIds AND NOT EXISTS ("
