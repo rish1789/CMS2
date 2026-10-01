@@ -203,3 +203,8 @@ The minimum complete delivery is **US1 + US2 + US3**: correct money, correct per
 - **T029:** final full backend suite **1,108 passed, 0 failed, 0 skipped**, `spotlessCheck` green. After that, the clearer clinic-fee 403 messages were re-verified with the targeted set: 50/50.
 - **T031:** audit docs 08, 04, 02 and 10; `backlog/progress.md`; `HANDOFF.md` Part 17; `CODEX_HANDOFF.md`.
 
+## Phase 8: Convergence
+
+- [ ] T033 Let the doctor concerned read their own prices at a clinic even when they are not (or are no longer) active staff there: `ClinicFeeService.get` allows the caller if they are active staff of the clinic **or** the account of `doctorProfileId`; cover it in `ClinicFeeAuthorizationTest` per FR-006 (partial)
+- [ ] T034 Remove the now-unused doctor-wide readiness queries `AppointmentTypeRepository.findDoctorProfileIdsWithAnAppointmentTypeMissingFeeOverride` and `DoctorDefaultFeeRepository.findDoctorProfileIdsWithDefaultFee`, and update the javadoc in `ClinicAppointmentTypePriceRepository` that cites the first, per FR-012 / Constitution II (unrequested)
+
