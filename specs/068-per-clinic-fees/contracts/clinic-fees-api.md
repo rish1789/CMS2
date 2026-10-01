@@ -1,6 +1,6 @@
 # Contract: Clinic-Scoped Fees API (068)
 
-All endpoints sit on the **staff** chain (`/api/v1/clinics/**`) and need a staff Bearer token. They are added to the chain's authenticated allowlist.
+All endpoints sit on the **staff** chain (`/api/v1/clinics/**`) and need a staff Bearer token. That chain already requires authentication for everything except clinic registration, so no allowlist change is needed.
 
 **Common errors**
 - 401: no or invalid token.

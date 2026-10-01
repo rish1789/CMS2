@@ -80,7 +80,6 @@ backend/src/main/java/com/cms/booking/
 ├── dto/AppointmentTypeResponse.java                  # feeOverride -> fee (effective at clinic)
 └── api/PatientBookingController.java                 # clinic-scoped appointment-type listing
 
-backend/src/main/java/com/cms/identity/account/config/SecurityConfig.java   # allowlist new staff paths
 backend/src/main/java/com/cms/identity/admin/service/{DoctorVerificationService,ClinicVerificationService}.java  # guard and cleanup
 backend/src/main/java/com/cms/common/OpenApiConfig.java                     # fix the "/api/v1/doctors/** (public)" doc label
 

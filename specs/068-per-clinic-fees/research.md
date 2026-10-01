@@ -23,7 +23,7 @@ Traced at `main` `4c2a407` (Spring Boot 4.1).
 - **Guards.**
   - The doctor delete guard (`DoctorVerificationService.deleteGuarded`) blocks on doctor-wide types and default fee.
   - The clinic permanent delete (`ClinicVerificationService`) deletes per-clinic housekeeping rows, such as booking-limit overrides.
-- **Security.** `/api/v1/doctors/**` is `BookingSecurityConfig`'s staff-JWT, authenticated-only chain. `OpenApiConfig`'s description wrongly calls it "public", a doc bug that 068 fixes in passing. `/api/v1/clinics/**` is the staff chain, which is fail-closed after SEC-01: new paths must be allowlisted there, or they return 401.
+- **Security.** `/api/v1/doctors/**` is `BookingSecurityConfig`'s staff-JWT, authenticated-only chain. `OpenApiConfig`'s description wrongly calls it "public", a doc bug that 068 fixes in passing. `/api/v1/clinics/**` is the staff chain. After SEC-01 it permits only `POST /clinics/register` and requires authentication for everything else, so new paths under it are protected automatically and need no allowlist entry.
 
 ## R2: Data model: new clinic-scoped price tables (chosen)
 
@@ -67,7 +67,7 @@ The unique keys enforce FR-001 and FR-002 at the data layer, so two admins savin
 | `PUT` | `/api/v1/clinics/{clinicId}/doctors/{doctorProfileId}/fees/appointment-types/{appointmentTypeId}` | `{amount}` | Write: as above |
 | `DELETE` | `/api/v1/clinics/{clinicId}/doctors/{doctorProfileId}/fees/appointment-types/{appointmentTypeId}` | removes the type price, so the default applies | Write: as above |
 
-- All of them are added to the staff chain's authenticated allowlist (SEC-01).
+- The staff chain already requires authentication for every path except `POST /clinics/register`, so no security-config change is needed. Authorization is enforced in the service.
 - **Write rule.** The doctor must be actively staffed at the clinic, or the request is refused. Writes use an upsert on the unique key.
 
 **Retired doctor-wide price writes (FR-012).**
