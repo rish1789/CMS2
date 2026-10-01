@@ -1653,12 +1653,78 @@ This was done on branch `claude/spring-boot-4` while the owner was away. **It is
   - **T034:** removed three repository queries that 068 left dead (the doctor-wide readiness queries and `DoctorDefaultFeeRepository.findByDoctorProfile_Id`).
 - **Verification:** full backend suite 1,113 passed, 0 failed, `spotlessCheck` green; CI green.
 
-### State at end of day (2026-10-01)
+### State at end of day (2026-10-01) — superseded by Part 18
 
 - **`main` is the only branch.** The owner deleted every merged `claude/…` branch; there are no open PRs.
 - **Every tracked feature is converged.** Nothing required is open.
 - **Optional, only if the owner asks:** 069, the gap between cancellation and 067's session lock.
 - **`NVD_API_KEY`:** deferred (see above). **The owner asked not to be reminded about it**; raise it only if they bring it up, or when a real deployment is actually being prepared.
+
+## Part 18 — Live-audit repairs, 2B, Phase 3 decisions; 3C paused mid-way (2026-10-01, cloud sandbox)
+
+Everything below was driven by `docs/NEXT_PHASES_ACTION_PLAN.md` and `docs/LIVE_SOFTWARE_AUDIT_2026-10-01.md`. Every package was test-first, got a browser check against a real backend with synthetic data, and went through its own PR. The owner merged each PR after CI was green.
+
+### Merged
+
+| PR | Spec | What it fixed |
+|---|---|---|
+| rish1789/CMS2#34 | 069 | Live-audit findings 1–3: a no-show shown as "Visit complete" and as the next visit; cancel offered when it can't succeed. The server derives `visitOutcome` and cancellation eligibility. |
+| rish1789/CMS2#36 | 070 | Finding 4: login now returns to the clinic and doctor picked in discovery (validated `returnTo`). |
+| rish1789/CMS2#37 | 071 | Finding 5: a 429 was unreadable in the browser. CORS now runs before the rate limiter on throttled paths, `Retry-After` is exposed, and signup shows rate-limit, unknown and network errors. |
+| rish1789/CMS2#38 | 072 | Finding 6: discovery stopped at 20 results. It now has page controls, an `X-Total-Count` header (body unchanged) and a unique tie-break sort. |
+| rish1789/CMS2#39 | 073 | Finding 7: doctors saw admin-only tools. One role table drives the sidebar, tiles and direct URLs, and every role at the current clinic is used. Frontend only. |
+| rish1789/CMS2#40 | 074 | Phase 2B, PB-001/PB-002: a duplicate phone gave "slot already booked" or a 500. All three staff paths now return 409 `PATIENT_PHONE_ALREADY_REGISTERED`, naming the existing patient; nothing is merged. The owner merged this with the naming as proposed. |
+
+All seven live-audit findings are fixed. The last full backend suite, on the 074 head, passed **1,158/0/0**; Vitest passed 526/526.
+
+### Phase 3 decisions (rish1789/CMS2#41, docs only, open and green at the time of writing)
+
+`docs/PHASE_3_DECISION_RECORD.md` records the owner's answers:
+
+- **3C, staff deactivation and login (B-05, B-06, B-07):**
+  - A staff member with **no active role at any clinic** loses existing sessions on the next request and cannot log in.
+  - Login errors follow the **industry standard (OWASP/NIST)**: one generic message.
+  - **5 failed attempts lock an identifier for 15 minutes**, whether or not the account exists.
+- **3D, loss of verification (PB-009):**
+  - **No new bookings on any path** while a clinic or doctor is de-verified, and they stay out of search.
+  - **Re-verifying restores both.**
+  - Permanent deletion stays the existing guarded Super Admin tool.
+
+### Paused: 3C, spec 075 (branch `claude/075-login-hardening`, WIP commit, **no PR yet**)
+
+The branch is stacked on #41's branch. The owner paused the work while the full backend suite was running; that run was stopped and gave no results.
+
+**Done and green:**
+- **V44 `login_attempt` table:** keyed by realm and a SHA-256 hash of the normalised identifier, so unregistered emails are never stored.
+- **Lockout code:** `common.login.LoginAttemptGuard` (row lock, `REQUIRES_NEW`; configurable through `app.login.max-failures`, `window-minutes` and `lock-minutes`) and `LoginAttemptState`, the pure arithmetic.
+- **Login errors:** staff and patient login return `INVALID_CREDENTIALS` (401). An unknown identifier still runs a bcrypt comparison, so timing doesn't reveal which accounts exist. A lockout returns 429 `TOO_MANY_LOGIN_ATTEMPTS` with `Retry-After`.
+- **Deactivated staff:**
+  - `NO_ACTIVE_CLINIC_ACCESS` (403) after a correct password.
+  - The `StaffSessionPolicy` interface is checked in `StaffJwtAuthenticationFilter`; `ActiveRoleStaffSessionPolicy` is the real implementation.
+  - `@WebMvcTest` slices import `support.AllowAllStaffSessionsTestConfig`.
+- **Retired:** the old `AccountNotFoundException` and `IncorrectPasswordException` classes in both realms. The tests that pinned the old codes were updated to the decided behaviour.
+- **Login forms:** both show the lockout wait time, via `lib/loginLockout.ts`.
+- **Tests:**
+  - `LoginHardeningTest` 9/9 against real Postgres. It covers identical errors, the lockout for real and unregistered identifiers, concurrent failures, the deactivated-session cutoff, and a member deactivated at one clinic only.
+  - `LoginAttemptStateTest` 5/5.
+  - Contract slices 147/147.
+  - Vitest 528/528; lint at the 24 baseline.
+
+**Left to do, in order:**
+1. **Run the full backend suite.** About 11 integration test files mint staff tokens for account ids that don't exist (`issueToken(UUID.randomUUID())`). Those tokens now get 401 where a test may expect 403 or 404. Update each such assertion to the decided behaviour, or give the fixture a real account with an active role, whichever keeps the test's intent.
+2. **Fix a spec wording slip:** 062's refusal code is `CLINIC_NOT_ACTIVE`; `spec.md` says `STAFF_CLINIC_NOT_ACTIVE`.
+3. **Runtime check:**
+   - the generic errors;
+   - the lockout, using a short `app.login.lock-minutes` to see it expire;
+   - a deactivated staff session cut off in the browser.
+4. **Docs:** a progress row, the B-05 and B-07 statuses, and the plan line. Then open the PR.
+5. **Then 3D (spec 076)**, per the decision record.
+
+### Session notes
+
+- **Docker:** the daemon died twice; `nohup dockerd &` brings it back.
+- **Stopping processes:** `pkill -f` and `pgrep -f` match their own shell command line. Use `ps -eo pid,args | grep '[j]ava -jar'`.
+- **Stacking:** 072 and 073 were stacked on the previous PR, because they edited adjacent doc lines and the same CORS line. Merging in order kept every diff clean.
 
 ## Reference
 
