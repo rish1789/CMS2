@@ -54,6 +54,8 @@ tree grows any larger.
 
 ## ⚠️ This session ran on native Windows, not the `/tmp`-based sandbox the notes below assume
 
+> **Obsolete since Part 16 (2026-10-01):** Spring Boot 4 refuses to run under Gradle 8.10. Do **not** use the standalone `gradle-8.10` paths below. Use the project's wrapper instead: `backend/gradlew.bat` on Windows, `./gradlew` elsewhere. The wrapper pins Gradle 8.14.3.
+
 The "Resume the environment" section right below was written for an earlier session's Linux-style
 sandbox (`/tmp/gradle-8.10/bin/gradle`, bash-only). This session's actual machine is native
 Windows (PowerShell/Git Bash), and Gradle was invoked instead as:
@@ -1551,6 +1553,55 @@ On 2026-09-30, work happened in other sessions and in this one. **Part 14's "Tes
 - **Scratch worktrees in this container** (not pushed; safe to delete):
   - `/home/user/CMS2-ts7` (`scratch/ts7-check`, a local merge of #9 onto `main`);
   - `/home/user/CMS2-sb4` (`scratch/sb4-check`, #1 plus a Gradle 8.14.3 wrapper, for scoping only).
+
+## Part 16 — Spring Boot 3.3 → 4.1 migration (2026-10-01, cloud sandbox)
+
+This was done on branch `claude/spring-boot-4` while the owner was away. **It is not merged; the owner reviews and merges.** It replaces the closed Dependabot PR #1.
+
+### Changes
+
+- **Gradle wrapper 8.10 → 8.14.3**, regenerated with `./gradlew wrapper`. `gradlew` stays executable, and `gradlew.bat` keeps the repo's LF line endings.
+- **`build.gradle`:**
+  - Boot 4.1.1;
+  - `spring-boot-starter-web` → `spring-boot-starter-webmvc`;
+  - `flyway-core` → **`spring-boot-starter-flyway`**. Boot 4 moved Flyway's auto-configuration into this starter; without it, migrations silently stop running at startup.
+  - springdoc 2.6.0 → **3.1.1** (built against Boot 4.1.0);
+  - new test starters `spring-boot-starter-webmvc-test` and `spring-boot-starter-security-test`.
+- **Production code:** one import. `ApiErrorController` now implements `org.springframework.boot.webmvc.error.ErrorController`. The `RateLimitingFilter`'s private Jackson 2 `ObjectMapper` is unchanged; it still works.
+- **Tests:** 47 files, all mechanical. `@MockBean` → `@MockitoBean` (Spring Framework 7's `org.springframework.test.context.bean.override.mockito`); every use was a test-class field, which is what `@MockitoBean` supports. The `@WebMvcTest`/`@AutoConfigureMockMvc` imports moved to `org.springframework.boot.webmvc.test.autoconfigure`.
+- **`application.yml`: `spring.jackson.use-jackson2-defaults: true`.**
+  - Boot 4 uses Jackson 3, and its `FAIL_ON_NULL_FOR_PRIMITIVES` default made a request body that omitted a primitive field fail with 400. For example, the front-desk walk-in request omits `confirmDuplicate`. This broke 3 integration tests (`QueueSendInCompleteTest`, `WalkInLineLifecycleTest`, `RejectedClinicBookingRefusalTest.walkInIsRefused`).
+  - The setting restores Boot 3's exact JSON behaviour for every client. Adopting Jackson 3 defaults would be a separate decision.
+- **`.claude/launch.json`:** both backend configurations now run `./backend/gradlew.bat -p backend bootRun` instead of the standalone `gradle-8.10`.
+  - **Not testable from the cloud sandbox.** On first use the wrapper downloads Gradle 8.14.3.
+  - If that fails on the Windows machine, extract Gradle 8.14.3 the same way 8.10 was extracted, and point the configuration at it.
+- **README:** the tech stack now says Spring Boot 4.1.
+
+### Verification (cloud sandbox, Docker 29.3.1, Testcontainers 2.0.5)
+
+- **Build:** compile has 0 errors and 0 warnings (main and test), and `spotlessCheck` is clean.
+- **Full backend suite: 1,071 tests, 1,070 passed, 0 failed, 1 skipped (18m 20s).** The skip is `SessionAvailabilityIntegrationTest.todaysElapsedSlotIsUnlisted…`, which by design runs only between 02:30 and 21:00 in the JVM's clock; the run was at about 01:30 UTC. Main's baseline is 1,071/0.
+- **Runtime:** the boot jar was started against a fresh Postgres 16.
+  - **Database:** Flyway migrated an empty schema V1 → **V41** (41 rows, all successful), Hibernate `validate` passed, health was `UP`, and there were 0 ERROR log lines. The only WARNs were springdoc's "docs endpoint enabled" notices (known SEC-09).
+  - **Logins:** a patient (signup → login → `GET /patients/bookings`), a ClinicAdmin (register → `/staff/login` → `GET /clinics/{id}/staff`) and the Super Admin (`/staff/login` with the env credentials → `GET /admin/clinics`) all returned **200**.
+  - **Access control:**
+    - every cross-realm token and every missing token returned **401**, including an unmapped `/clinics/{id}/x`;
+    - `/discovery/cities` returned 200;
+    - CORS preflights returned 403 for a foreign origin and 200 for `localhost:5173`;
+    - `/actuator/env` returned 403, and validation errors keep the coded `{error, message}` body.
+
+### Found along the way (pre-existing, not Spring Boot)
+
+- **`SlotCompletionServiceTest` fails between 00:00 and 01:00 in the JVM's clock** (05:30–06:30 IST when the clock is UTC). It builds the slot start as `LocalTime.now().minusHours(1)` on today's date, which wraps to 23:xx. 3 tests then hit `SlotNotYetStartedException`. They pass outside that hour, and the fix is to use `LocalDateTime.now().minusHours(1)`. This is the same family of problem as the "today's 09:00 slots" fixtures.
+
+### Still open after this
+
+- Merge this PR and confirm CI on `main`.
+- Confirm the Windows launch configuration starts the backend.
+- Fix the `SlotCompletionServiceTest` midnight wrap.
+- Convergence passes for 065, 066 and 067.
+- 068 (cancellation vs. 067's session lock).
+- Owner decisions: SEC-03, PB-005, and the `NVD_API_KEY` secret.
 
 ## Reference
 
