@@ -20,15 +20,25 @@ export type SignupPatientErrorBody =
   | { error: 'EMAIL_ALREADY_IN_USE'; message: string }
   | { error: 'MISSING_REQUIRED_FIELD'; field: string; message?: string }
   | { error: 'SIGNUP_FAILED'; message?: string }
+  // 071-readable-rate-limit: the shared public-endpoint throttle (047).
+  | { error: 'RATE_LIMIT_EXCEEDED'; message?: string }
 
 export class SignupPatientApiError extends Error {
   readonly body: SignupPatientErrorBody
+  // Seconds from the Retry-After header of a 429, when the browser could read it.
+  readonly retryAfterSeconds?: number
 
-  constructor(body: SignupPatientErrorBody) {
+  constructor(body: SignupPatientErrorBody, retryAfterSeconds?: number) {
     super(body.message ?? body.error)
     this.name = 'SignupPatientApiError'
     this.body = body
+    this.retryAfterSeconds = retryAfterSeconds
   }
+}
+
+function retryAfterSecondsOf(response: Response): number | undefined {
+  const seconds = Number.parseInt(response.headers.get('Retry-After') ?? '', 10)
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined
 }
 
 export async function signupPatient(
@@ -42,7 +52,7 @@ export async function signupPatient(
 
   if (!response.ok) {
     const body = (await response.json()) as SignupPatientErrorBody
-    throw new SignupPatientApiError(body)
+    throw new SignupPatientApiError(body, retryAfterSecondsOf(response))
   }
 
   return (await response.json()) as SignupPatientResponse
