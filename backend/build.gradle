@@ -44,7 +44,7 @@ dependencies {
 
     // Interactive OpenAPI/Swagger docs (served at /docs, raw spec at /api-docs - see
     // application.yml's springdoc.* properties and com.cms.common.OpenApiConfig).
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.2.0'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     // Boot 4: @WebMvcTest/@AutoConfigureMockMvc live in the webmvc test module, and
